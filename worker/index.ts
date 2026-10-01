@@ -732,25 +732,38 @@ export default {
 
         let recipientId = String(body.user_id || "").trim();
         const recipientEmail = normalizeEmail(body.recipient_email);
+        let recipientCreated = false;
+        let temporaryPassword = "";
 
         if (recipientId) {
-          const recipient: any = await env.DB.prepare("SELECT id,email FROM users WHERE id=? AND status='active' LIMIT 1").bind(recipientId).first();
-          if (!recipient) return json({ error: "Selected user is not active." }, { status: 400 });
+          const recipient: any = await env.DB.prepare("SELECT id,email,status FROM users WHERE id=? LIMIT 1").bind(recipientId).first();
+          if (!recipient) return json({ error: "Selected user was not found." }, { status: 400 });
           if (recipientEmail && normalizeEmail(recipient.email) !== recipientEmail) {
             return json({ error: "The selected user and client email do not match." }, { status: 400 });
           }
-        } else if (recipientEmail) {
-          const recipient: any = await env.DB.prepare("SELECT id FROM users WHERE email=? AND status='active' LIMIT 1").bind(recipientEmail).first();
-          if (!recipient) {
-            return json({ error: "No active TaalLab user exists for that email. Create the client account first." }, { status: 400 });
+          if (recipient.status !== "active") {
+            await env.DB.prepare("UPDATE users SET status='active',updated_at=? WHERE id=?").bind(created, recipient.id).run();
           }
-          recipientId = String(recipient.id);
-        } else {
-          return json({ error: "Select a client user or enter a client email." }, { status: 400 });
+        } else if (recipientEmail) {
+          const existing: any = await env.DB.prepare("SELECT id,status FROM users WHERE email=? LIMIT 1").bind(recipientEmail).first();
+          if (existing) {
+            recipientId = String(existing.id);
+            if (existing.status !== "active") {
+              await env.DB.prepare("UPDATE users SET status='active',updated_at=? WHERE id=?").bind(created, recipientId).run();
+            }
+          } else {
+            temporaryPassword = randomToken(12);
+            const hash = await hashPassword(temporaryPassword);
+            recipientId = randomToken(16);
+            await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status) VALUES(?,?,?,?,?,?,?)")
+              .bind(recipientId, recipientEmail, hash, "user", created, created, "active")
+              .run();
+            recipientCreated = true;
+          }
         }
 
         await env.DB.prepare("INSERT INTO transfers(id,created_at,expires_at,message,total_size,file_count,status,user_id) VALUES(?,?,?,?,?,?,?,?)")
-          .bind(transferId, created, expires, String(body.message || "").slice(0, 4000), total, list.length, "active", recipientId)
+          .bind(transferId, created, expires, String(body.message || "").slice(0, 4000), total, list.length, "active", recipientId || null)
           .run();
 
         const result = [];
@@ -761,8 +774,6 @@ export default {
           const safeName = String(f.name || "file").replace(/[^a-zA-Z0-9._-]/g, "_");
           const mimeType = String(f.type || "application/octet-stream");
           const size = Number(f.size || 0);
-          const uploadUrl = await createDriveUploadSession(env, driveFileId, safeName, mimeType, size, folderId);
-
           await env.DB.prepare(`INSERT INTO files(id,transfer_id,original_name,storage_key,mime_type,size,created_at,expires_at,download_token,status)
             VALUES(?,?,?,?,?,?,?,?,?,?)`)
             .bind(fileId, transferId, String(f.name || safeName), driveFileId, mimeType, size, created, expires, token, "active")
@@ -774,12 +785,49 @@ export default {
             size,
             type: mimeType,
             token,
-            uploadUrl,
+            uploadUrl: `${origin(env)}/api/admin/files/${fileId}/upload`,
             uploadMethod: "PUT",
           });
         }
 
-        return json({ transferId, files: result });
+        return json({
+          transferId,
+          files: result,
+          recipient: recipientId ? {
+            email: recipientEmail || null,
+            userCreated: recipientCreated,
+            temporaryPassword: recipientCreated ? temporaryPassword : null,
+          } : null,
+        });
+      }
+
+      const adminFileUpload = url.pathname.match(/^\/api\/admin\/files\/([^/]+)\/upload$/);
+      if (adminFileUpload && req.method === "PUT") {
+        await requireAdmin(req, env);
+        const fileId = adminFileUpload[1];
+        const file: any = await env.DB.prepare(`SELECT f.*,t.status AS transfer_status
+          FROM files f JOIN transfers t ON t.id=f.transfer_id
+          WHERE f.id=? LIMIT 1`).bind(fileId).first();
+        if (!file || file.status !== "active" || file.transfer_status !== "active" || Number(file.expires_at) <= now()) {
+          return json({ error: "Upload target is not available." }, { status: 404 });
+        }
+        const folderId = await ensureDriveFolder(env);
+        const uploadUrl = await createDriveUploadSession(
+          env,
+          String(file.storage_key),
+          String(file.original_name || "file").replace(/[^a-zA-Z0-9._-]/g, "_"),
+          String(file.mime_type || "application/octet-stream"),
+          Number(file.size || 0),
+          folderId,
+        );
+        const headers = new Headers();
+        headers.set("Content-Type", String(file.mime_type || "application/octet-stream"));
+        headers.set("Content-Length", String(file.size || 0));
+        const response = await fetch(uploadUrl, { method: "PUT", headers, body: req.body });
+        return new Response(response.body, {
+          status: response.status,
+          headers: { "content-type": response.headers.get("content-type") || "application/json" },
+        });
       }
 
       const complete = url.pathname.match(/^\/api\/admin\/transfers\/([^/]+)\/complete$/);

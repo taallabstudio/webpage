@@ -374,6 +374,7 @@ function Upload({onDone}) {
   const [uploading,setUploading]=useState(false);
   useEffect(()=>{api("/admin/users").then(d=>setRecipients((d.users||[]).filter(u=>u.status==="active"))).catch(()=>{})},[]);
   const [created,setCreated]=useState(null);
+  const [recipientInfo,setRecipientInfo]=useState(null);
   const [progress,setProgress]=useState({done:0,total:0,active:""});
   const addFiles=e=>setFiles(prev=>[...prev,...Array.from(e.target.files||[])].map((f,i)=>f.id?f:Object.assign(f,{id:crypto.randomUUID()})));
   const drop=e=>{e.preventDefault();setFiles(prev=>[...prev,...Array.from(e.dataTransfer.files||[])].map(f=>Object.assign(f,{id:crypto.randomUUID()})))};
@@ -382,6 +383,7 @@ function Upload({onDone}) {
     setUploading(true);
     try{
       const init=await api("/admin/transfers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,user_id:recipientId||null,recipient_email:recipientEmail.trim(),files:files.map(f=>({name:f.name,size:f.size,type:f.type}))})});
+      setRecipientInfo(init.recipient||null);
       let done=0;
       setProgress({done:0,total:init.files.length,active:"Preparing upload…"});
       for(let i=0;i<init.files.length;i++){
@@ -393,7 +395,7 @@ function Upload({onDone}) {
           xhr.open("PUT",item.uploadUrl);
           xhr.setRequestHeader("Content-Type",file.type||"application/octet-stream");
           xhr.upload.onprogress=e=>{ if(e.lengthComputable) setProgress({done,total:init.files.length,active:`${item.name} — ${Math.round(e.loaded/e.total*100)}%`}); };
-          xhr.onload=()=>xhr.status>=200&&xhr.status<300?resolve():reject(new Error(`Upload failed for ${item.name} (${xhr.status})`));
+          xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300) resolve(); else reject(new Error(`Upload failed for ${item.name} (${xhr.status})`));};
           xhr.onerror=()=>reject(new Error(`Upload failed for ${item.name}`));
           xhr.send(file);
         });
@@ -404,7 +406,7 @@ function Upload({onDone}) {
     }catch(e){alert(e.message)}finally{setUploading(false)}
   }
   if(created) return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">TRANSFER CREATED</span><h1>Ready to send</h1><p>Your TaalLab transfer is live for the configured expiration window.</p></div></div>
-    <div className="created-card"><div className="success-large"><Check/></div><h2>Transfer Created</h2><label>Transfer Link<div className="copy-row"><input readOnly value={created.transferUrl}/><button className="ghost-btn" onClick={()=>navigator.clipboard.writeText(created.transferUrl)}><Copy/> Copy Link</button></div></label>
+    <div className="created-card"><div className="success-large"><Check/></div><h2>Transfer Created</h2>{recipientInfo?.userCreated&&<div className="success-pill" style={{marginBottom:16}}>Client account created for {recipientInfo.email}. Temporary password: <strong>{recipientInfo.temporaryPassword}</strong></div>}{!recipientInfo&&<div className="muted" style={{marginBottom:16}}>Link-only transfer — no client account was assigned.</div>}<label>Transfer Link<div className="copy-row"><input readOnly value={created.transferUrl}/><button className="ghost-btn" onClick={()=>navigator.clipboard.writeText(created.transferUrl)}><Copy/> Copy Link</button></div></label>
       <h3>Files</h3>{created.files.map(f=><div className="created-file" key={f.id}><IconFor kind={f.kind}/><div><strong>{f.name}</strong><small>{formatBytes(f.size)} • Expires {fmtDate(f.expires_at)}</small></div><button className="ghost-btn" onClick={()=>navigator.clipboard.writeText(f.downloadUrl)}><Link2/> Copy link</button></div>)}
       <button className="primary-btn" onClick={onDone}>Back to dashboard</button>
     </div></div>;
@@ -412,10 +414,10 @@ function Upload({onDone}) {
     <div className="upload-grid"><section className="panel upload-panel"><div className="dropzone" onDragOver={e=>e.preventDefault()} onDrop={drop}><UploadCloud/><h2>Drop files here</h2><p>or choose multiple files from your computer</p><label className="primary-btn"><Plus/> Select files<input hidden type="file" multiple onChange={addFiles}/></label><small>Files go directly to private R2 storage.</small></div>
       {!!files.length&&<div className="upload-files">{files.map(f=><div className="upload-file" key={f.id}><File/><div><strong>{f.name}</strong><small>{formatBytes(f.size)}</small></div><button className="icon-btn" onClick={()=>setFiles(files.filter(x=>x.id!==f.id))}><X/></button></div>)}</div>}
     </section><section className="panel message-panel">
-      <label>Client email<input type="email" list="client-users" value={recipientEmail} placeholder="client@example.com" onChange={e=>{setRecipientEmail(e.target.value);setRecipientId("")}} required/><datalist id="client-users">{recipients.map(u=><option key={u.id} value={u.email}>{u.email}</option>)}</datalist></label>
-      <label>Select existing user<select value={recipientId} onChange={e=>{const id=e.target.value;setRecipientId(id);const match=recipients.find(u=>u.id===id);if(match)setRecipientEmail(match.email)}}><option value="">Type email above or select a user…</option>{recipients.map(u=><option key={u.id} value={u.id}>{u.email}{u.role==="admin"?" (Admin)":""}</option>)}</select></label>
-      <small className="muted">The email must belong to an active TaalLab user. Clients can receive files only; they cannot create transfers.</small>
-      <label>Client message<textarea rows="8" placeholder="Add a message for your client…" value={message} onChange={e=>setMessage(e.target.value)}/></label><div className="upload-summary"><span>Expiration</span><strong>7 days after upload</strong><span>Files</span><strong>{files.length}</strong><span>Total size</span><strong>{formatBytes(files.reduce((n,f)=>n+f.size,0))}</strong></div><button className="primary-btn full" disabled={uploading||!files.length||!recipientEmail.trim()} onClick={upload}>{uploading?<><RefreshCw className="spin"/> {progress.active||"Uploading…"} ({progress.done}/{progress.total})</>:<><UploadCloud/> Create transfer</>}</button></section></div>
+      <label>Client email <span className="muted">(optional)</span><input type="email" list="client-users" value={recipientEmail} placeholder="client@example.com — leave blank for link only" onChange={e=>{setRecipientEmail(e.target.value);setRecipientId("")}}/><datalist id="client-users">{recipients.map(u=><option key={u.id} value={u.email}>{u.email}</option>)}</datalist></label>
+      <label>Select existing user <span className="muted">(optional)</span><select value={recipientId} onChange={e=>{const id=e.target.value;setRecipientId(id);const match=recipients.find(u=>u.id===id);if(match)setRecipientEmail(match.email)}}><option value="">No account / enter email manually…</option>{recipients.map(u=><option key={u.id} value={u.id}>{u.email}{u.role==="admin"?" (Admin)":""}</option>)}</select></label>
+      <small className="muted">Email is optional. If you enter an email, an existing account is reused (and reactivated if disabled); if it does not exist, a receive-only user account is created automatically. Leave it blank for a link-only transfer. Clients can receive files only; they cannot create transfers.</small>
+      <label>Client message<textarea rows="8" placeholder="Add a message for your client…" value={message} onChange={e=>setMessage(e.target.value)}/></label><div className="upload-summary"><span>Expiration</span><strong>7 days after upload</strong><span>Files</span><strong>{files.length}</strong><span>Total size</span><strong>{formatBytes(files.reduce((n,f)=>n+f.size,0))}</strong></div><button className="primary-btn full" disabled={uploading||!files.length} onClick={upload}>{uploading?<><RefreshCw className="spin"/> {progress.active||"Uploading…"} ({progress.done}/{progress.total})</>:<><UploadCloud/> Create transfer</>}</button></section></div>
   </div>;
 }
 
