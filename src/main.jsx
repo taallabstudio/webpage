@@ -395,7 +395,7 @@ function Upload({onDone}) {
           xhr.open("PUT",item.uploadUrl);
           xhr.setRequestHeader("Content-Type",file.type||"application/octet-stream");
           xhr.upload.onprogress=e=>{ if(e.lengthComputable) setProgress({done,total:init.files.length,active:`${item.name} — ${Math.round(e.loaded/e.total*100)}%`}); };
-          xhr.onload=()=>xhr.status>=200&&xhr.status<300?resolve():reject(new Error(`Upload failed for ${item.name} (${xhr.status})`));
+          xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300) resolve(); else reject(new Error(`Upload failed for ${item.name} (${xhr.status})`));};
           xhr.onerror=()=>reject(new Error(`Upload failed for ${item.name}`));
           xhr.send(file);
         });
