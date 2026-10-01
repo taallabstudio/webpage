@@ -732,25 +732,38 @@ export default {
 
         let recipientId = String(body.user_id || "").trim();
         const recipientEmail = normalizeEmail(body.recipient_email);
+        let recipientCreated = false;
+        let temporaryPassword = "";
 
         if (recipientId) {
-          const recipient: any = await env.DB.prepare("SELECT id,email FROM users WHERE id=? AND status='active' LIMIT 1").bind(recipientId).first();
-          if (!recipient) return json({ error: "Selected user is not active." }, { status: 400 });
+          const recipient: any = await env.DB.prepare("SELECT id,email,status FROM users WHERE id=? LIMIT 1").bind(recipientId).first();
+          if (!recipient) return json({ error: "Selected user was not found." }, { status: 400 });
           if (recipientEmail && normalizeEmail(recipient.email) !== recipientEmail) {
             return json({ error: "The selected user and client email do not match." }, { status: 400 });
           }
-        } else if (recipientEmail) {
-          const recipient: any = await env.DB.prepare("SELECT id FROM users WHERE email=? AND status='active' LIMIT 1").bind(recipientEmail).first();
-          if (!recipient) {
-            return json({ error: "No active TaalLab user exists for that email. Create the client account first." }, { status: 400 });
+          if (recipient.status !== "active") {
+            await env.DB.prepare("UPDATE users SET status='active',updated_at=? WHERE id=?").bind(created, recipient.id).run();
           }
-          recipientId = String(recipient.id);
-        } else {
-          return json({ error: "Select a client user or enter a client email." }, { status: 400 });
+        } else if (recipientEmail) {
+          const existing: any = await env.DB.prepare("SELECT id,status FROM users WHERE email=? LIMIT 1").bind(recipientEmail).first();
+          if (existing) {
+            recipientId = String(existing.id);
+            if (existing.status !== "active") {
+              await env.DB.prepare("UPDATE users SET status='active',updated_at=? WHERE id=?").bind(created, recipientId).run();
+            }
+          } else {
+            temporaryPassword = randomToken(12);
+            const hash = await hashPassword(temporaryPassword);
+            recipientId = randomToken(16);
+            await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status) VALUES(?,?,?,?,?,?,?)")
+              .bind(recipientId, recipientEmail, hash, "user", created, created, "active")
+              .run();
+            recipientCreated = true;
+          }
         }
 
         await env.DB.prepare("INSERT INTO transfers(id,created_at,expires_at,message,total_size,file_count,status,user_id) VALUES(?,?,?,?,?,?,?,?)")
-          .bind(transferId, created, expires, String(body.message || "").slice(0, 4000), total, list.length, "active", recipientId)
+          .bind(transferId, created, expires, String(body.message || "").slice(0, 4000), total, list.length, "active", recipientId || null)
           .run();
 
         const result = [];
@@ -779,7 +792,15 @@ export default {
           });
         }
 
-        return json({ transferId, files: result });
+        return json({
+          transferId,
+          files: result,
+          recipient: recipientId ? {
+            email: recipientEmail || null,
+            userCreated: recipientCreated,
+            temporaryPassword: recipientCreated ? temporaryPassword : null,
+          } : null,
+        });
       }
 
       const complete = url.pathname.match(/^\/api\/admin\/transfers\/([^/]+)\/complete$/);
