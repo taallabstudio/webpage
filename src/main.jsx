@@ -128,18 +128,129 @@ function Preview({file,onClose}) {
 }
 
 function Login({onLogin}) {
+  const [email,setEmail]=useState("");
   const [password,setPassword]=useState("");
   const [error,setError]=useState("");
+  const [setup,setSetup]=useState(false);
+  const [setupSecret,setSetupSecret]=useState("");
   async function submit(e) {
     e.preventDefault(); setError("");
-    try { await api("/admin/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})}); onLogin(); }
-    catch(e){setError(e.message)}
+    try {
+      const body=setup?{email,password,setup_secret:setupSecret}:{email,password};
+      await api(setup?"/auth/setup":"/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      onLogin();
+    } catch(e){setError(e.message)}
   }
   return <div className="login-page"><div className="login-card">
-    <Logo/><div className="login-icon"><ShieldCheck/></div><h1>Admin sign in</h1><p>Manage TaalLab transfers securely.</p>
-    <form onSubmit={submit}><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoFocus/></label>
-    {error && <div className="error-box">{error}</div>}<button className="primary-btn full">Sign in</button></form>
+    <Logo/><div className="login-icon"><ShieldCheck/></div>
+    <h1>{setup?"Create admin account":"Sign in"}</h1>
+    <p>{setup?"Set up the first TaalLab administrator.":"Manage TaalLab transfers securely."}</p>
+    <form onSubmit={submit}>
+      <label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus required/></label>
+      {setup&&<label>Setup secret<input type="password" value={setupSecret} onChange={e=>setSetupSecret(e.target.value)} required/></label>}
+      <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} minLength={8} required/></label>
+      {error&&<div className="error-box">{error}</div>}
+      <button className="primary-btn full">{setup?"Create admin & sign in":"Sign in"}</button>
+    </form>
+    <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSetup(v=>!v);setError("")}}>
+      {setup?"Back to sign in":"First-time setup"}
+    </button>
   </div></div>;
+}
+
+function Admin({initialUpload=false}) {
+  const [authed,setAuthed]=useState(null);
+  const [user,setUser]=useState(null);
+  const [page,setPage]=useState(initialUpload ? "upload" : "dashboard");
+  const [stats,setStats]=useState(null);
+  const [transfers,setTransfers]=useState([]);
+  const [selected,setSelected]=useState(null);
+
+  async function refresh(){
+    try {
+      const me=await api("/auth/me");
+      if(!me.authenticated){setAuthed(false);return;}
+      if(me.user.role!=="admin"){setAuthed(false);return;}
+      setUser(me.user);
+      const d=await api("/admin/overview");
+      setStats(d.stats); setTransfers(d.transfers); setAuthed(true);
+    } catch { setAuthed(false); }
+  }
+  useEffect(()=>{refresh()},[]);
+  if(authed===null) return <div className="loading"><RefreshCw className="spin"/> Checking session…</div>;
+  if(!authed) return <Login onLogin={refresh}/>;
+
+  async function logout(){await api("/auth/logout",{method:"POST"});setAuthed(false);setUser(null)}
+  return <div className="admin-layout">
+    <aside className="sidebar"><Logo/><div className="side-links">
+      <button className={page==="dashboard"?"active":""} onClick={()=>setPage("dashboard")}><Gauge/> Dashboard</button>
+      <button className={page==="transfers"?"active":""} onClick={()=>setPage("transfers")}><FolderOpen/> Transfers</button>
+      <button className={page==="upload"?"active":""} onClick={()=>setPage("upload")}><UploadCloud/> New Transfer</button>
+      <button className={page==="users"?"active":""} onClick={()=>setPage("users")}><UserRound/> Users</button>
+      <button className={page==="settings"?"active":""} onClick={()=>setPage("settings")}><Settings/> Account</button>
+    </div><div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div><button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
+    <main className="admin-main">
+      <div className="admin-mobile-head"><Logo/><button><Menu/></button></div>
+      {page==="dashboard"&&<Dashboard stats={stats} transfers={transfers} onOpen={setSelected}/>}
+      {page==="transfers"&&<Transfers transfers={transfers} onOpen={setSelected}/>}
+      {page==="upload"&&<Upload onDone={()=>{setPage("dashboard");refresh()}}/>}
+      {page==="users"&&<UserManagement currentUser={user}/>}
+      {page==="settings"&&<AccountSettings user={user} onPasswordChanged={refresh}/>}
+      {selected&&<TransferDetail transfer={selected} onClose={()=>setSelected(null)} onChanged={refresh}/>}
+    </main>
+  </div>;
+}
+
+function UserManagement({currentUser}) {
+  const [users,setUsers]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [form,setForm]=useState({email:"",password:"",role:"user"});
+  const [error,setError]=useState("");
+  async function load(){try{const d=await api("/admin/users");setUsers(d.users)}catch(e){setError(e.message)}finally{setLoading(false)}}
+  useEffect(()=>{load()},[]);
+  async function create(e){
+    e.preventDefault();setError("");
+    try{await api("/admin/users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});setForm({email:"",password:"",role:"user"});load()}catch(e){setError(e.message)}
+  }
+  async function update(id,body){
+    try{await api("/admin/users/"+id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});load()}catch(e){setError(e.message)}
+  }
+  return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">ADMINISTRATION</span><h1>Users</h1><p>Create accounts and manage passwords, roles and access.</p></div></div>
+    <section className="panel" style={{padding:24}}>
+      <h2>Create user</h2>
+      <form onSubmit={create} style={{display:"grid",gridTemplateColumns:"1.3fr 1fr .7fr auto",gap:12,alignItems:"end"}}>
+        <label>Email<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} required/></label>
+        <label>Temporary password<input type="password" minLength={8} value={form.password} onChange={e=>setForm({...form,password:e.target.value})} required/></label>
+        <label>Role<select value={form.role} onChange={e=>setForm({...form,role:e.target.value})}><option value="user">User</option><option value="admin">Admin</option></select></label>
+        <button className="primary-btn">Create</button>
+      </form>
+      {error&&<div className="error-box" style={{marginTop:14}}>{error}</div>}
+    </section>
+    <section className="panel"><div className="panel-head"><div><h2>Accounts</h2><p>{users.length} account{users.length===1?"":"s"}</p></div></div>
+      {loading?<div className="loading">Loading…</div>:<div className="table-wrap"><table><thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Password</th><th></th></tr></thead><tbody>
+        {users.map(u=><tr key={u.id}><td>{u.email}</td><td><select value={u.role} disabled={u.id===currentUser?.id} onChange={e=>update(u.id,{role:e.target.value})}><option value="user">User</option><option value="admin">Admin</option></select></td><td><button className="ghost-btn" disabled={u.id===currentUser?.id} onClick={()=>update(u.id,{status:u.status==="active"?"disabled":"active"})}>{u.status}</button></td><td><button className="ghost-btn" onClick={()=>{const p=prompt("Enter a new password (minimum 8 characters):");if(p)update(u.id,{password:p})}}>Change password</button></td><td>{u.id===currentUser?.id?<span className="muted">You</span>:null}</td></tr>)}
+      </tbody></table></div>}
+    </section>
+  </div>;
+}
+
+function AccountSettings({user,onPasswordChanged}) {
+  const [currentPassword,setCurrentPassword]=useState("");
+  const [newPassword,setNewPassword]=useState("");
+  const [message,setMessage]=useState("");
+  const [error,setError]=useState("");
+  async function change(e){
+    e.preventDefault();setMessage("");setError("");
+    try{await api("/account/password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({current_password:currentPassword,new_password:newPassword})});setCurrentPassword("");setNewPassword("");setMessage("Password changed successfully.");onPasswordChanged()}catch(e){setError(e.message)}
+  }
+  return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">ACCOUNT</span><h1>Account</h1><p>{user?.email} • {user?.role}</p></div></div>
+    <section className="panel" style={{maxWidth:620,padding:24}}><h2>Change password</h2><form onSubmit={change}>
+      <label>Current password<input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} required/></label>
+      <label>New password<input type="password" minLength={8} value={newPassword} onChange={e=>setNewPassword(e.target.value)} required/></label>
+      {error&&<div className="error-box">{error}</div>}{message&&<div className="success-pill">{message}</div>}
+      <button className="primary-btn">Change password</button>
+    </form></section>
+  </div>;
 }
 
 function Admin({initialUpload=false}) {
@@ -281,5 +392,4 @@ function App(){
   return <Landing/>;
 }
 
-createRoot(document.getElementById("root")).render(<App/>);
 createRoot(document.getElementById("root")).render(<App/>);
