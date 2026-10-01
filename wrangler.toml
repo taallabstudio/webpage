@@ -12,6 +12,15 @@ database_name = "taallab-transfers"
 database_id = "73795e54-d7bc-4406-99b0-515c50396bb1"
 migrations_dir = "migrations"
 
+[previews.vars]
+APP_ORIGIN = "https://taallab.work"
+DEFAULT_EXPIRY_DAYS = "7"
+
+[[previews.d1_databases]]
+binding = "DB"
+database_name = "taallab-transfers-preview"
+database_id = "3d879502-b07a-46ba-9927-d844d15cb748"
+
 [triggers]
 crons = ["0 * * * *"]
 

@@ -2,7 +2,8 @@ export interface Env {
   DB: D1Database;
   APP_ORIGIN: string;
   DEFAULT_EXPIRY_DAYS: string;
-  ADMIN_PASSWORD_HASH: string;
+  ADMIN_PASSWORD_HASH?: string;
+  ADMIN_SETUP_SECRET?: string;
   SESSION_SECRET: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
@@ -83,6 +84,208 @@ async function passwordMatches(password: string, stored: string) {
   for (let i = 0; i < bits.length; i++) diff |= bits[i] ^ expected[i];
   return diff === 0;
 }
+const PASSWORD_ITERATIONS = 150000;
+
+async function hashPassword(password: string) {
+  if (password.length < 8) throw new Error("Password must be at least 8 characters.");
+  if (password.length > 256) throw new Error("Password is too long.");
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt, iterations: PASSWORD_ITERATIONS, hash: "SHA-256" },
+    key,
+    256,
+  ));
+  return `pbkdf2${PASSWORD_ITERATIONS}${base64Url(salt)}${base64Url(bits)}`;
+}
+
+async function ensureSupportSchema(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`).run();
+  const columns: any = await env.DB.prepare("PRAGMA table_info(files)").all();
+  const hasLastDownloaded = (columns.results || []).some((col: any) => col.name === "last_downloaded_at");
+  if (!hasLastDownloaded) {
+    await env.DB.prepare("ALTER TABLE files ADD COLUMN last_downloaded_at INTEGER").run();
+  }
+}
+
+function normalizeEmail(value: unknown) {
+  return String(value || "").trim().toLowerCase();
+}
+
+async function getSessionUser(req: Request, env: Env) {
+  const sid = parseCookie(req, "taallab_session");
+  if (!sid) return null;
+  const row: any = await env.DB.prepare(`SELECT u.id,u.email,u.role,u.status,u.created_at,u.updated_at
+    FROM sessions s JOIN users u ON u.id=s.user_id
+    WHERE s.id=? AND s.expires_at>? AND u.status='active' LIMIT 1`)
+    .bind(sid, now()).first();
+  return row || null;
+}
+
+async function requireUser(req: Request, env: Env) {
+  const user = await getSessionUser(req, env);
+  if (!user) throw json({ error: "Unauthorized" }, { status: 401 });
+  return user;
+}
+
+async function requireAdmin(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  if (user.role !== "admin") throw json({ error: "Forbidden" }, { status: 403 });
+  return user;
+}
+
+async function createUserSession(env: Env, userId: string) {
+  const id = await makeSession(env.SESSION_SECRET);
+  await env.DB.prepare("INSERT INTO sessions(id,user_id,created_at,expires_at) VALUES(?,?,?,?)")
+    .bind(id, userId, now(), now() + 7 * 86400).run();
+  return id;
+}
+
+async function authLogin(req: Request, env: Env) {
+  const body = await req.json().catch(() => ({}));
+  const email = normalizeEmail(body.email);
+  const password = String(body.password || "");
+  if (!email || !password) return json({ error: "Email and password are required." }, { status: 400 });
+
+  const user: any = await env.DB.prepare("SELECT id,email,password_hash,role,status FROM users WHERE email=? LIMIT 1")
+    .bind(email).first();
+
+  if (!user || user.status !== "active" || !(await passwordMatches(password, String(user.password_hash)))) {
+    return json({ error: "Invalid email or password." }, { status: 401 });
+  }
+
+  const sid = await createUserSession(env, user.id);
+  return json(
+    { ok: true, user: { id: user.id, email: user.email, role: user.role } },
+    { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400) } },
+  );
+}
+
+async function authLogout(req: Request, env: Env) {
+  const sid = parseCookie(req, "taallab_session");
+  if (sid) {
+    await env.DB.prepare("DELETE FROM sessions WHERE id=?").bind(sid).run();
+    await env.DB.prepare("DELETE FROM admin_sessions WHERE id=?").bind(sid).run().catch(() => {});
+  }
+  return json({ ok: true }, { headers: { "set-cookie": cookie("taallab_session", "", 0) } });
+}
+
+async function authSetup(req: Request, env: Env) {
+  const body = await req.json().catch(() => ({}));
+  const setupSecret = String(body.setup_secret || "");
+  const email = normalizeEmail(body.email);
+  const password = String(body.password || "");
+
+  if (!env.ADMIN_SETUP_SECRET) return json({ error: "Admin setup is not configured. Add ADMIN_SETUP_SECRET as a Worker secret first." }, { status: 503 });
+  if (setupSecret !== env.ADMIN_SETUP_SECRET) return json({ error: "Invalid setup secret." }, { status: 401 });
+  if (!email || !email.includes("@")) return json({ error: "Enter a valid email address." }, { status: 400 });
+  if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, { status: 400 });
+
+  const count: any = await env.DB.prepare("SELECT COUNT(*) n FROM users").first();
+  if (Number(count?.n || 0) > 0) return json({ error: "Initial setup has already been completed." }, { status: 409 });
+
+  const id = randomToken(16);
+  const hash = await hashPassword(password);
+  await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status) VALUES(?,?,?,?,?,?,?)")
+    .bind(id, email, hash, "admin", now(), now(), "active").run();
+
+  const sid = await createUserSession(env, id);
+  return json(
+    { ok: true, user: { id, email, role: "admin" } },
+    { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400) } },
+  );
+}
+
+async function currentUser(env: Env, req: Request) {
+  const user = await getSessionUser(req, env);
+  return user ? json({ authenticated: true, user }) : json({ authenticated: false });
+}
+
+async function changeOwnPassword(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  const body = await req.json().catch(() => ({}));
+  const currentPassword = String(body.current_password || "");
+  const newPassword = String(body.new_password || "");
+
+  const row: any = await env.DB.prepare("SELECT password_hash FROM users WHERE id=?").bind(user.id).first();
+  if (!row || !(await passwordMatches(currentPassword, String(row.password_hash)))) {
+    return json({ error: "Current password is incorrect." }, { status: 401 });
+  }
+
+  const hash = await hashPassword(newPassword);
+  await env.DB.prepare("UPDATE users SET password_hash=?,updated_at=? WHERE id=?").bind(hash, now(), user.id).run();
+  await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(user.id).run();
+
+  const sid = await createUserSession(env, user.id);
+  return json({ ok: true }, { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400) } });
+}
+
+async function listUsers(env: Env) {
+  const result = await env.DB.prepare("SELECT id,email,role,status,created_at,updated_at FROM users ORDER BY created_at DESC").all();
+  return json({ users: result.results });
+}
+
+async function createManagedUser(req: Request, env: Env) {
+  await requireAdmin(req, env);
+  const body = await req.json().catch(() => ({}));
+  const email = normalizeEmail(body.email);
+  const password = String(body.password || "");
+  const role = body.role === "admin" ? "admin" : "user";
+
+  if (!email || !email.includes("@")) return json({ error: "Enter a valid email address." }, { status: 400 });
+  if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, { status: 400 });
+
+  const existing: any = await env.DB.prepare("SELECT id FROM users WHERE email=? LIMIT 1").bind(email).first();
+  if (existing) return json({ error: "A user with that email already exists." }, { status: 409 });
+
+  const id = randomToken(16);
+  const hash = await hashPassword(password);
+  await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status) VALUES(?,?,?,?,?,?,?)")
+    .bind(id, email, hash, role, now(), now(), "active").run();
+
+  return json({ ok: true, user: { id, email, role, status: "active" } }, { status: 201 });
+}
+
+async function updateManagedUser(req: Request, env: Env, id: string) {
+  const admin = await requireAdmin(req, env);
+  const body = await req.json().catch(() => ({}));
+  const target: any = await env.DB.prepare("SELECT id,email,role,status FROM users WHERE id=?").bind(id).first();
+  if (!target) return json({ error: "User not found." }, { status: 404 });
+
+  const updates: string[] = [];
+  const values: any[] = [];
+
+  if (body.password !== undefined) {
+    const password = String(body.password || "");
+    if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, { status: 400 });
+    updates.push("password_hash=?");
+    values.push(await hashPassword(password));
+  }
+
+  if (body.status === "active" || body.status === "disabled") {
+    if (target.id === admin.id && body.status === "disabled") return json({ error: "You cannot disable your own admin account." }, { status: 400 });
+    updates.push("status=?");
+    values.push(body.status);
+  }
+
+  if (body.role === "user" || body.role === "admin") {
+    if (target.id === admin.id && body.role !== "admin") return json({ error: "You cannot remove your own admin role." }, { status: 400 });
+    updates.push("role=?");
+    values.push(body.role);
+  }
+
+  if (!updates.length) return json({ error: "Nothing to update." }, { status: 400 });
+
+  updates.push("updated_at=?");
+  values.push(now(), id);
+  await env.DB.prepare("UPDATE users SET " + updates.join(",") + " WHERE id=?").bind(...values).run();
+
+  if (body.password !== undefined || body.status === "disabled" || body.role === "user") {
+    await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(id).run();
+  }
+
+  return json({ ok: true });
+}
 
 async function makeSession(secret: string) {
   const data = new TextEncoder().encode(`${secret}.${randomToken(32)}`);
@@ -91,16 +294,8 @@ async function makeSession(secret: string) {
 }
 
 async function isAdmin(req: Request, env: Env) {
-  const sid = parseCookie(req, "taallab_session");
-  if (!sid) return false;
-  const row = await env.DB.prepare("SELECT id FROM admin_sessions WHERE id=? AND expires_at>? LIMIT 1")
-    .bind(sid, now())
-    .first();
-  return !!row;
-}
-
-async function requireAdmin(req: Request, env: Env) {
-  if (!(await isAdmin(req, env))) throw json({ error: "Unauthorized" }, { status: 401 });
+  const user = await getSessionUser(req, env);
+  return !!user && user.role === "admin";
 }
 
 async function deriveEncryptionKey(secret: string) {
@@ -142,18 +337,6 @@ async function setSetting(env: Env, key: string, value: string) {
   )
     .bind(key, value)
     .run();
-}
-
-async function login(req: Request, env: Env) {
-  const body = await req.json().catch(() => ({}));
-  if (!(await passwordMatches(String(body.password || ""), env.ADMIN_PASSWORD_HASH))) {
-    return json({ error: "Invalid password" }, { status: 401 });
-  }
-  const id = await makeSession(env.SESSION_SECRET);
-  await env.DB.prepare("INSERT INTO admin_sessions(id,created_at,expires_at) VALUES(?,?,?)")
-    .bind(id, now(), now() + 7 * 86400)
-    .run();
-  return json({ ok: true }, { headers: { "set-cookie": cookie("taallab_session", id, 7 * 86400) } });
 }
 
 async function googleLogin(req: Request, env: Env) {
@@ -453,6 +636,7 @@ async function cleanup(env: Env) {
     env.DB.prepare("UPDATE files SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?").bind(cutoff),
   ]);
 }
 
@@ -460,12 +644,23 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     try {
-      if (url.pathname === "/api/admin/login" && req.method === "POST") return login(req, env);
-      if (url.pathname === "/api/admin/logout" && req.method === "POST") {
-        const sid = parseCookie(req, "taallab_session");
-        if (sid) await env.DB.prepare("DELETE FROM admin_sessions WHERE id=?").bind(sid).run();
-        return json({ ok: true }, { headers: { "set-cookie": cookie("taallab_session", "", 0) } });
+      await ensureSupportSchema(env);
+      await ensureSupportSchema(env);
+
+      if (url.pathname === "/api/auth/setup" && req.method === "POST") return authSetup(req, env);
+      if ((url.pathname === "/api/auth/login" || url.pathname === "/api/admin/login") && req.method === "POST") return authLogin(req, env);
+      if ((url.pathname === "/api/auth/logout" || url.pathname === "/api/admin/logout") && req.method === "POST") return authLogout(req, env);
+      if (url.pathname === "/api/auth/me" && req.method === "GET") return currentUser(env, req);
+      if (url.pathname === "/api/account/password" && req.method === "POST") return changeOwnPassword(req, env);
+
+      if (url.pathname === "/api/admin/users" && req.method === "GET") {
+        await requireAdmin(req, env);
+        return listUsers(env);
       }
+      if (url.pathname === "/api/admin/users" && req.method === "POST") return createManagedUser(req, env);
+
+      const managedUser = url.pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
+      if (managedUser && req.method === "PATCH") return updateManagedUser(req, env, managedUser[1]);
 
       if (url.pathname === "/api/google/status" && req.method === "GET") {
         await requireAdmin(req, env);
