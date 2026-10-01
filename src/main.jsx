@@ -95,7 +95,7 @@ function TransferPage({id}) {
       </div>
       {data.message && <div className="message-box"><MessageSquare size={18}/><div><p>“{data.message}”</p><small>Attached to transfer package #{data.id}</small></div></div>}
       <div className="primary-actions">
-        <button className="primary-btn" onClick={async()=>{ const r=await api(`/transfers/${data.id}/download-all`); r.files.forEach((u,i)=>setTimeout(()=>{ const a=document.createElement("a"); a.href=u; a.rel="noopener"; document.body.appendChild(a); a.click(); a.remove(); }, i*450)); }}><ArrowDownToLine/> Download All ({data.totalSize})</button>
+        <button className="primary-btn" onClick={async()=>{ const r=await api(`/transfers/${data.id}/download-all`); r.files.forEach((u,i)=>setTimeout(()=>{ const a=document.createElement("a"); a.href=u; a.rel="noopener"; document.body.appendChild(a); a.click(); a.remove(); }, i*450)); }}><ArrowDownToLine/> Download All ({data.files.length})</button>
       </div>
       <div className="security-strip"><LockKeyhole size={15}/> Private transfer • Files expire automatically • Secure storage</div>
       <div className="manifest-head"><div><h3>Transfer Manifest</h3><small>Select items to preview or download</small></div></div>
@@ -389,6 +389,13 @@ function Upload({onDone}) {
       for(let i=0;i<init.files.length;i++){
         const item=init.files[i];
         const file=files[i];
+
+        if(item.reused){
+          done++;
+          setProgress({done,total:init.files.length,active:`${item.name} — reused existing Drive file`});
+          continue;
+        }
+
         setProgress({done,total:init.files.length,active:item.name});
         await new Promise((resolve,reject)=>{
           const xhr=new XMLHttpRequest();
@@ -430,7 +437,7 @@ function TransferDetail({transfer,onClose,onChanged}) {
     {detail.recipient_email&&<div className="message-box"><MessageSquare size={18}/><p><strong>Client:</strong> {detail.recipient_email}</p></div>}
     {detail.message&&<div className="message-box"><MessageSquare size={18}/><p>“{detail.message}”</p></div>}
     <div className="drawer-actions"><button className="ghost-btn" onClick={async()=>{const d=await api(`/admin/transfers/${detail.id}/extend`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({days:7})}); alert(`Extended to ${fmtDate(d.expires_at)}`); onChanged();}}><Clock3/> +7 days</button><button className="danger-btn" onClick={async()=>{if(!confirm("Delete this transfer and all of its files permanently?"))return; await api(`/admin/transfers/${detail.id}`,{method:"DELETE"}); onClose(); onChanged();}}><Trash2/> Delete transfer</button></div>
-    <h3>Files</h3><div className="detail-files">{detail.files.map(f=><div className="detail-file" key={f.id}><IconFor kind={f.kind}/><div className="file-info"><strong>{f.original_name}</strong><small>{formatBytes(f.size)} • {f.download_count} downloads • {f.last_downloaded_at?fmtDate(f.last_downloaded_at):"Never downloaded"}</small></div><button className="icon-btn" title="Copy link" onClick={()=>navigator.clipboard.writeText(f.downloadUrl)}><Link2/></button><a className="icon-btn" href={`/api/files/${f.download_token}/preview`} target="_blank"><Eye/></a></div>)}</div>
+    <h3>Files</h3><div className="detail-files">{detail.files.map(f=><div className="detail-file" key={f.id}><IconFor kind={f.kind}/><div className="file-info"><strong>{f.original_name}</strong><small>{formatBytes(f.size)} • {f.download_count} downloads • {f.last_downloaded_at?fmtDate(f.last_downloaded_at):"Never downloaded"}</small></div><a className="icon-btn" title="Open download page" href={`/d/${detail.id}`}><Link2/></a><a className="icon-btn" title="Preview file" href={`/api/files/${f.download_token}/preview`} target="_blank" rel="noopener noreferrer"><Eye/></a></div>)}</div>
   </div>;
 }
 
