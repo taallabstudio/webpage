@@ -2,7 +2,6 @@ export interface Env {
   DB: D1Database;
   APP_ORIGIN: string;
   DEFAULT_EXPIRY_DAYS: string;
-  ADMIN_PASSWORD_HASH?: string;
   ADMIN_SETUP_SECRET?: string;
   SESSION_SECRET: string;
   GOOGLE_CLIENT_ID: string;
@@ -178,11 +177,8 @@ async function authSetup(req: Request, env: Env) {
   const email = normalizeEmail(body.email);
   const password = String(body.password || "");
 
-  // Temporary bootstrap fallback: this is removed immediately after the first admin is created.
-  const setupAuthorized = setupSecret === "12345678"
-    || (env.ADMIN_SETUP_SECRET
-      ? setupSecret === env.ADMIN_SETUP_SECRET
-      : !!env.ADMIN_PASSWORD_HASH && await passwordMatches(setupSecret, env.ADMIN_PASSWORD_HASH));
+  if (!env.ADMIN_SETUP_SECRET) return json({ error: "Admin setup is not configured." }, { status: 503 });
+  const setupAuthorized = setupSecret === env.ADMIN_SETUP_SECRET;
   if (!setupAuthorized) return json({ error: "Invalid setup secret." }, { status: 401 });
   if (!email || !email.includes("@")) return json({ error: "Enter a valid email address." }, { status: 400 });
   if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, { status: 400 });
