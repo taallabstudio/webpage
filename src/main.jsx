@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ArrowDownToLine, ArrowLeft, Check, ChevronRight, Clock3, Copy, Download,
@@ -250,36 +251,6 @@ function AccountSettings({user,onPasswordChanged}) {
       {error&&<div className="error-box">{error}</div>}{message&&<div className="success-pill">{message}</div>}
       <button className="primary-btn">Change password</button>
     </form></section>
-  </div>;
-}
-
-function Admin({initialUpload=false}) {
-  const [authed,setAuthed]=useState(null);
-  const [page,setPage]=useState(initialUpload ? "upload" : "dashboard");
-  const [stats,setStats]=useState(null);
-  const [transfers,setTransfers]=useState([]);
-  const [selected,setSelected]=useState(null);
-
-  async function refresh(){ try { const d=await api("/admin/overview"); setStats(d.stats); setTransfers(d.transfers); setAuthed(true); } catch { setAuthed(false); } }
-  useEffect(()=>{refresh()},[]);
-  if (authed===null) return <div className="loading"><RefreshCw className="spin"/> Checking admin session…</div>;
-  if (!authed) return <Login onLogin={refresh}/>;
-
-  async function logout(){await api("/admin/logout",{method:"POST"});setAuthed(false)}
-  return <div className="admin-layout">
-    <aside className="sidebar"><Logo/><div className="side-links">
-      <button className={page==="dashboard"?"active":""} onClick={()=>setPage("dashboard")}><Gauge/> Dashboard</button>
-      <button className={page==="transfers"?"active":""} onClick={()=>setPage("transfers")}><FolderOpen/> Transfers</button>
-      <button className={page==="upload"?"active":""} onClick={()=>setPage("upload")}><UploadCloud/> New Transfer</button>
-      <button><HardDrive/> Storage</button><button><Settings/> Settings</button>
-    </div><button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
-    <main className="admin-main">
-      <div className="admin-mobile-head"><Logo/><button><Menu/></button></div>
-      {page==="dashboard" && <Dashboard stats={stats} transfers={transfers} onOpen={setSelected}/>}
-      {page==="transfers" && <Transfers transfers={transfers} onOpen={setSelected}/>}
-      {page==="upload" && <Upload onDone={()=>{setPage("dashboard");refresh()}}/>}
-      {selected && <TransferDetail transfer={selected} onClose={()=>setSelected(null)} onChanged={refresh}/>}
-    </main>
   </div>;
 }
 
