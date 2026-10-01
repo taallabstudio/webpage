@@ -98,7 +98,7 @@ async function hashPassword(password: string) {
     key,
     256,
   ));
-  return `pbkdf2${PASSWORD_ITERATIONS}${base64Url(salt)}${base64Url(bits)}`;
+  return `pbkdf2$${PASSWORD_ITERATIONS}$${base64Url(salt)}$${base64Url(bits)}`;
 }
 
 async function ensureSupportSchema(env: Env) {
@@ -648,7 +648,6 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     try {
-      await ensureSupportSchema(env);
       await ensureSupportSchema(env);
 
       if (url.pathname === "/api/auth/setup" && req.method === "POST") return authSetup(req, env);
