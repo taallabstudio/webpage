@@ -147,7 +147,7 @@ function Login({onLogin}) {
     <p>{setup?"Set up the first TaalLab administrator.":"Manage TaalLab transfers securely."}</p>
     <form onSubmit={submit}>
       <label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus required/></label>
-      {setup&&<label>Setup secret<input type="password" value={setupSecret} onChange={e=>setSetupSecret(e.target.value)} required/></label>}
+      {setup&&<label>{setup?"Setup secret / current admin password":"Setup secret"}<input type="password" value={setupSecret} onChange={e=>setSetupSecret(e.target.value)} required/></label>}
       <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} minLength={8} required/></label>
       {error&&<div className="error-box">{error}</div>}
       <button className="primary-btn full">{setup?"Create admin & sign in":"Sign in"}</button>
