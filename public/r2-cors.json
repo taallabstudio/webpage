@@ -1,0 +1,9 @@
+[
+  {
+    "AllowedOrigins": ["https://taallab.work", "https://www.taallab.work"],
+    "AllowedMethods": ["PUT", "GET", "HEAD"],
+    "AllowedHeaders": ["Content-Type"],
+    "ExposeHeaders": ["ETag", "Content-Length", "Content-Range"],
+    "MaxAgeSeconds": 3600
+  }
+]

@@ -1,0 +1,30 @@
+name = "taallab-transfer-api"
+main = "worker/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+APP_ORIGIN = "https://taallab.work"
+DEFAULT_EXPIRY_DAYS = "7"
+R2_ACCOUNT_ID = "REPLACE_WITH_CLOUDFLARE_ACCOUNT_ID"
+R2_BUCKET_NAME = "taallab-transfers"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "taallab-transfers"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "taallab-transfers"
+
+# If taallab.work DNS is proxied through Cloudflare, route only the backend
+# paths to this Worker while GitHub Pages continues serving the frontend.
+# Uncomment after adding the Worker route in Cloudflare:
+# routes = [
+#   { pattern = "taallab.work/api/*", zone_name = "taallab.work" },
+#   { pattern = "taallab.work/f/*", zone_name = "taallab.work" }
+# ]
+
+[triggers]
+crons = ["0 * * * *"]
