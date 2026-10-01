@@ -69,12 +69,14 @@ function fromBase64Url(s: string) {
 async function passwordMatches(password: string, stored: string) {
   const [scheme, iterations, saltText, hashText] = stored.split("$");
   if (scheme !== "pbkdf2" || !iterations || !saltText || !hashText) return false;
+  const iterationCount = Number(iterations);
+  if (!Number.isSafeInteger(iterationCount) || iterationCount < 1000 || iterationCount > 500000) return false;
   const salt = fromBase64Url(saltText);
   const expected = fromBase64Url(hashText);
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = new Uint8Array(
     await crypto.subtle.deriveBits(
-      { name: "PBKDF2", salt, iterations: Number(iterations), hash: "SHA-256" },
+      { name: "PBKDF2", salt, iterations: iterationCount, hash: "SHA-256" },
       key,
       256,
     ),
@@ -84,7 +86,7 @@ async function passwordMatches(password: string, stored: string) {
   for (let i = 0; i < bits.length; i++) diff |= bits[i] ^ expected[i];
   return diff === 0;
 }
-const PASSWORD_ITERATIONS = 150000;
+const PASSWORD_ITERATIONS = 50000;
 
 async function hashPassword(password: string) {
   if (password.length < 8) throw new Error("Password must be at least 8 characters.");
