@@ -774,8 +774,6 @@ export default {
           const safeName = String(f.name || "file").replace(/[^a-zA-Z0-9._-]/g, "_");
           const mimeType = String(f.type || "application/octet-stream");
           const size = Number(f.size || 0);
-          const uploadUrl = await createDriveUploadSession(env, driveFileId, safeName, mimeType, size, folderId);
-
           await env.DB.prepare(`INSERT INTO files(id,transfer_id,original_name,storage_key,mime_type,size,created_at,expires_at,download_token,status)
             VALUES(?,?,?,?,?,?,?,?,?,?)`)
             .bind(fileId, transferId, String(f.name || safeName), driveFileId, mimeType, size, created, expires, token, "active")
@@ -787,7 +785,7 @@ export default {
             size,
             type: mimeType,
             token,
-            uploadUrl,
+            uploadUrl: `${origin(env)}/api/admin/files/${fileId}/upload`,
             uploadMethod: "PUT",
           });
         }
@@ -800,6 +798,35 @@ export default {
             userCreated: recipientCreated,
             temporaryPassword: recipientCreated ? temporaryPassword : null,
           } : null,
+        });
+      }
+
+      const adminFileUpload = url.pathname.match(/^\/api\/admin\/files\/([^/]+)\/upload$/);
+      if (adminFileUpload && req.method === "PUT") {
+        await requireAdmin(req, env);
+        const fileId = adminFileUpload[1];
+        const file: any = await env.DB.prepare(`SELECT f.*,t.status AS transfer_status
+          FROM files f JOIN transfers t ON t.id=f.transfer_id
+          WHERE f.id=? LIMIT 1`).bind(fileId).first();
+        if (!file || file.status !== "active" || file.transfer_status !== "active" || Number(file.expires_at) <= now()) {
+          return json({ error: "Upload target is not available." }, { status: 404 });
+        }
+        const folderId = await ensureDriveFolder(env);
+        const uploadUrl = await createDriveUploadSession(
+          env,
+          String(file.storage_key),
+          String(file.original_name || "file").replace(/[^a-zA-Z0-9._-]/g, "_"),
+          String(file.mime_type || "application/octet-stream"),
+          Number(file.size || 0),
+          folderId,
+        );
+        const headers = new Headers();
+        headers.set("Content-Type", String(file.mime_type || "application/octet-stream"));
+        headers.set("Content-Length", String(file.size || 0));
+        const response = await fetch(uploadUrl, { method: "PUT", headers, body: req.body });
+        return new Response(response.body, {
+          status: response.status,
+          headers: { "content-type": response.headers.get("content-type") || "application/json" },
         });
       }
 
