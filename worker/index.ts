@@ -585,7 +585,12 @@ async function adminOverview(env: Env) {
     env.DB.prepare(`SELECT
       COALESCE(SUM(CASE WHEN status='active' THEN 1 ELSE 0 END),0) active_transfers,
       COALESCE(SUM(file_count),0) total_files,
-      COALESCE(SUM(total_size),0) storage
+      COALESCE((SELECT SUM(size) FROM (
+        SELECT storage_key, MAX(size) size
+        FROM files
+        WHERE status='active'
+        GROUP BY storage_key
+      )),0) storage
       FROM transfers WHERE status!='deleted'`).first(),
     env.DB.prepare(`SELECT t.*, u.email recipient_email, COALESCE(SUM(f.download_count),0) downloads
       FROM transfers t
@@ -665,6 +670,12 @@ async function cleanup(env: Env) {
     .all();
 
   for (const f of files.results as any[]) {
+    const refs: any = await env.DB.prepare(
+      "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND id!=?"
+    ).bind(f.storage_key, f.id).first();
+
+    if (Number(refs?.n || 0) > 0) continue;
+
     try {
       await trashDriveFile(env, f.storage_key);
     } catch (e) {
@@ -769,23 +780,49 @@ export default {
         const result = [];
         for (const f of list) {
           const fileId = randomToken(16);
-          const driveFileId = await generateDriveFileId(env);
           const token = randomToken(32);
-          const safeName = String(f.name || "file").replace(/[^a-zA-Z0-9._-]/g, "_");
+          const originalName = String(f.name || "file");
+          const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, "_");
           const mimeType = String(f.type || "application/octet-stream");
           const size = Number(f.size || 0);
+
+          // Reuse an existing active Drive file when the name, size and MIME type match.
+          // This keeps separate transfer records/download tokens while storing only one
+          // physical copy in Google Drive.
+          const existing: any = await env.DB.prepare(`SELECT storage_key
+            FROM files
+            WHERE original_name=? AND size=? AND mime_type=? AND status='active' AND expires_at>?
+            ORDER BY created_at DESC LIMIT 1`)
+            .bind(originalName, size, mimeType, created)
+            .first();
+
+          let driveFileId = "";
+          let reused = false;
+          if (existing?.storage_key) {
+            const meta: any = await driveFile(env, String(existing.storage_key));
+            if (meta && !meta.trashed) {
+              driveFileId = String(existing.storage_key);
+              reused = true;
+            }
+          }
+
+          if (!driveFileId) {
+            driveFileId = await generateDriveFileId(env);
+          }
+
           await env.DB.prepare(`INSERT INTO files(id,transfer_id,original_name,storage_key,mime_type,size,created_at,expires_at,download_token,status)
             VALUES(?,?,?,?,?,?,?,?,?,?)`)
-            .bind(fileId, transferId, String(f.name || safeName), driveFileId, mimeType, size, created, expires, token, "active")
+            .bind(fileId, transferId, originalName, driveFileId, mimeType, size, created, expires, token, "active")
             .run();
 
           result.push({
             id: fileId,
-            name: f.name,
+            name: originalName,
             size,
             type: mimeType,
             token,
-            uploadUrl: `${origin(env)}/api/admin/files/${fileId}/upload`,
+            reused,
+            uploadUrl: reused ? null : `${origin(env)}/api/admin/files/${fileId}/upload`,
             uploadMethod: "PUT",
           });
         }
@@ -860,9 +897,14 @@ export default {
       if (adminDelete && req.method === "DELETE") {
         await requireAdmin(req, env);
         const id = adminDelete[1];
-        const files = await env.DB.prepare("SELECT storage_key FROM files WHERE transfer_id=?").bind(id).all();
+        const files = await env.DB.prepare("SELECT id,storage_key FROM files WHERE transfer_id=?").bind(id).all();
         for (const f of files.results as any[]) {
-          try { await trashDriveFile(env, f.storage_key); } catch (e) { console.error(e); }
+          const refs: any = await env.DB.prepare(
+            "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND transfer_id!=?"
+          ).bind(f.storage_key, id).first();
+          if (Number(refs?.n || 0) === 0) {
+            try { await trashDriveFile(env, f.storage_key); } catch (e) { console.error(e); }
+          }
         }
         await env.DB.batch([
           env.DB.prepare("UPDATE files SET status='deleted' WHERE transfer_id=?").bind(id),
