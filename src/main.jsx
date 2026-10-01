@@ -264,7 +264,7 @@ function Admin({initialUpload=false}) {
       {page==="transfers"&&<Transfers transfers={transfers} onOpen={setSelected}/>}
       {page==="upload"&&<Upload onDone={()=>{setPage("dashboard");refresh()}}/>}
       {page==="users"&&<UserManagement currentUser={user}/>}
-      {page==="settings"&&<AccountSettings user={user} onPasswordChanged={refresh}/>}
+      {page==="settings"&&<AccountSettings user={user} onPasswordChanged={refresh} showGoogleDrive/>}
       {selected&&<TransferDetail transfer={selected} onClose={()=>setSelected(null)} onChanged={refresh}/>}
     </main>
   </div>;
@@ -303,7 +303,7 @@ function UserManagement({currentUser}) {
   </div>;
 }
 
-function AccountSettings({user,onPasswordChanged}) {
+function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [currentPassword,setCurrentPassword]=useState("");
   const [newPassword,setNewPassword]=useState("");
   const [message,setMessage]=useState("");
@@ -312,6 +312,13 @@ function AccountSettings({user,onPasswordChanged}) {
     e.preventDefault();setMessage("");setError("");
     try{await api("/account/password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({current_password:currentPassword,new_password:newPassword})});setCurrentPassword("");setNewPassword("");setMessage("Password changed successfully.");onPasswordChanged()}catch(e){setError(e.message)}
   }
+  const [driveConnected,setDriveConnected]=useState(null);
+  const [driveError,setDriveError]=useState("");
+  useEffect(()=>{
+    if(!showGoogleDrive) return;
+    api("/google/status").then(d=>setDriveConnected(!!d.connected)).catch(e=>{setDriveConnected(false);setDriveError(e.message)});
+  },[showGoogleDrive]);
+
   return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">ACCOUNT</span><h1>Account</h1><p>{user?.email} • {user?.role}</p></div></div>
     <section className="panel" style={{maxWidth:620,padding:24}}><h2>Change password</h2><form onSubmit={change}>
       <label>Current password<input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} required/></label>
@@ -319,6 +326,17 @@ function AccountSettings({user,onPasswordChanged}) {
       {error&&<div className="error-box">{error}</div>}{message&&<div className="success-pill">{message}</div>}
       <button className="primary-btn">Change password</button>
     </form></section>
+    {showGoogleDrive&&<section className="panel" style={{maxWidth:620,padding:24,marginTop:18}}>
+      <div className="panel-head" style={{padding:0,border:0}}>
+        <div><h2>Google Drive</h2><p>Files uploaded by TaalLab are stored in the connected Google Drive.</p></div>
+        {driveConnected===true&&<span className="success-pill">Connected</span>}
+        {driveConnected===false&&<span className="status deleted">Not connected</span>}
+      </div>
+      {driveError&&<div className="error-box" style={{marginTop:14}}>{driveError}</div>}
+      <div style={{marginTop:16}}>
+        <a className="primary-btn" href="/api/google/login">{driveConnected?"Reconnect Google Drive":"Connect Google Drive"}</a>
+      </div>
+    </section>}
   </div>;
 }
 
@@ -343,7 +361,7 @@ function Transfers({transfers,onOpen}) {
 
 function TransferTable({transfers,onOpen}) {
   return <div className="table-wrap"><table><thead><tr><th>Transfer</th><th>Created</th><th>Expires</th><th>Files</th><th>Size</th><th>Downloads</th><th>Status</th><th></th></tr></thead><tbody>
-    {transfers.map(t=><tr key={t.id}><td><button className="table-link" onClick={()=>onOpen(t)}>{t.id}</button>{t.message&&<small>{t.message.slice(0,46)}{t.message.length>46?"…":""}</small>}</td><td>{fmtDate(t.created_at)}</td><td>{fmtDate(t.expires_at)}</td><td>{t.file_count}</td><td>{formatBytes(t.total_size)}</td><td>{t.downloads}</td><td><span className={`status ${t.status}`}>{t.status}</span></td><td><button className="icon-btn"><MoreHorizontal/></button></td></tr>)}
+    {transfers.map(t=><tr key={t.id}><td><button className="table-link" onClick={()=>onOpen(t)}>{t.id}</button>{t.recipient_email&&<small>To: {t.recipient_email}</small>}{t.message&&<small>{t.message.slice(0,46)}{t.message.length>46?"…":""}</small>}</td><td>{fmtDate(t.created_at)}</td><td>{fmtDate(t.expires_at)}</td><td>{t.file_count}</td><td>{formatBytes(t.total_size)}</td><td>{t.downloads}</td><td><span className={`status ${t.status}`}>{t.status}</span></td><td><button className="icon-btn"><MoreHorizontal/></button></td></tr>)}
   </tbody></table></div>;
 }
 
@@ -351,6 +369,7 @@ function Upload({onDone}) {
   const [files,setFiles]=useState([]);
   const [message,setMessage]=useState("");
   const [recipientId,setRecipientId]=useState("");
+  const [recipientEmail,setRecipientEmail]=useState("");
   const [recipients,setRecipients]=useState([]);
   const [uploading,setUploading]=useState(false);
   useEffect(()=>{api("/admin/users").then(d=>setRecipients((d.users||[]).filter(u=>u.status==="active"))).catch(()=>{})},[]);
@@ -362,7 +381,7 @@ function Upload({onDone}) {
     if(!files.length)return;
     setUploading(true);
     try{
-      const init=await api("/admin/transfers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,user_id:recipientId||null,files:files.map(f=>({name:f.name,size:f.size,type:f.type}))})});
+      const init=await api("/admin/transfers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,user_id:recipientId||null,recipient_email:recipientEmail.trim(),files:files.map(f=>({name:f.name,size:f.size,type:f.type}))})});
       let done=0;
       setProgress({done:0,total:init.files.length,active:"Preparing upload…"});
       for(let i=0;i<init.files.length;i++){
@@ -393,8 +412,10 @@ function Upload({onDone}) {
     <div className="upload-grid"><section className="panel upload-panel"><div className="dropzone" onDragOver={e=>e.preventDefault()} onDrop={drop}><UploadCloud/><h2>Drop files here</h2><p>or choose multiple files from your computer</p><label className="primary-btn"><Plus/> Select files<input hidden type="file" multiple onChange={addFiles}/></label><small>Files go directly to private R2 storage.</small></div>
       {!!files.length&&<div className="upload-files">{files.map(f=><div className="upload-file" key={f.id}><File/><div><strong>{f.name}</strong><small>{formatBytes(f.size)}</small></div><button className="icon-btn" onClick={()=>setFiles(files.filter(x=>x.id!==f.id))}><X/></button></div>)}</div>}
     </section><section className="panel message-panel">
-      <label>Send to client<select value={recipientId} onChange={e=>setRecipientId(e.target.value)} required><option value="">Select a user…</option>{recipients.map(u=><option key={u.id} value={u.id}>{u.email}{u.role==="admin"?" (Admin)":""}</option>)}</select></label>
-      <label>Client message<textarea rows="8" placeholder="Add a message for your client…" value={message} onChange={e=>setMessage(e.target.value)}/></label><div className="upload-summary"><span>Expiration</span><strong>7 days after upload</strong><span>Files</span><strong>{files.length}</strong><span>Total size</span><strong>{formatBytes(files.reduce((n,f)=>n+f.size,0))}</strong></div><button className="primary-btn full" disabled={uploading||!files.length||!recipientId} onClick={upload}>{uploading?<><RefreshCw className="spin"/> {progress.active||"Uploading…"} ({progress.done}/{progress.total})</>:<><UploadCloud/> Create transfer</>}</button></section></div>
+      <label>Client email<input type="email" list="client-users" value={recipientEmail} placeholder="client@example.com" onChange={e=>{setRecipientEmail(e.target.value);setRecipientId("")}} required/><datalist id="client-users">{recipients.map(u=><option key={u.id} value={u.email}>{u.email}</option>)}</datalist></label>
+      <label>Select existing user<select value={recipientId} onChange={e=>{const id=e.target.value;setRecipientId(id);const match=recipients.find(u=>u.id===id);if(match)setRecipientEmail(match.email)}}><option value="">Type email above or select a user…</option>{recipients.map(u=><option key={u.id} value={u.id}>{u.email}{u.role==="admin"?" (Admin)":""}</option>)}</select></label>
+      <small className="muted">The email must belong to an active TaalLab user. Clients can receive files only; they cannot create transfers.</small>
+      <label>Client message<textarea rows="8" placeholder="Add a message for your client…" value={message} onChange={e=>setMessage(e.target.value)}/></label><div className="upload-summary"><span>Expiration</span><strong>7 days after upload</strong><span>Files</span><strong>{files.length}</strong><span>Total size</span><strong>{formatBytes(files.reduce((n,f)=>n+f.size,0))}</strong></div><button className="primary-btn full" disabled={uploading||!files.length||!recipientEmail.trim()} onClick={upload}>{uploading?<><RefreshCw className="spin"/> {progress.active||"Uploading…"} ({progress.done}/{progress.total})</>:<><UploadCloud/> Create transfer</>}</button></section></div>
   </div>;
 }
 
@@ -404,6 +425,7 @@ function TransferDetail({transfer,onClose,onChanged}) {
   if(!detail)return <div className="detail-drawer"><RefreshCw className="spin"/></div>;
   return <div className="detail-drawer"><div className="drawer-head"><div><span className="eyebrow">TRANSFER DETAILS</span><h2>{detail.id}</h2></div><button onClick={onClose}><X/></button></div>
     <div className="detail-stats"><span>Created<strong>{fmtDate(detail.created_at)}</strong></span><span>Expires<strong>{fmtDate(detail.expires_at)}</strong></span><span>Total size<strong>{formatBytes(detail.total_size)}</strong></span><span>Downloads<strong>{detail.downloads}</strong></span></div>
+    {detail.recipient_email&&<div className="message-box"><MessageSquare size={18}/><p><strong>Client:</strong> {detail.recipient_email}</p></div>}
     {detail.message&&<div className="message-box"><MessageSquare size={18}/><p>“{detail.message}”</p></div>}
     <div className="drawer-actions"><button className="ghost-btn" onClick={async()=>{const d=await api(`/admin/transfers/${detail.id}/extend`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({days:7})}); alert(`Extended to ${fmtDate(d.expires_at)}`); onChanged();}}><Clock3/> +7 days</button><button className="danger-btn" onClick={async()=>{if(!confirm("Delete this transfer and all of its files permanently?"))return; await api(`/admin/transfers/${detail.id}`,{method:"DELETE"}); onClose(); onChanged();}}><Trash2/> Delete transfer</button></div>
     <h3>Files</h3><div className="detail-files">{detail.files.map(f=><div className="detail-file" key={f.id}><IconFor kind={f.kind}/><div className="file-info"><strong>{f.original_name}</strong><small>{formatBytes(f.size)} • {f.download_count} downloads • {f.last_downloaded_at?fmtDate(f.last_downloaded_at):"Never downloaded"}</small></div><button className="icon-btn" title="Copy link" onClick={()=>navigator.clipboard.writeText(f.downloadUrl)}><Link2/></button><a className="icon-btn" href={`/api/files/${f.download_token}/preview`} target="_blank"><Eye/></a></div>)}</div>

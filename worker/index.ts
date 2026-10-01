@@ -587,8 +587,10 @@ async function adminOverview(env: Env) {
       COALESCE(SUM(file_count),0) total_files,
       COALESCE(SUM(total_size),0) storage
       FROM transfers WHERE status!='deleted'`).first(),
-    env.DB.prepare(`SELECT t.*, COALESCE(SUM(f.download_count),0) downloads
-      FROM transfers t LEFT JOIN files f ON f.transfer_id=t.id
+    env.DB.prepare(`SELECT t.*, u.email recipient_email, COALESCE(SUM(f.download_count),0) downloads
+      FROM transfers t
+      LEFT JOIN users u ON u.id=t.user_id
+      LEFT JOIN files f ON f.transfer_id=t.id
       GROUP BY t.id ORDER BY t.created_at DESC`).all(),
     env.DB.prepare("SELECT COUNT(*) n FROM transfers WHERE status='active' AND expires_at>? AND expires_at<=?")
       .bind(now(), now() + 2 * 86400)
@@ -728,10 +730,23 @@ export default {
         const transferId = randomToken(7);
         const total = list.reduce((sum: number, f: any) => sum + Number(f.size || 0), 0);
 
-        const recipientId = String(body.user_id || "").trim() || null;
+        let recipientId = String(body.user_id || "").trim();
+        const recipientEmail = normalizeEmail(body.recipient_email);
+
         if (recipientId) {
-          const recipient: any = await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active' LIMIT 1").bind(recipientId).first();
+          const recipient: any = await env.DB.prepare("SELECT id,email FROM users WHERE id=? AND status='active' LIMIT 1").bind(recipientId).first();
           if (!recipient) return json({ error: "Selected user is not active." }, { status: 400 });
+          if (recipientEmail && normalizeEmail(recipient.email) !== recipientEmail) {
+            return json({ error: "The selected user and client email do not match." }, { status: 400 });
+          }
+        } else if (recipientEmail) {
+          const recipient: any = await env.DB.prepare("SELECT id FROM users WHERE email=? AND status='active' LIMIT 1").bind(recipientEmail).first();
+          if (!recipient) {
+            return json({ error: "No active TaalLab user exists for that email. Create the client account first." }, { status: 400 });
+          }
+          recipientId = String(recipient.id);
+        } else {
+          return json({ error: "Select a client user or enter a client email." }, { status: 400 });
         }
 
         await env.DB.prepare("INSERT INTO transfers(id,created_at,expires_at,message,total_size,file_count,status,user_id) VALUES(?,?,?,?,?,?,?,?)")
@@ -833,8 +848,11 @@ export default {
       if (adminTransfer && req.method === "GET") {
         await requireAdmin(req, env);
         const id = adminTransfer[1];
-        const t: any = await env.DB.prepare(`SELECT t.*,COALESCE(SUM(f.download_count),0) downloads
-          FROM transfers t LEFT JOIN files f ON f.transfer_id=t.id WHERE t.id=? GROUP BY t.id`).bind(id).first();
+        const t: any = await env.DB.prepare(`SELECT t.*,u.email recipient_email,COALESCE(SUM(f.download_count),0) downloads
+          FROM transfers t
+          LEFT JOIN users u ON u.id=t.user_id
+          LEFT JOIN files f ON f.transfer_id=t.id
+          WHERE t.id=? GROUP BY t.id`).bind(id).first();
         if (!t) return json({ error: "Transfer not found" }, { status: 404 });
         const files = await env.DB.prepare("SELECT * FROM files WHERE transfer_id=? ORDER BY created_at").bind(id).all();
         return json({
