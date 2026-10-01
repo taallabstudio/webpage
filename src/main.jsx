@@ -257,13 +257,29 @@ function TransferDetail({transfer,onClose,onChanged}) {
 
 function formatBytes(n){if(!n)return"0 B";const u=["B","KB","MB","GB","TB"];const i=Math.min(Math.floor(Math.log(n)/Math.log(1024)),u.length-1);return`${(n/1024**i).toFixed(i?2:0)} ${u[i]}`}
 function fmtDate(v){return new Date(Number(v)*1000).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})}
-function getPath(){return location.pathname}
+function getPath(){
+  return location.pathname.replace(/\/+$/, "") || "/";
+}
+
 function App(){
-  const path=getPath();
-  if(path==="/") return <Landing/>;
-  if(path.startsWith("/d/")) return <TransferPage id={path.split("/")[2]}/>;
-  if(path==="/admin"||path==="/admin/") return <Admin/>;
-  if(path==="/admin/upload") return <Admin initialUpload/>;
+  const path = getPath();
+
+  if(path === "/") return <Landing/>;
+
+  if(path.startsWith("/d/")) {
+    return <TransferPage id={path.split("/")[2]}/>;
+  }
+
+  if(path === "/admin") {
+    return <Admin/>;
+  }
+
+  if(path === "/admin/upload") {
+    return <Admin initialUpload/>;
+  }
+
   return <Landing/>;
 }
+
+createRoot(document.getElementById("root")).render(<App/>);
 createRoot(document.getElementById("root")).render(<App/>);
