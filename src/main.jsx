@@ -158,6 +158,74 @@ function Login({onLogin}) {
   </div></div>;
 }
 
+function UserPortal({user}) {
+  const [page,setPage]=useState("transfers");
+  const [transfers,setTransfers]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  const [refreshKey,setRefreshKey]=useState(0);
+
+  async function load(){
+    setLoading(true); setError("");
+    try {
+      const d=await api("/user/transfers");
+      setTransfers(d.transfers || []);
+    } catch(e) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+
+  useEffect(()=>{load()},[refreshKey]);
+
+  async function logout(){
+    await api("/auth/logout",{method:"POST"});
+    location.href="/admin";
+  }
+
+  const available=transfers.filter(t=>t.available).length;
+  const downloaded=transfers.filter(t=>t.downloaded).length;
+
+  return <div className="admin-layout">
+    <aside className="sidebar"><Logo/><div className="side-links">
+      <button className={page==="transfers"?"active":""} onClick={()=>setPage("transfers")}><FolderOpen/> My Transfers</button>
+      <button className={page==="settings"?"active":""} onClick={()=>setPage("settings")}><Settings/> Account</button>
+    </div>
+    <div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div>
+    <button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
+    <main className="admin-main">
+      <div className="admin-mobile-head"><Logo/></div>
+      {page==="transfers" ? <div className="admin-content">
+        <div className="page-head"><div>
+          <span className="eyebrow">TAALLAB TRANSFER</span>
+          <h1>My transfers</h1>
+          <p>Your previous TaalLab deliveries and their download status.</p>
+        </div></div>
+        <div className="stat-grid">
+          <div className="stat-card"><div className="stat-icon"><FolderOpen/></div><span>Total transfers</span><strong>{transfers.length}</strong></div>
+          <div className="stat-card"><div className="stat-icon"><Check/></div><span>Available</span><strong>{available}</strong></div>
+          <div className="stat-card"><div className="stat-icon"><Download/></div><span>Downloaded</span><strong>{downloaded}</strong></div>
+        </div>
+        <section className="panel">
+          <div className="panel-head"><div><h2>Previous deliveries</h2><p>File contents are not shown here. Open an available transfer to download.</p></div><button className="ghost-btn" onClick={()=>setRefreshKey(v=>v+1)}><RefreshCw size={16}/> Refresh</button></div>
+          {error&&<div className="error-box" style={{margin:16}}>{error}</div>}
+          {loading ? <div className="loading">Loading transfers…</div> :
+            transfers.length===0 ? <div className="empty-state"><FolderOpen/><h3>No transfers yet</h3><p>Your TaalLab deliveries will appear here when they are assigned to this account.</p></div> :
+            <div className="table-wrap"><table><thead><tr><th>Transfer</th><th>Sent on</th><th>Files</th><th>Size</th><th>Downloaded</th><th>Status</th><th></th></tr></thead><tbody>
+              {transfers.map(t=><tr key={t.id}>
+                <td><strong>{t.id}</strong>{t.message&&<small>{t.message.slice(0,50)}{t.message.length>50?"…":""}</small>}</td>
+                <td>{fmtDate(t.created_at)}</td>
+                <td>{t.file_count}</td>
+                <td>{formatBytes(t.total_size)}</td>
+                <td><span className={t.downloaded?"status active":"status"}>{t.downloaded?"Downloaded":"Not downloaded"}</span></td>
+                <td><span className={`status ${t.available?"active":"deleted"}`}>{t.available?"Available":"Expired"}</span></td>
+                <td>{t.available?<a className="primary-btn" href={`/d/${t.id}`}>Open</a>:<span className="muted">Unavailable</span>}</td>
+              </tr>)}
+            </tbody></table></div>}
+        </section>
+      </div> : <AccountSettings user={user} onPasswordChanged={()=>{}}/>}
+    </main>
+  </div>;
+}
+
 function Admin({initialUpload=false}) {
   const [authed,setAuthed]=useState(null);
   const [user,setUser]=useState(null);
@@ -170,8 +238,8 @@ function Admin({initialUpload=false}) {
     try {
       const me=await api("/auth/me");
       if(!me.authenticated){setAuthed(false);return;}
-      if(me.user.role!=="admin"){setAuthed(false);return;}
       setUser(me.user);
+      if(me.user.role!=="admin"){setAuthed(true);return;}
       const d=await api("/admin/overview");
       setStats(d.stats); setTransfers(d.transfers); setAuthed(true);
     } catch { setAuthed(false); }
@@ -179,6 +247,7 @@ function Admin({initialUpload=false}) {
   useEffect(()=>{refresh()},[]);
   if(authed===null) return <div className="loading"><RefreshCw className="spin"/> Checking session…</div>;
   if(!authed) return <Login onLogin={refresh}/>;
+  if(user?.role!=="admin") return <UserPortal user={user}/>;
 
   async function logout(){await api("/auth/logout",{method:"POST"});setAuthed(false);setUser(null)}
   return <div className="admin-layout">
@@ -281,7 +350,10 @@ function TransferTable({transfers,onOpen}) {
 function Upload({onDone}) {
   const [files,setFiles]=useState([]);
   const [message,setMessage]=useState("");
+  const [recipientId,setRecipientId]=useState("");
+  const [recipients,setRecipients]=useState([]);
   const [uploading,setUploading]=useState(false);
+  useEffect(()=>{api("/admin/users").then(d=>setRecipients((d.users||[]).filter(u=>u.status==="active"))).catch(()=>{})},[]);
   const [created,setCreated]=useState(null);
   const [progress,setProgress]=useState({done:0,total:0,active:""});
   const addFiles=e=>setFiles(prev=>[...prev,...Array.from(e.target.files||[])].map((f,i)=>f.id?f:Object.assign(f,{id:crypto.randomUUID()})));
@@ -290,7 +362,7 @@ function Upload({onDone}) {
     if(!files.length)return;
     setUploading(true);
     try{
-      const init=await api("/admin/transfers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,files:files.map(f=>({name:f.name,size:f.size,type:f.type}))})});
+      const init=await api("/admin/transfers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,user_id:recipientId||null,files:files.map(f=>({name:f.name,size:f.size,type:f.type}))})});
       let done=0;
       setProgress({done:0,total:init.files.length,active:"Preparing upload…"});
       for(let i=0;i<init.files.length;i++){
@@ -320,7 +392,9 @@ function Upload({onDone}) {
   return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">NEW TRANSFER</span><h1>Send files</h1><p>Upload large studio assets and create a private client link.</p></div></div>
     <div className="upload-grid"><section className="panel upload-panel"><div className="dropzone" onDragOver={e=>e.preventDefault()} onDrop={drop}><UploadCloud/><h2>Drop files here</h2><p>or choose multiple files from your computer</p><label className="primary-btn"><Plus/> Select files<input hidden type="file" multiple onChange={addFiles}/></label><small>Files go directly to private R2 storage.</small></div>
       {!!files.length&&<div className="upload-files">{files.map(f=><div className="upload-file" key={f.id}><File/><div><strong>{f.name}</strong><small>{formatBytes(f.size)}</small></div><button className="icon-btn" onClick={()=>setFiles(files.filter(x=>x.id!==f.id))}><X/></button></div>)}</div>}
-    </section><section className="panel message-panel"><label>Client message<textarea rows="8" placeholder="Add a message for your client…" value={message} onChange={e=>setMessage(e.target.value)}/></label><div className="upload-summary"><span>Expiration</span><strong>7 days after upload</strong><span>Files</span><strong>{files.length}</strong><span>Total size</span><strong>{formatBytes(files.reduce((n,f)=>n+f.size,0))}</strong></div><button className="primary-btn full" disabled={uploading||!files.length} onClick={upload}>{uploading?<><RefreshCw className="spin"/> {progress.active||"Uploading…"} ({progress.done}/{progress.total})</>:<><UploadCloud/> Create transfer</>}</button></section></div>
+    </section><section className="panel message-panel">
+      <label>Send to client<select value={recipientId} onChange={e=>setRecipientId(e.target.value)} required><option value="">Select a user…</option>{recipients.map(u=><option key={u.id} value={u.id}>{u.email}{u.role==="admin"?" (Admin)":""}</option>)}</select></label>
+      <label>Client message<textarea rows="8" placeholder="Add a message for your client…" value={message} onChange={e=>setMessage(e.target.value)}/></label><div className="upload-summary"><span>Expiration</span><strong>7 days after upload</strong><span>Files</span><strong>{files.length}</strong><span>Total size</span><strong>{formatBytes(files.reduce((n,f)=>n+f.size,0))}</strong></div><button className="primary-btn full" disabled={uploading||!files.length||!recipientId} onClick={upload}>{uploading?<><RefreshCw className="spin"/> {progress.active||"Uploading…"} ({progress.done}/{progress.total})</>:<><UploadCloud/> Create transfer</>}</button></section></div>
   </div>;
 }
 
@@ -351,7 +425,7 @@ function App(){
     return <TransferPage id={path.split("/")[2]}/>;
   }
 
-  if(path === "/admin") {
+  if(path === "/admin" || path === "/login") {
     return <Admin/>;
   }
 
