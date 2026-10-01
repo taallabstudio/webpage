@@ -107,6 +107,19 @@ async function ensureSupportSchema(env: Env) {
   if (!hasLastDownloaded) {
     await env.DB.prepare("ALTER TABLE files ADD COLUMN last_downloaded_at INTEGER").run();
   }
+
+  const transferColumns: any = await env.DB.prepare("PRAGMA table_info(transfers)").all();
+  const hasTransferUser = (transferColumns.results || []).some((col: any) => col.name === "user_id");
+  if (!hasTransferUser) {
+    try {
+      await env.DB.prepare("ALTER TABLE transfers ADD COLUMN user_id TEXT").run();
+    } catch (e) {
+      const check: any = await env.DB.prepare("PRAGMA table_info(transfers)").all();
+      const exists = (check.results || []).some((col: any) => col.name === "user_id");
+      if (!exists) throw e;
+    }
+  }
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_transfers_user_id ON transfers(user_id)").run();
 }
 
 function normalizeEmail(value: unknown) {
@@ -544,6 +557,29 @@ async function streamDriveFile(env: Env, fileId: string, req: Request, downloadN
   });
 }
 
+async function userTransfers(env: Env, userId: string) {
+  const result: any = await env.DB.prepare(`SELECT
+      t.id,t.created_at,t.expires_at,t.message,t.total_size,t.file_count,t.status,
+      COALESCE(SUM(f.download_count),0) downloads,
+      COALESCE(SUM(CASE WHEN f.download_count>0 THEN 1 ELSE 0 END),0) downloaded_files
+    FROM transfers t
+    LEFT JOIN files f ON f.transfer_id=t.id
+    WHERE t.user_id=?
+    GROUP BY t.id
+    ORDER BY t.created_at DESC`)
+    .bind(userId)
+    .all();
+
+  const current = now();
+  return json({
+    transfers: (result.results || []).map((t: any) => ({
+      ...t,
+      available: t.status === "active" && Number(t.expires_at) > current,
+      downloaded: Number(t.downloads || 0) > 0,
+    })),
+  });
+}
+
 async function adminOverview(env: Env) {
   const [stats, transfers, expiring] = await Promise.all([
     env.DB.prepare(`SELECT
@@ -670,6 +706,11 @@ export default {
       if (url.pathname === "/api/google/login" && req.method === "GET") return googleLogin(req, env);
       if (url.pathname === "/api/google/callback" && req.method === "GET") return googleCallback(req, env);
 
+      if (url.pathname === "/api/user/transfers" && req.method === "GET") {
+        const user = await requireUser(req, env);
+        return userTransfers(env, user.id);
+      }
+
       if (url.pathname === "/api/admin/overview") {
         await requireAdmin(req, env);
         return adminOverview(env);
@@ -687,8 +728,14 @@ export default {
         const transferId = randomToken(7);
         const total = list.reduce((sum: number, f: any) => sum + Number(f.size || 0), 0);
 
-        await env.DB.prepare("INSERT INTO transfers(id,created_at,expires_at,message,total_size,file_count,status) VALUES(?,?,?,?,?,?,?)")
-          .bind(transferId, created, expires, String(body.message || "").slice(0, 4000), total, list.length, "active")
+        const recipientId = String(body.user_id || "").trim() || null;
+        if (recipientId) {
+          const recipient: any = await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active' LIMIT 1").bind(recipientId).first();
+          if (!recipient) return json({ error: "Selected user is not active." }, { status: 400 });
+        }
+
+        await env.DB.prepare("INSERT INTO transfers(id,created_at,expires_at,message,total_size,file_count,status,user_id) VALUES(?,?,?,?,?,?,?,?)")
+          .bind(transferId, created, expires, String(body.message || "").slice(0, 4000), total, list.length, "active", recipientId)
           .run();
 
         const result = [];
