@@ -6,6 +6,7 @@ export interface Env {
   SESSION_SECRET: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
+  RESEND_API_KEY: string;
 }
 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
@@ -417,6 +418,57 @@ async function googleCallback(req: Request, env: Env) {
 async function googleStatus(env: Env) {
   const token = await getSetting(env, SETTINGS_REFRESH);
   return json({ connected: !!token });
+}
+
+async function sendTransferEmail(env: Env, recipientEmail: string, transferId: string, message: string) {
+  if (!recipientEmail) return { sent: false, skipped: true };
+
+  const transferUrl = `${origin(env)}/d/${transferId}`;
+  const subject = "You received a file from TaalLab";
+  const safeMessage = String(message || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" } as any)[c]);
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033">
+      <h2 style="margin-bottom:8px">You received a file from TaalLab</h2>
+      <p>TaalLab has sent you a file delivery.</p>
+      ${safeMessage ? `<div style="padding:16px;background:#f4f5f7;border-radius:10px;margin:20px 0">${safeMessage}</div>` : ""}
+      <p style="margin:28px 0">
+        <a href="${transferUrl}" style="display:inline-block;background:#147ce5;color:white;text-decoration:none;padding:13px 20px;border-radius:8px;font-weight:600">View &amp; Download Files</a>
+      </p>
+      <p style="font-size:13px;color:#687080">This private transfer link will expire according to the delivery settings.</p>
+      <p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.work</p>
+    </div>
+  `;
+  const text = `You received a file from TaalLab.
+
+${message ? String(message) + "\n\n" : ""}View and download your files:
+${transferUrl}
+
+TaalLab
+contact@taallab.work`;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": `trackdeliver-transfer-${transferId}`,
+    },
+    body: JSON.stringify({
+      from: "TaalLab <contact@taallab.work>",
+      to: [recipientEmail],
+      subject,
+      html,
+      text,
+    }),
+  });
+
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.error("Resend email failed", response.status, data);
+    return { sent: false, error: data?.message || data?.error || `Email provider returned HTTP ${response.status}` };
+  }
+
+  return { sent: true, id: data?.id || null };
 }
 
 async function getAccessToken(env: Env) {
@@ -874,7 +926,7 @@ export default {
         const t: any = await env.DB.prepare("SELECT * FROM transfers WHERE id=?").bind(id).first();
         if (!t) return json({ error: "Transfer not found" }, { status: 404 });
 
-        const files = await env.DB.prepare("SELECT id,original_name,size,expires_at,download_token,storage_key FROM files WHERE transfer_id=? ORDER BY created_at")
+        const files = await env.DB.prepare("SELECT id,original_name,size,expires_at,download_token,storage_key,mime_type FROM files WHERE transfer_id=? ORDER BY created_at")
           .bind(id)
           .all();
 
@@ -883,12 +935,26 @@ export default {
           if (!meta || meta.trashed) return json({ error: `Upload is incomplete: ${f.original_name}` }, { status: 409 });
         }
 
+        let notification: any = { sent: false, skipped: true };
+        if (t.user_id) {
+          const recipient: any = await env.DB.prepare("SELECT email FROM users WHERE id=? AND status='active' LIMIT 1").bind(t.user_id).first();
+          if (recipient?.email) {
+            notification = await sendTransferEmail(
+              env,
+              String(recipient.email),
+              id,
+              String(t.message || ""),
+            );
+          }
+        }
+
         return json({
           transferUrl: `${origin(env)}/d/${id}`,
+          notification,
           files: files.results.map((f: any) => ({
             ...f,
             kind: fileKind(f.mime_type || "application/octet-stream", f.original_name),
-            downloadUrl: `${origin(env)}/f/${f.download_token}`,
+            downloadUrl: `${origin(env)}/d/${id}`,
           })),
         });
       }
