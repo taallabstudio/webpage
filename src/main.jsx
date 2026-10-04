@@ -310,6 +310,7 @@ function TransferTable({transfers,onOpen}) {
 
 function Upload({onDone}) {
   const [files,setFiles]=useState([]);
+  const [clientEmail,setClientEmail]=useState("");
   const [message,setMessage]=useState("");
   const [uploading,setUploading]=useState(false);
   const [created,setCreated]=useState(null);
@@ -320,7 +321,7 @@ function Upload({onDone}) {
     if(!files.length)return;
     setUploading(true);
     try{
-      const init=await api("/admin/transfers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,files:files.map(f=>({name:f.name,size:f.size,type:f.type}))})});
+      const init=await api("/admin/transfers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({client_email:clientEmail,message,files:files.map(f=>({name:f.name,size:f.size,type:f.type}))})});
       let done=0;
       setProgress({done:0,total:init.files.length,active:"Preparing upload…"});
       for(let i=0;i<init.files.length;i++){
@@ -343,14 +344,14 @@ function Upload({onDone}) {
     }catch(e){alert(e.message)}finally{setUploading(false)}
   }
   if(created) return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">TRANSFER CREATED</span><h1>Ready to send</h1><p>Your TaalLab transfer is live for the configured expiration window.</p></div></div>
-    <div className="created-card"><div className="success-large"><Check/></div><h2>Transfer Created</h2><label>Transfer Link<div className="copy-row"><input readOnly value={created.transferUrl}/><button className="ghost-btn" onClick={()=>navigator.clipboard.writeText(created.transferUrl)}><Copy/> Copy Link</button></div></label>
+    <div className="created-card">{created.emailError&&<div className="error-box" style={{marginBottom:16}}>Transfer created, but the notification email could not be sent: {created.emailError}</div>}{created.emailSent&&<div className="success-pill" style={{marginBottom:16}}>Notification email sent to {created.clientEmail}.</div>}<div className="success-large"><Check/></div><h2>Transfer Created</h2><label>Transfer Link<div className="copy-row"><input readOnly value={created.transferUrl}/><button className="ghost-btn" onClick={()=>navigator.clipboard.writeText(created.transferUrl)}><Copy/> Copy Link</button></div></label>
       <h3>Files</h3>{created.files.map(f=><div className="created-file" key={f.id}><IconFor kind={f.kind}/><div><strong>{f.name}</strong><small>{formatBytes(f.size)} • Expires {fmtDate(f.expires_at)}</small></div><button className="ghost-btn" onClick={()=>navigator.clipboard.writeText(f.downloadUrl)}><Link2/> Copy link</button></div>)}
       <button className="primary-btn" onClick={onDone}>Back to dashboard</button>
     </div></div>;
   return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">NEW TRANSFER</span><h1>Send files</h1><p>Upload large studio assets and create a private client link.</p></div></div>
     <div className="upload-grid"><section className="panel upload-panel"><div className="dropzone" onDragOver={e=>e.preventDefault()} onDrop={drop}><UploadCloud/><h2>Drop files here</h2><p>or choose multiple files from your computer</p><label className="primary-btn"><Plus/> Select files<input hidden type="file" multiple onChange={addFiles}/></label><small>Files go directly to private R2 storage.</small></div>
       {!!files.length&&<div className="upload-files">{files.map(f=><div className="upload-file" key={f.id}><File/><div><strong>{f.name}</strong><small>{formatBytes(f.size)}</small></div><button className="icon-btn" onClick={()=>setFiles(files.filter(x=>x.id!==f.id))}><X/></button></div>)}</div>}
-    </section><section className="panel message-panel"><label>Client message<textarea rows="8" placeholder="Add a message for your client…" value={message} onChange={e=>setMessage(e.target.value)}/></label><div className="upload-summary"><span>Expiration</span><strong>7 days after upload</strong><span>Files</span><strong>{files.length}</strong><span>Total size</span><strong>{formatBytes(files.reduce((n,f)=>n+f.size,0))}</strong></div><button className="primary-btn full" disabled={uploading||!files.length} onClick={upload}>{uploading?<><RefreshCw className="spin"/> {progress.active||"Uploading…"} ({progress.done}/{progress.total})</>:<><UploadCloud/> Create transfer</>}</button></section></div>
+    </section><section className="panel message-panel"><label>Client email <span className="muted">(optional)</span><input type="email" placeholder="client@example.com" value={clientEmail} onChange={e=>setClientEmail(e.target.value)}/></label><small className="muted">If provided, the client receives a secure download link from contact@taallab.work. The file itself is never attached.</small><label style={{marginTop:16}}>Client message<textarea rows="8" placeholder="Add a message for your client…" value={message} onChange={e=>setMessage(e.target.value)}/></label><div className="upload-summary"><span>Expiration</span><strong>7 days after upload</strong><span>Files</span><strong>{files.length}</strong><span>Total size</span><strong>{formatBytes(files.reduce((n,f)=>n+f.size,0))}</strong></div><button className="primary-btn full" disabled={uploading||!files.length} onClick={upload}>{uploading?<><RefreshCw className="spin"/> {progress.active||"Uploading…"} ({progress.done}/{progress.total})</>:<><UploadCloud/> Create transfer</>}</button></section></div>
   </div>;
 }
 
@@ -360,7 +361,7 @@ function TransferDetail({transfer,onClose,onChanged}) {
   if(!detail)return <div className="detail-drawer"><RefreshCw className="spin"/></div>;
   return <div className="detail-drawer"><div className="drawer-head"><div><span className="eyebrow">TRANSFER DETAILS</span><h2>{detail.id}</h2></div><button onClick={onClose}><X/></button></div>
     <div className="detail-stats"><span>Created<strong>{fmtDate(detail.created_at)}</strong></span><span>Expires<strong>{fmtDate(detail.expires_at)}</strong></span><span>Total size<strong>{formatBytes(detail.total_size)}</strong></span><span>Downloads<strong>{detail.downloads}</strong></span></div>
-    {detail.message&&<div className="message-box"><MessageSquare size={18}/><p>“{detail.message}”</p></div>}
+    {detail.client_email&&<div className="message-box"><MessageSquare size={18}/><p>Client: {detail.client_email}</p></div>}{detail.message&&<div className="message-box"><MessageSquare size={18}/><p>“{detail.message}”</p></div>}
     <div className="drawer-actions"><button className="ghost-btn" onClick={async()=>{const d=await api(`/admin/transfers/${detail.id}/extend`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({days:7})}); alert(`Extended to ${fmtDate(d.expires_at)}`); onChanged();}}><Clock3/> +7 days</button><button className="danger-btn" onClick={async()=>{if(!confirm("Delete this transfer and all of its files permanently?"))return; await api(`/admin/transfers/${detail.id}`,{method:"DELETE"}); onClose(); onChanged();}}><Trash2/> Delete transfer</button></div>
     <h3>Files</h3><div className="detail-files">{detail.files.map(f=><div className="detail-file" key={f.id}><IconFor kind={f.kind}/><div className="file-info"><strong>{f.original_name}</strong><small>{formatBytes(f.size)} • {f.download_count} downloads • {f.last_downloaded_at?fmtDate(f.last_downloaded_at):"Never downloaded"}</small></div><button className="icon-btn" title="Copy link" onClick={()=>navigator.clipboard.writeText(f.downloadUrl)}><Link2/></button><a className="icon-btn" href={`/api/files/${f.download_token}/preview`} target="_blank"><Eye/></a></div>)}</div>
   </div>;
