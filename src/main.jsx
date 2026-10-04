@@ -32,7 +32,7 @@ const api = async (path, options={}) => {
 
 function Logo() {
   return <div className="brand" aria-label="TrackDeliver by TaalLab">
-    <span className="brand-mark" aria-hidden="true">T</span>
+    <span className="brand-logo" aria-hidden="true"><img src="/logo.svg" alt="" /></span>
     <span>TrackDeliver <small>by TaalLab</small></span>
   </div>;
 }
@@ -48,7 +48,10 @@ function IconFor({kind}) {
 function Landing() {
   return <main className="landing">
     <div className="landing-glow" />
-    <Logo />
+    <header className="landing-nav">
+      <Logo />
+      <a className="login-nav-btn" href="/login"><UserRound size={16}/> Login</a>
+    </header>
     <div className="landing-center">
       <div className="eyebrow"><span className="dot" /> TrackDeliver by TaalLab</div>
       <h1>Page in building</h1>
