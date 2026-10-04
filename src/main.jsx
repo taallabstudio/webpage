@@ -31,7 +31,10 @@ const api = async (path, options={}) => {
 };
 
 function Logo() {
-  return <div className="brand"><span className="brand-mark">↗</span><span>TaalLab</span></div>;
+  return <div className="brand" aria-label="TrackDeliver by TaalLab">
+    <span className="brand-mark" aria-hidden="true">T</span>
+    <span>TrackDeliver <small>by TaalLab</small></span>
+  </div>;
 }
 
 function IconFor({kind}) {
@@ -47,7 +50,7 @@ function Landing() {
     <div className="landing-glow" />
     <Logo />
     <div className="landing-center">
-      <div className="eyebrow"><span className="dot" /> TaalLab Transfer</div>
+      <div className="eyebrow"><span className="dot" /> TrackDeliver by TaalLab</div>
       <h1>Page in building</h1>
       <p>Thank you for working with TaalLab.</p>
     </div>
@@ -58,7 +61,7 @@ function Header({admin=false, onLogout}) {
   return <header className="topbar">
     <Logo />
     {admin ? <nav className="topnav">
-      <a href="/admin">Dashboard</a><a href="/admin/upload">New Transfer</a>
+      <a href="/login">Dashboard</a><a href="/login">New Transfer</a>
       <button className="ghost-btn" onClick={onLogout}><LogOut size={16}/> Logout</button>
     </nav> : <nav className="topnav">
       <span className="status-pill"><span className="dot"/> Secure transfer</span>
@@ -178,7 +181,7 @@ function UserPortal({user}) {
 
   async function logout(){
     await api("/auth/logout",{method:"POST"});
-    location.href="/admin";
+    location.href="/login";
   }
 
   const available=transfers.filter(t=>t.available).length;
@@ -195,7 +198,7 @@ function UserPortal({user}) {
       <div className="admin-mobile-head"><Logo/></div>
       {page==="transfers" ? <div className="admin-content">
         <div className="page-head"><div>
-          <span className="eyebrow">TAALLAB TRANSFER</span>
+          <span className="eyebrow">TRACKDELIVER BY TAALLAB</span>
           <h1>My transfers</h1>
           <p>Your previous TaalLab deliveries and their download status.</p>
         </div></div>
