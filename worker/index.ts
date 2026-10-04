@@ -6,6 +6,7 @@ export interface Env {
   SESSION_SECRET: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
+  RESEND_API_KEY?: string;
 }
 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
@@ -124,6 +125,112 @@ async function ensureSupportSchema(env: Env) {
 
 function normalizeEmail(value: unknown) {
   return String(value || "").trim().toLowerCase();
+}
+
+function parseVersionedFilename(name: string) {
+  const match = String(name).match(/^(.*?)\\s+v(\\d+)(\\.[^.]+)$/i);
+  if (!match) return null;
+  return { base: match[1].trim().toLowerCase(), version: Number(match[2]), extension: match[3].toLowerCase() };
+}
+
+function escapeHtml(value: unknown) {
+  return String(value || "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[ch] || ch));
+}
+
+async function sendTransferEmail(env: Env, recipientEmail: string, transferUrl: string, message: string, fileCount: number, expiresAt: number) {
+  if (!env.RESEND_API_KEY || !recipientEmail) return false;
+  const countText = fileCount === 1 ? "1 file" : `${fileCount} files`;
+  const safeMessage = escapeHtml(message);
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1d2229;max-width:600px;margin:auto">
+      <h2 style="margin-bottom:8px">You received a new delivery from TaalLab</h2>
+      <p>Your TrackDeliver delivery is ready. It contains <strong>${countText}</strong>.</p>
+      ${safeMessage ? `<p style="background:#f5f6f8;padding:14px;border-radius:10px">${safeMessage}</p>` : ""}
+      <p><a href="${escapeHtml(transferUrl)}" style="display:inline-block;background:#0878e8;color:#fff;text-decoration:none;padding:12px 18px;border-radius:9px;font-weight:700">Open &amp; download files</a></p>
+      <p style="color:#707782;font-size:13px">This delivery expires on ${new Date(expiresAt * 1000).toLocaleString("en-IN")}.</p>
+      <p style="color:#707782;font-size:12px">TrackDeliver by TaalLab</p>
+    </div>`;
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "TrackDeliver by TaalLab <contact@taallab.work>",
+      to: [recipientEmail],
+      subject: "You received a new file delivery from TaalLab",
+      html,
+    }),
+  });
+  if (!response.ok) {
+    console.error("Transfer email failed", response.status, await response.text().catch(() => ""));
+    return false;
+  }
+  return true;
+}
+
+async function supersedeOlderVersions(env: Env, transferId: string) {
+  const currentFiles: any = await env.DB.prepare(
+    "SELECT id,original_name FROM files WHERE transfer_id=? AND status='active'"
+  ).bind(transferId).all();
+
+  const oldIds = new Set<string>();
+  const storageKeys = new Set<string>();
+
+  for (const current of (currentFiles.results || []) as any[]) {
+    const currentVersion = parseVersionedFilename(String(current.original_name || ""));
+    if (!currentVersion || !Number.isFinite(currentVersion.version)) continue;
+
+    const candidates: any = await env.DB.prepare(
+      "SELECT id,storage_key,transfer_id,original_name FROM files WHERE status='active' AND expires_at>? AND id!=?"
+    ).bind(now(), current.id).all();
+
+    for (const old of (candidates.results || []) as any[]) {
+      const oldVersion = parseVersionedFilename(String(old.original_name || ""));
+      if (!oldVersion) continue;
+      if (oldVersion.base !== currentVersion.base) continue;
+      if (oldVersion.version >= currentVersion.version) continue;
+
+      oldIds.add(String(old.id));
+      storageKeys.add(String(old.storage_key));
+    }
+  }
+
+  if (!oldIds.size) return;
+
+  for (const id of oldIds) {
+    await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(id).run();
+  }
+
+  for (const storageKey of storageKeys) {
+    const refs: any = await env.DB.prepare(
+      "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active'"
+    ).bind(storageKey).first();
+    if (Number(refs?.n || 0) === 0) {
+      try {
+        await trashDriveFile(env, storageKey);
+      } catch (e) {
+        console.error("Failed to remove superseded Drive file", storageKey, e);
+      }
+    }
+  }
+
+  const affectedTransfers: any = await env.DB.prepare(
+    `SELECT DISTINCT transfer_id FROM files WHERE id IN (${[...oldIds].map(() => "?").join(",")})`
+  ).bind(...oldIds).all();
+
+  for (const row of (affectedTransfers.results || []) as any[]) {
+    const remaining: any = await env.DB.prepare(
+      "SELECT COUNT(*) n FROM files WHERE transfer_id=? AND status='active'"
+    ).bind(row.transfer_id).first();
+    if (Number(remaining?.n || 0) === 0) {
+      await env.DB.prepare("UPDATE transfers SET status='deleted' WHERE id=? AND status='active'")
+        .bind(row.transfer_id).run();
+    }
+  }
 }
 
 async function getSessionUser(req: Request, env: Env) {
@@ -883,8 +990,31 @@ export default {
           if (!meta || meta.trashed) return json({ error: `Upload is incomplete: ${f.original_name}` }, { status: 409 });
         }
 
+        await supersedeOlderVersions(env, id);
+
+        const recipient: any = t.user_id
+          ? await env.DB.prepare("SELECT email FROM users WHERE id=? LIMIT 1").bind(t.user_id).first()
+          : null;
+        const transferUrl = `${origin(env)}/d/${id}`;
+        let emailSent = false;
+        if (recipient?.email) {
+          try {
+            emailSent = await sendTransferEmail(
+              env,
+              String(recipient.email),
+              transferUrl,
+              String(t.message || ""),
+              Number(t.file_count || files.results.length),
+              Number(t.expires_at),
+            );
+          } catch (e) {
+            console.error("Transfer email error", e);
+          }
+        }
+
         return json({
-          transferUrl: `${origin(env)}/d/${id}`,
+          transferUrl,
+          emailSent,
           files: files.results.map((f: any) => ({
             ...f,
             kind: fileKind(f.mime_type || "application/octet-stream", f.original_name),
