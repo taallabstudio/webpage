@@ -7,6 +7,7 @@ export interface Env {
   SESSION_SECRET: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
+  RESEND_API_KEY: string;
 }
 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
@@ -106,6 +107,10 @@ async function ensureSupportSchema(env: Env) {
   if (!hasLastDownloaded) {
     await env.DB.prepare("ALTER TABLE files ADD COLUMN last_downloaded_at INTEGER").run();
   }
+  const transferColumns: any = await env.DB.prepare("PRAGMA table_info(transfers)").all();
+  const transferNames = new Set((transferColumns.results || []).map((col: any) => col.name));
+  if (!transferNames.has("client_email")) await env.DB.prepare("ALTER TABLE transfers ADD COLUMN client_email TEXT").run();
+  if (!transferNames.has("email_sent_at")) await env.DB.prepare("ALTER TABLE transfers ADD COLUMN email_sent_at INTEGER").run();
 }
 
 function normalizeEmail(value: unknown) {
@@ -339,6 +344,48 @@ async function setSetting(env: Env, key: string, value: string) {
     .run();
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+async function ensureClientUser(env: Env, email: string) {
+  const normalized = normalizeEmail(email);
+  const existing: any = await env.DB.prepare("SELECT id FROM users WHERE email=? LIMIT 1").bind(normalized).first();
+  if (existing) {
+    await env.DB.prepare("UPDATE users SET status='active',updated_at=? WHERE id=?").bind(now(), existing.id).run();
+    return existing.id;
+  }
+  const id = randomToken(16);
+  const temporaryPassword = randomToken(24);
+  const hash = await hashPassword(temporaryPassword);
+  await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status) VALUES(?,?,?,?,?,?,?)").bind(id, normalized, hash, "user", now(), now(), "active").run();
+  return id;
+}
+
+async function sendTransferEmail(env: Env, email: string, transferId: string, expiresAt: number, message: string, fileCount: number) {
+  if (!env.RESEND_API_KEY) throw new Error("RESEND_API_KEY is not configured.");
+  const link = origin(env) + "/d/" + transferId;
+  const safeMessage = escapeHtml(message).replace(/\n/g, "<br>");
+  const safeExpiry = escapeHtml(new Date(expiresAt * 1000).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" }));
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + env.RESEND_API_KEY,
+      "Content-Type": "application/json",
+      "Idempotency-Key": "transfer-created/" + transferId,
+    },
+    body: JSON.stringify({
+      from: "TaalLab <contact@taallab.work>",
+      to: [email],
+      subject: "You received a file from TaalLab",
+      html: "<!doctype html><html><body style='margin:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#171717'><div style='max-width:620px;margin:40px auto;padding:0 18px'><div style='background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:36px'><div style='font-size:22px;font-weight:700;margin-bottom:24px'>TaalLab</div><h1 style='font-size:28px;margin:0 0 12px'>You received a file</h1><p style='font-size:16px;line-height:1.6;margin:0 0 20px'>TaalLab has sent you a secure file delivery.</p><div style='background:#f7f7f8;border-radius:12px;padding:16px;margin:20px 0'><strong>" + fileCount + " " + (fileCount === 1 ? "file" : "files") + "</strong><br><span style='color:#666'>Available until " + safeExpiry + "</span></div>" + (message ? "<div style='margin:20px 0;padding:16px;background:#f7f7f8;border-radius:12px;color:#444;line-height:1.6'>" + safeMessage + "</div>" : "") + "<a href='" + link + "' style='display:inline-block;background:#147ef5;color:#fff;text-decoration:none;padding:14px 22px;border-radius:10px;font-weight:700'>View &amp; Download Files</a><p style='font-size:13px;color:#777;line-height:1.5;margin-top:28px'>This email contains a secure link. The files are not attached to this email.</p></div></div></body></html>",
+      text: "You received a file from TaalLab. View and download your files here: " + link + "\n\nAvailable until " + new Date(expiresAt * 1000).toLocaleDateString("en-IN") + (message ? "\n\nMessage: " + message : ""),
+    }),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.message || data?.error || ("Resend returned HTTP " + response.status));
+  return data;
+}
 async function googleLogin(req: Request, env: Env) {
   await requireAdmin(req, env);
   const state = randomToken(24);
@@ -645,7 +692,6 @@ export default {
     const url = new URL(req.url);
     try {
       await ensureSupportSchema(env);
-      await ensureSupportSchema(env);
 
       if (url.pathname === "/api/auth/setup" && req.method === "POST") return authSetup(req, env);
       if ((url.pathname === "/api/auth/login" || url.pathname === "/api/admin/login") && req.method === "POST") return authLogin(req, env);
@@ -678,6 +724,10 @@ export default {
         await requireAdmin(req, env);
         const body = await req.json().catch(() => ({}));
         const list = Array.isArray(body.files) ? body.files : [];
+        const clientEmail = normalizeEmail(body.client_email);
+        if (clientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) {
+          return json({ error: "Enter a valid client email address." }, { status: 400 });
+        }
         if (!list.length) return json({ error: "No files selected" }, { status: 400 });
 
         const folderId = await ensureDriveFolder(env);
@@ -686,8 +736,8 @@ export default {
         const transferId = randomToken(7);
         const total = list.reduce((sum: number, f: any) => sum + Number(f.size || 0), 0);
 
-        await env.DB.prepare("INSERT INTO transfers(id,created_at,expires_at,message,total_size,file_count,status) VALUES(?,?,?,?,?,?,?)")
-          .bind(transferId, created, expires, String(body.message || "").slice(0, 4000), total, list.length, "active")
+        await env.DB.prepare("INSERT INTO transfers(id,created_at,expires_at,message,total_size,file_count,status,client_email,email_sent_at) VALUES(?,?,?,?,?,?,?,?,?,?)")
+          .bind(transferId, created, expires, String(body.message || "").slice(0, 4000), total, list.length, "active", clientEmail || null, null)
           .run();
 
         const result = [];
@@ -726,7 +776,7 @@ export default {
         const t: any = await env.DB.prepare("SELECT * FROM transfers WHERE id=?").bind(id).first();
         if (!t) return json({ error: "Transfer not found" }, { status: 404 });
 
-        const files = await env.DB.prepare("SELECT id,original_name,size,expires_at,download_token,storage_key FROM files WHERE transfer_id=? ORDER BY created_at")
+        const files = await env.DB.prepare("SELECT id,original_name,size,mime_type,expires_at,download_token,storage_key FROM files WHERE transfer_id=? ORDER BY created_at")
           .bind(id)
           .all();
 
@@ -735,8 +785,25 @@ export default {
           if (!meta || meta.trashed) return json({ error: `Upload is incomplete: ${f.original_name}` }, { status: 409 });
         }
 
+        let emailSent = !!t.email_sent_at;
+        let emailError = "";
+        if (t.client_email && !t.email_sent_at) {
+          try {
+            await ensureClientUser(env, String(t.client_email));
+            await sendTransferEmail(env, String(t.client_email), id, Number(t.expires_at), String(t.message || ""), files.results.length);
+            await env.DB.prepare("UPDATE transfers SET email_sent_at=? WHERE id=?").bind(now(), id).run();
+            emailSent = true;
+          } catch (e) {
+            emailError = e instanceof Error ? e.message : "Could not send notification email.";
+            console.error("Transfer email failed", id, emailError);
+          }
+        }
+
         return json({
           transferUrl: `${origin(env)}/d/${id}`,
+          emailSent,
+          emailError: emailError || undefined,
+          clientEmail: t.client_email || "",
           files: files.results.map((f: any) => ({
             ...f,
             kind: fileKind(f.mime_type || "application/octet-stream", f.original_name),
