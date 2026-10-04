@@ -31,7 +31,7 @@ const api = async (path, options={}) => {
 };
 
 function Logo() {
-  return <div className="brand"><span className="brand-mark">↗</span><span>TaalLab</span></div>;
+  return <div className="brand"><img className="brand-logo" src="/trackdeliver-logo.svg" alt="TrackDeliver by TaalLab"/><span>TrackDeliver <em>by TaalLab</em></span></div>;
 }
 
 function IconFor({kind}) {
@@ -47,9 +47,9 @@ function Landing() {
     <div className="landing-glow" />
     <Logo />
     <div className="landing-center">
-      <div className="eyebrow"><span className="dot" /> TaalLab Transfer</div>
+      <div className="eyebrow"><span className="dot" /> TrackDeliver by TaalLab</div>
       <h1>Page in building</h1>
-      <p>Thank you for working with TaalLab.</p>
+      <p>Secure studio deliveries, built by TaalLab.</p>
     </div>
   </main>;
 }
@@ -178,7 +178,7 @@ function UserPortal({user}) {
 
   async function logout(){
     await api("/auth/logout",{method:"POST"});
-    location.href="/admin";
+    location.href="/login";
   }
 
   const available=transfers.filter(t=>t.available).length;
@@ -195,7 +195,7 @@ function UserPortal({user}) {
       <div className="admin-mobile-head"><Logo/></div>
       {page==="transfers" ? <div className="admin-content">
         <div className="page-head"><div>
-          <span className="eyebrow">TAALLAB TRANSFER</span>
+          <span className="eyebrow">TRACKDELIVER BY TAALLAB</span>
           <h1>My transfers</h1>
           <p>Your previous TaalLab deliveries and their download status.</p>
         </div></div>
@@ -239,6 +239,7 @@ function Admin({initialUpload=false}) {
       const me=await api("/auth/me");
       if(!me.authenticated){setAuthed(false);return;}
       setUser(me.user);
+      if(location.pathname === "/login") history.replaceState(null, "", "/admin");
       if(me.user.role!=="admin"){setAuthed(true);return;}
       const d=await api("/admin/overview");
       setStats(d.stats); setTransfers(d.transfers); setAuthed(true);
@@ -246,7 +247,10 @@ function Admin({initialUpload=false}) {
   }
   useEffect(()=>{refresh()},[]);
   if(authed===null) return <div className="loading"><RefreshCw className="spin"/> Checking session…</div>;
-  if(!authed) return <Login onLogin={refresh}/>;
+  if(!authed) {
+    if(location.pathname !== "/login") location.replace("/login");
+    return <Login onLogin={refresh}/>;
+  }
   if(user?.role!=="admin") return <UserPortal user={user}/>;
 
   async function logout(){await api("/auth/logout",{method:"POST"});setAuthed(false);setUser(null)}
@@ -349,7 +353,7 @@ function Dashboard({stats,transfers,onOpen}) {
     ["Expiring soon",stats?.expiring_soon||0,Clock3],
     ["Expired / cleanup",stats?.expired||0,Trash2]
   ];
-  return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">TAALLAB TRANSFER</span><h1>Dashboard</h1><p>Everything you need to manage client deliveries.</p></div><button className="primary-btn" onClick={()=>location.href="/admin/upload"}><Plus/> New Transfer</button></div>
+  return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">TRACKDELIVER BY TAALLAB</span><h1>Dashboard</h1><p>Everything you need to manage client deliveries.</p></div><button className="primary-btn" onClick={()=>location.href="/admin/upload"}><Plus/> New Transfer</button></div>
     <div className="stat-grid">{cards.map(([label,value,Icon])=><div className="stat-card" key={label}><div className="stat-icon"><Icon/></div><span>{label}</span><strong>{value}</strong></div>)}</div>
     <section className="panel"><div className="panel-head"><div><h2>Recent transfers</h2><p>Client deliveries and download activity.</p></div><button className="ghost-btn" onClick={()=>location.href="/admin"}>View all <ChevronRight/></button></div><TransferTable transfers={transfers.slice(0,8)} onOpen={onOpen}/></section>
   </div>;
@@ -413,7 +417,7 @@ function Upload({onDone}) {
     }catch(e){alert(e.message)}finally{setUploading(false)}
   }
   if(created) return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">TRANSFER CREATED</span><h1>Ready to send</h1><p>Your TaalLab transfer is live for the configured expiration window.</p></div></div>
-    <div className="created-card"><div className="success-large"><Check/></div><h2>Transfer Created</h2>{recipientInfo?.userCreated&&<div className="success-pill" style={{marginBottom:16}}>Client account created for {recipientInfo.email}. Temporary password: <strong>{recipientInfo.temporaryPassword}</strong></div>}{!recipientInfo&&<div className="muted" style={{marginBottom:16}}>Link-only transfer — no client account was assigned.</div>}<label>Transfer Link<div className="copy-row"><input readOnly value={created.transferUrl}/><button className="ghost-btn" onClick={()=>navigator.clipboard.writeText(created.transferUrl)}><Copy/> Copy Link</button></div></label>
+    <div className="created-card"><div className="success-large"><Check/></div><h2>Transfer Created</h2>{created.emailSent&&<div className="success-pill" style={{marginBottom:16}}>Delivery email sent to {recipientInfo?.email}.</div>}{recipientInfo?.userCreated&&<div className="success-pill" style={{marginBottom:16}}>Client account created for {recipientInfo.email}. Temporary password: <strong>{recipientInfo.temporaryPassword}</strong></div>}{!recipientInfo&&<div className="muted" style={{marginBottom:16}}>Link-only transfer — no client account was assigned.</div>}<label>Transfer Link<div className="copy-row"><input readOnly value={created.transferUrl}/><button className="ghost-btn" onClick={()=>navigator.clipboard.writeText(created.transferUrl)}><Copy/> Copy Link</button></div></label>
       <h3>Files</h3>{created.files.map(f=><div className="created-file" key={f.id}><IconFor kind={f.kind}/><div><strong>{f.name}</strong><small>{formatBytes(f.size)} • Expires {fmtDate(f.expires_at)}</small></div><button className="ghost-btn" onClick={()=>navigator.clipboard.writeText(f.downloadUrl)}><Link2/> Copy link</button></div>)}
       <button className="primary-btn" onClick={onDone}>Back to dashboard</button>
     </div></div>;
@@ -456,7 +460,7 @@ function App(){
     return <TransferPage id={path.split("/")[2]}/>;
   }
 
-  if(path === "/admin" || path === "/login") {
+  if(path === "/login" || path === "/admin") {
     return <Admin/>;
   }
 
