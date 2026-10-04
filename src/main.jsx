@@ -239,6 +239,7 @@ function Admin({initialUpload=false}) {
       const me=await api("/auth/me");
       if(!me.authenticated){setAuthed(false);return;}
       setUser(me.user);
+      if(location.pathname === "/login") history.replaceState(null, "", "/admin");
       if(me.user.role!=="admin"){setAuthed(true);return;}
       const d=await api("/admin/overview");
       setStats(d.stats); setTransfers(d.transfers); setAuthed(true);
