@@ -409,6 +409,8 @@ function Upload({onDone}) {
         done++; setProgress({done,total:init.files.length,active:item.name});
       }
       const result=await api(`/admin/transfers/${init.transferId}/complete`,{method:"POST"});
+      if (result.notification?.sent) alert("Transfer created. Notification email sent successfully.");
+      else if (result.notification?.error) alert(`Transfer created, but the notification email could not be sent: ${result.notification.error}`);
       setCreated(result);
     }catch(e){alert(e.message)}finally{setUploading(false)}
   }
