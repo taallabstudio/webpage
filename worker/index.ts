@@ -128,7 +128,7 @@ function normalizeEmail(value: unknown) {
 }
 
 function parseVersionedFilename(name: string) {
-  const match = String(name).match(/^(.*?)\\s+v(\\d+)(\\.[^.]+)$/i);
+  const match = String(name).match(/^(.*?)\s+v(\d+)(\.[^.]+)$/i);
   if (!match) return null;
   return { base: match[1].trim().toLowerCase(), version: Number(match[2]), extension: match[3].toLowerCase() };
 }
