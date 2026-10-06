@@ -1074,3 +1074,54 @@ html{scroll-behavior:smooth}
       scale(.82);
   }
 }
+
+
+/* FINAL FIX — the headphone lives directly under .landing so it can truly
+   remain fixed while every page section scrolls above it. */
+.landing > .hero-headphones{
+  position:fixed !important;
+  z-index:0 !important;
+  left:70% !important;
+  top:50% !important;
+  width:min(34vw,500px) !important;
+  height:auto !important;
+  margin:0 !important;
+  object-fit:contain !important;
+  transform:
+    translate3d(-50%,-50%,0)
+    rotate(var(--headphone-page-rotation,0deg))
+    scale(.86) !important;
+  transform-origin:center center !important;
+  opacity:1 !important;
+  pointer-events:none !important;
+  filter:drop-shadow(0 35px 45px rgba(10,54,88,.18)) !important;
+  will-change:transform;
+}
+.landing > .landing-nav,
+.landing > .hero-scroll-stage,
+.landing > .site-section,
+.landing > .contact-section{
+  position:relative;
+  z-index:1;
+}
+.landing > .landing-nav{
+  z-index:20;
+}
+
+@media(max-width:760px){
+  .landing > .hero-headphones{
+    left:50% !important;
+    top:62% !important;
+    width:min(68vw,380px) !important;
+    transform:
+      translate3d(-50%,-50%,0)
+      rotate(var(--headphone-page-rotation,0deg))
+      scale(.82) !important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .landing > .hero-headphones{
+    transform:translate3d(-50%,-50%,0) scale(.86) !important;
+  }
+}
