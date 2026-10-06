@@ -48,41 +48,28 @@ function Landing() {
   const [bookingSent, setBookingSent] = useState(false);
 
   useEffect(() => {
-    // Intersection Observer approach:
-    // when an element enters the viewport -> add "scroll-show";
-    // when it leaves -> remove it again. This makes the animation
-    // play both ways: down = fade in, up = fade out.
-    const revealItems = Array.from(
-      document.querySelectorAll(
-        ".landing .site-section .section-heading, " +
-        ".landing .site-section .scroll-reveal, " +
-        ".landing .contact-section .contact-inner > div:first-child, " +
-        ".landing .contact-section .contact-grid > *"
-      )
-    );
-
-    revealItems.forEach((item) => {
-      item.classList.add("scroll-reveal-item");
-      item.classList.remove("scroll-show");
-    });
+    // Scroll reveal — follows the supplied IntersectionObserver tutorial:
+    // .reveal starts hidden/down, and .show brings it into place.
+    const revealElements = document.querySelectorAll(".landing .reveal");
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            entry.target.classList.add("scroll-show");
+            entry.target.classList.add("show");
           } else {
-            entry.target.classList.remove("scroll-show");
+            entry.target.classList.remove("show");
           }
         });
       },
       {
-        threshold: 0.15,
-        rootMargin: "0px 0px -10% 0px",
+        threshold: 0.12,
+        rootMargin: "0px 0px -8% 0px",
       }
     );
 
-    revealItems.forEach((item) => observer.observe(item));
+    revealElements.forEach((el) => observer.observe(el));
+
 
     // Keep the existing hero scroll animation untouched.
     const stage = document.querySelector(".hero-scroll-stage");
@@ -206,7 +193,7 @@ function Landing() {
     </section>
 
     <section className="site-section services-section reveal-on-scroll" id="services">
-      <div className="section-heading">
+      <div className="section-heading reveal">
         <span className="section-kicker">WHAT WE DO</span>
         <h2>Everything your<br/><em>sound</em> needs.</h2>
         <p>From the first idea to the final master, TaalLab gives your project a focused space to become what you imagined.</p>
@@ -219,7 +206,7 @@ function Landing() {
           ["04","Mastering","Final polish, translation and loudness for release-ready audio.","mastering"],
           ["05","Dubbing / Voice Over","Professional voice recording, dubbing and spoken-word production.","dubbing"]
         ].map(([num,title,desc,id]) =>
-          <article className="service-card scroll-reveal" id={id} key={id}>
+          <article className="service-card reveal" id={id} key={id}>
             <span>{num}</span>
             <h3>{title}</h3>
             <p>{desc}</p>
@@ -230,34 +217,34 @@ function Landing() {
     </section>
 
     <section className="site-section studio-section-new reveal-on-scroll" id="studio">
-      <div className="studio-visual studio-photo-wrap scroll-reveal" aria-label="TaalLab recording studio">
+      <div className="studio-visual studio-photo-wrap reveal" aria-label="TaalLab recording studio">
         <img className="studio-photo" src="/studio.webp" alt="TaalLab recording studio" />
         <div className="studio-photo-overlay" />
         <div className="studio-visual-label"><span>TAAL LAB</span><small>RECORDING STUDIO</small></div>
       </div>
-      <div className="studio-copy scroll-reveal">
+      <div className="studio-copy reveal">
         <span className="section-kicker">THE STUDIO</span>
         <h2>A focused room for<br/><em>great sound.</em></h2>
         <p>TaalLab is a dedicated recording and music-production studio built for artists, creators and projects that deserve attention to detail.</p>
         <p>Bring an idea, a finished song or simply a voice. We'll help you shape it into something you can be proud of.</p>
         <div className="equipment-list" id="equipment">
-          <div className="scroll-reveal"><strong>01</strong><span>Recording &amp; vocal production</span></div>
-          <div className="scroll-reveal"><strong>02</strong><span>Music production &amp; arrangement</span></div>
-          <div className="scroll-reveal"><strong>03</strong><span>Mixing &amp; mastering workflow</span></div>
-          <div className="scroll-reveal"><strong>04</strong><span>Voice over &amp; dubbing setup</span></div>
+          <div className="reveal"><strong>01</strong><span>Recording &amp; vocal production</span></div>
+          <div className="reveal"><strong>02</strong><span>Music production &amp; arrangement</span></div>
+          <div className="reveal"><strong>03</strong><span>Mixing &amp; mastering workflow</span></div>
+          <div className="reveal"><strong>04</strong><span>Voice over &amp; dubbing setup</span></div>
         </div>
       </div>
     </section>
 
     <section className="site-section booking-section reveal-on-scroll" id="book-session">
-      <div className="booking-intro scroll-reveal">
+      <div className="booking-intro reveal">
         <span className="section-kicker">BOOK A SESSION</span>
         <h2>Let's make<br/><em>something.</em></h2>
         <p>Tell us what you're working on and what you need. We'll get back to you with the next steps.</p>
-        <div className="booking-detail"><span>01</span><div><strong>Choose a service</strong><small>Recording, production, mixing, mastering or voice work.</small></div></div>
-        <div className="booking-detail"><span>02</span><div><strong>Tell us about the project</strong><small>Give us your preferred date and a little context.</small></div></div>
+        <div className="booking-detail reveal"><span>01</span><div><strong>Choose a service</strong><small>Recording, production, mixing, mastering or voice work.</small></div></div>
+        <div className="booking-detail reveal"><span>02</span><div><strong>Tell us about the project</strong><small>Give us your preferred date and a little context.</small></div></div>
       </div>
-      <form className="booking-form scroll-reveal" onSubmit={submitBooking}>
+      <form className="booking-form reveal" onSubmit={submitBooking}>
         <div className="form-row">
           <label>Name<input name="name" required placeholder="Your name" /></label>
           <label>Email<input name="email" type="email" required placeholder="you@example.com" /></label>
@@ -281,7 +268,7 @@ function Landing() {
           <span className="section-kicker">GET IN TOUCH</span>
           <h2>Come make<br/><em>some noise.</em></h2>
         </div>
-        <div className="contact-grid scroll-reveal">
+        <div className="contact-grid reveal">
           <a id="contact-email" href="mailto:contact@taallab.work"><span>Email</span><strong>contact@taallab.work</strong></a>
           <a id="contact-instagram" href="https://www.instagram.com/taallabstudio" target="_blank" rel="noopener noreferrer"><span>Instagram</span><strong>@taallabstudio</strong></a>
           <div id="contact-whatsapp"><span>WhatsApp</span><strong>Contact us for the studio number</strong></div>
