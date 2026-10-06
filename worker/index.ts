@@ -644,7 +644,12 @@ async function adminOverview(env: Env) {
         GROUP BY storage_key
       )),0) storage
       FROM transfers WHERE status!='deleted'`).first(),
-    env.DB.prepare(`SELECT t.*, u.email recipient_email, COALESCE(SUM(f.download_count),0) downloads
+    env.DB.prepare(`SELECT t.*, u.email recipient_email,
+      COALESCE(SUM(f.download_count),0) downloads,
+      COALESCE(
+        (SELECT original_name FROM files WHERE transfer_id=t.id ORDER BY created_at LIMIT 1),
+        'Untitled transfer'
+      ) file_name
       FROM transfers t
       LEFT JOIN users u ON u.id=t.user_id
       LEFT JOIN files f ON f.transfer_id=t.id
@@ -957,6 +962,13 @@ export default {
             downloadUrl: `${origin(env)}/d/${id}`,
           })),
         });
+      }
+
+      const adminClearDeleted = url.pathname === "/api/admin/transfers/deleted" && req.method === "DELETE";
+      if (adminClearDeleted) {
+        await requireAdmin(req, env);
+        await env.DB.prepare("DELETE FROM transfers WHERE status='deleted'").run();
+        return json({ ok: true });
       }
 
       const adminDelete = url.pathname.match(/^\/api\/admin\/transfers\/([^/]+)$/);
