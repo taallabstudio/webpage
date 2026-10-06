@@ -674,10 +674,20 @@ html{scroll-behavior:smooth}
   will-change:opacity,transform;
 }
 
-.landing .site-section .section-heading.is-visible,
+.landing .site-section.reveal-on-scroll.is-visible .section-heading,
 .landing .site-section .scroll-reveal.is-visible,
-.landing .contact-section .contact-inner > div:first-child.is-visible,
-.landing .contact-section .contact-grid > *.is-visible{
+.landing .contact-section.reveal-on-scroll.is-visible .contact-inner > div:first-child,
+.landing .contact-section.reveal-on-scroll.is-visible .contact-grid{
+  opacity:1 !important;
+  transform:translate3d(0,0,0) !important;
+}
+
+.landing .contact-section .contact-grid > *{
+  opacity:0 !important;
+  transform:translate3d(0,22px,0) !important;
+  transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1) !important;
+}
+.landing .contact-section.reveal-on-scroll.is-visible .contact-grid > *{
   opacity:1 !important;
   transform:translate3d(0,0,0) !important;
 }
