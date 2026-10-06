@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { createRoot } from "react-dom/client";
 import {
   ArrowDownToLine, ArrowLeft, Check, ChevronRight, Clock3, Copy, Download,
@@ -104,6 +106,30 @@ function Landing() {
     window.addEventListener("scroll", onRevealScroll, { passive: true });
     window.addEventListener("resize", syncReveals);
 
+    gsap.registerPlugin(ScrollTrigger);
+
+    const scrollHeadphone = document.querySelector(".scroll-headphone");
+    const landing = document.querySelector(".landing");
+    let headphoneTween = null;
+
+    if (scrollHeadphone && landing) {
+      gsap.set(scrollHeadphone, {
+        rotation: 0,
+        transformOrigin: "50% 50%",
+      });
+
+      headphoneTween = gsap.to(scrollHeadphone, {
+        rotation: 720,
+        ease: "none",
+        scrollTrigger: {
+          trigger: landing,
+          start: "top top",
+          end: "bottom bottom",
+          scrub: true,
+        },
+      });
+    }
+
     // Keep the existing hero scroll animation untouched.
     const stage = document.querySelector(".hero-scroll-stage");
     let raf = 0;
@@ -153,6 +179,7 @@ function Landing() {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", updateHero);
       if (raf) cancelAnimationFrame(raf);
+      if (headphoneTween) headphoneTween.kill();
     };
   }, []);
 
