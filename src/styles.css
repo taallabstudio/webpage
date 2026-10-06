@@ -1077,3 +1077,59 @@ html{scroll-behavior:smooth}
   backdrop-filter:blur(3px);
   pointer-events:none;
 }
+
+/* Admin transfer filters */
+.transfer-filter-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 18px;
+  border-bottom:1px solid var(--line);
+  background:#fbfbfc;
+}
+.transfer-filter-group{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.transfer-filter-group>span{
+  color:#858c95;
+  font-size:10px;
+  font-weight:600;
+  margin-right:4px;
+}
+.transfer-filter-group button{
+  border:1px solid transparent;
+  background:transparent;
+  color:#68717c;
+  border-radius:9px;
+  padding:7px 11px;
+  font-size:10px;
+  font-weight:600;
+  cursor:pointer;
+}
+.transfer-filter-group button:hover{
+  background:#f0f2f4;
+}
+.transfer-filter-group button.active{
+  background:#eaf3fc;
+  border-color:#cfe4f8;
+  color:#147be8;
+}
+@media(max-width:760px){
+  .transfer-filter-bar{
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .transfer-filter-group{
+    width:100%;
+    overflow:auto;
+  }
+  .transfer-filter-group button{
+    flex:1;
+  }
+  .transfer-filter-bar .danger-btn{
+    justify-content:center;
+  }
+}
