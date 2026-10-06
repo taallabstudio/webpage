@@ -30,10 +30,10 @@ const api = async (path, options={}) => {
   return data;
 };
 
-function Logo() {
-  return <div className="brand" aria-label="TrackDeliver by TaalLab">
+function Logo({studioOnly=false}) {
+  return <div className="brand" aria-label={studioOnly ? "TaalLab" : "TrackDeliver by TaalLab"}>
     <span className="brand-logo" aria-hidden="true"><img src="/logo.svg" alt="" /></span>
-    <span>TrackDeliver <small>by TaalLab</small></span>
+    <span>{studioOnly ? "TaalLab" : <>TrackDeliver <small>by TaalLab</small></>}</span>
   </div>;
 }
 
@@ -60,7 +60,7 @@ function Landing() {
         <a href="#tracks">Tracks</a>
         <a href="#contact">Contact</a>
       </nav>
-      <a className="studio-brand" href="#home" aria-label="TaalLab home"><Logo /></a>
+      <a className="studio-brand" href="#home" aria-label="TaalLab home"><Logo studioOnly /></a>
     </header>
     <div className="landing-center">
       <div className="eyebrow"><span className="dot" /> TAAL LAB • RECORDING &amp; MUSIC PRODUCTION</div>
