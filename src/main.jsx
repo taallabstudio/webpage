@@ -104,38 +104,6 @@ function Landing() {
     window.addEventListener("scroll", onRevealScroll, { passive: true });
     window.addEventListener("resize", syncReveals);
 
-    // Scroll-driven headphone: a separate layer that travels down the page,
-    // rotates with scroll, and stays behind the important content.
-    const scrollHeadphone = document.querySelector(".scroll-headphone");
-    let headphoneRaf = 0;
-
-    const updateScrollHeadphone = () => {
-      headphoneRaf = 0;
-      if (!scrollHeadphone) return;
-
-      const maxScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
-      const progress = Math.min(1, Math.max(0, window.scrollY / maxScroll));
-      const heroFade = Math.min(1, Math.max(0, (window.scrollY - window.innerHeight * 0.42) / (window.innerHeight * 0.55)));
-      const x = 68 - progress * 52;
-      const y = 42 + progress * 48;
-      const rotation = progress * 720;
-      const scale = 0.52 + progress * 0.22;
-
-      scrollHeadphone.style.setProperty("--headphone-x", x.toFixed(3) + "vw");
-      scrollHeadphone.style.setProperty("--headphone-y", y.toFixed(3) + "vh");
-      scrollHeadphone.style.setProperty("--headphone-rotation", rotation.toFixed(2) + "deg");
-      scrollHeadphone.style.setProperty("--headphone-scale", scale.toFixed(3));
-      scrollHeadphone.style.setProperty("--headphone-opacity", heroFade.toFixed(3));
-    };
-
-    const onHeadphoneScroll = () => {
-      if (!headphoneRaf) headphoneRaf = requestAnimationFrame(updateScrollHeadphone);
-    };
-
-    updateScrollHeadphone();
-    window.addEventListener("scroll", onHeadphoneScroll, { passive: true });
-    window.addEventListener("resize", updateScrollHeadphone);
-
     // Keep the existing hero scroll animation untouched.
     const stage = document.querySelector(".hero-scroll-stage");
     let raf = 0;
@@ -151,6 +119,22 @@ function Landing() {
 
       stage.style.setProperty("--hero-progress", progress.toFixed(4));
       stage.classList.toggle("hero-exiting", progress > 0.34);
+
+      const heroHeadphones = stage.querySelector(".hero-headphones");
+      if (heroHeadphones) {
+        const maxPageScroll = Math.max(
+          document.documentElement.scrollHeight - viewportHeight,
+          1
+        );
+        const pageProgress = Math.min(
+          1,
+          Math.max(0, window.scrollY / maxPageScroll)
+        );
+        heroHeadphones.style.setProperty(
+          "--headphone-page-rotation",
+          (pageProgress * 720).toFixed(2) + "deg"
+        );
+      }
     };
 
     const onScroll = () => {
@@ -188,13 +172,6 @@ function Landing() {
 
   return <main className="landing" id="home">
     <div className="landing-glow" />
-    <img
-      className="scroll-headphone"
-      src="/headphones.webp"
-      alt=""
-      aria-hidden="true"
-    />
-
     <header className="landing-nav">
       <a className="studio-brand" href="#home" aria-label="TaalLab home"><Logo studioOnly /></a>
 
