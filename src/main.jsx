@@ -3,8 +3,7 @@ import { createRoot } from "react-dom/client";
 import {
   ArrowDownToLine, ArrowLeft, Check, ChevronRight, Clock3, Copy, Download,
   Eye, File, FileAudio, FileImage, FileText, FileVideo, FolderOpen, Gauge,
-  HardDrive, Link2, LockKeyhole, LogOut, Menu, MessageSquare, MoreHorizontal,
-  Play, Plus, RefreshCw, Search, Settings, ShieldCheck, Trash2, UploadCloud,
+  HardDrive, Link2, LockKeyhole, LogOut, Menu, MessageSquare, MoreHorizontal, Plus, RefreshCw, Search, Settings, ShieldCheck, Trash2, UploadCloud,
   UserRound, X
 } from "lucide-react";
 import "./styles.css";
@@ -55,7 +54,7 @@ function Landing() {
     const body = encodeURIComponent(
       `Name: ${form.get("name")}\nEmail: ${form.get("email")}\nWhatsApp: ${form.get("whatsapp") || "Not provided"}\nService: ${form.get("service")}\nPreferred date: ${form.get("date") || "Flexible"}\n\nMessage:\n${form.get("message") || ""}`
     );
-    window.location.href = `mailto:taallabstudio@gmail.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:contact@taallab.work?subject=${subject}&body=${body}`;
     setBookingSent(true);
   }
 
@@ -87,7 +86,6 @@ function Landing() {
           </div>
         </div>
 
-        <a href="#tracks">Tracks / Work</a>
         <a href="#book-session">Book a Session</a>
 
         <div className="nav-dropdown">
@@ -114,7 +112,7 @@ function Landing() {
         <p>Music production, recording, mixing and mastering for artists who care about every detail.</p>
         <div className="hero-actions">
           <a className="primary-btn" href="#book-session">Book a session <ChevronRight size={16}/></a>
-          <a className="hero-link" href="#tracks">Listen to our work <ChevronRight size={16}/></a>
+          
         </div>
       </div>
       <div className="hero-note">
@@ -167,33 +165,6 @@ function Landing() {
       </div>
     </section>
 
-    <section className="site-section tracks-section" id="tracks">
-      <div className="section-heading section-heading-row">
-        <div>
-          <span className="section-kicker">SELECTED WORK</span>
-          <h2>Tracks / <em>Work.</em></h2>
-        </div>
-        <p>Music produced, recorded and shaped at TaalLab. Add your releases here as the catalogue grows.</p>
-      </div>
-      <div className="track-grid">
-        <article className="track-card featured">
-          <div className="track-art"><span>TL</span></div>
-          <div className="track-info"><span>TAAL LAB • 001</span><h3>Your next release</h3><p>Artist / Project name</p></div>
-          <button className="track-play" aria-label="Play track"><Play size={17} fill="currentColor"/></button>
-        </article>
-        <article className="track-card">
-          <div className="track-art alt"><span>TL</span></div>
-          <div className="track-info"><span>TAAL LAB • 002</span><h3>Studio session</h3><p>Artist / Project name</p></div>
-          <button className="track-play" aria-label="Play track"><Play size={17} fill="currentColor"/></button>
-        </article>
-        <article className="track-card">
-          <div className="track-art third"><span>TL</span></div>
-          <div className="track-info"><span>TAAL LAB • 003</span><h3>Production work</h3><p>Artist / Project name</p></div>
-          <button className="track-play" aria-label="Play track"><Play size={17} fill="currentColor"/></button>
-        </article>
-      </div>
-    </section>
-
     <section className="site-section booking-section" id="book-session">
       <div className="booking-intro">
         <span className="section-kicker">BOOK A SESSION</span>
@@ -216,7 +187,7 @@ function Landing() {
         <label>Preferred date <span>(optional)</span><input name="date" type="date" /></label>
         <label>Message <span>(optional)</span><textarea name="message" rows="5" placeholder="Tell us about your project..." /></label>
         <button className="primary-btn" type="submit">Send booking enquiry <ChevronRight size={16}/></button>
-        {bookingSent && <p className="booking-note">Your email app should have opened with the enquiry. If it didn't, email us directly at taallabstudio@gmail.com.</p>}
+        {bookingSent && <p className="booking-note">Your email app should have opened with the enquiry. If it didn't, email us directly at contact@taallab.work.</p>}
       </form>
     </section>
 
@@ -227,10 +198,10 @@ function Landing() {
           <h2>Come make<br/><em>some noise.</em></h2>
         </div>
         <div className="contact-grid">
-          <a id="contact-email" href="mailto:taallabstudio@gmail.com"><span>Email</span><strong>taallabstudio@gmail.com</strong></a>
+          <a id="contact-email" href="mailto:contact@taallab.work"><span>Email</span><strong>contact@taallab.work</strong></a>
           <a id="contact-instagram" href="https://www.instagram.com/taallabstudio" target="_blank" rel="noopener noreferrer"><span>Instagram</span><strong>@taallabstudio</strong></a>
           <div id="contact-whatsapp"><span>WhatsApp</span><strong>Contact us for the studio number</strong></div>
-          <div id="contact-location"><span>Location</span><strong>TaalLab Studio • India</strong></div>
+          <a id="contact-location" href="https://share.google/gHDTeuoEYJrjQpcFk" target="_blank" rel="noopener noreferrer"><span>Location</span><strong>Open TaalLab Studio in Maps</strong></a>
         </div>
       </div>
       <footer><Logo studioOnly/><span>© 2026 TaalLab. Music, recording &amp; production.</span></footer>
