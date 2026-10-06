@@ -56,7 +56,7 @@ function Landing() {
           observer.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.12, rootMargin: "0px 0px -7% 0px" });
+    }, { threshold: 0.08, rootMargin: "0px 0px -12% 0px" });
 
     revealItems.forEach((item) => observer.observe(item));
 
