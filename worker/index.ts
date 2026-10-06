@@ -967,7 +967,10 @@ export default {
       const adminClearDeleted = url.pathname === "/api/admin/transfers/deleted" && req.method === "DELETE";
       if (adminClearDeleted) {
         await requireAdmin(req, env);
-        await env.DB.prepare("DELETE FROM transfers WHERE status='deleted'").run();
+        await env.DB.batch([
+          env.DB.prepare("DELETE FROM files WHERE transfer_id IN (SELECT id FROM transfers WHERE status='deleted')"),
+          env.DB.prepare("DELETE FROM transfers WHERE status='deleted'"),
+        ]);
         return json({ ok: true });
       }
 
