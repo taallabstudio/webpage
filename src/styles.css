@@ -856,3 +856,45 @@ html{scroll-behavior:smooth}
 #contact .contact-grid > :nth-child(2){transition-delay:100ms !important}
 #contact .contact-grid > :nth-child(3){transition-delay:200ms !important}
 #contact .contact-grid > :nth-child(4){transition-delay:300ms !important}
+
+
+/* TaalLab section scroll motion — final override.
+   Scroll down: fade + rise into place.
+   Scroll up: fade + fall back out.
+   The JavaScript only changes data-scroll-reveal; CSS handles the animation. */
+.landing .site-section .section-heading,
+.landing .site-section .scroll-reveal,
+.landing .contact-section .contact-inner > div:first-child,
+.landing .contact-section .contact-grid > *{
+  opacity:0 !important;
+  transform:translate3d(0,48px,0) !important;
+  transition:
+    opacity 1100ms cubic-bezier(.22,1,.36,1),
+    transform 1100ms cubic-bezier(.22,1,.36,1) !important;
+  will-change:opacity,transform;
+}
+
+.landing .site-section .section-heading[data-scroll-reveal="in"],
+.landing .site-section .scroll-reveal[data-scroll-reveal="in"],
+.landing .contact-section .contact-inner > div:first-child[data-scroll-reveal="in"],
+.landing .contact-section .contact-grid > *[data-scroll-reveal="in"]{
+  opacity:1 !important;
+  transform:translate3d(0,0,0) !important;
+}
+
+#services .service-card:nth-child(1){transition-delay:0ms !important}
+#services .service-card:nth-child(2){transition-delay:100ms !important}
+#services .service-card:nth-child(3){transition-delay:200ms !important}
+#services .service-card:nth-child(4){transition-delay:300ms !important}
+#services .service-card:nth-child(5){transition-delay:400ms !important}
+
+#studio .studio-photo-wrap{transition-delay:0ms !important}
+#studio .studio-copy{transition-delay:140ms !important}
+
+#book-session .booking-intro{transition-delay:0ms !important}
+#book-session .booking-form{transition-delay:140ms !important}
+
+#contact .contact-grid > :nth-child(1){transition-delay:0ms !important}
+#contact .contact-grid > :nth-child(2){transition-delay:100ms !important}
+#contact .contact-grid > :nth-child(3){transition-delay:200ms !important}
+#contact .contact-grid > :nth-child(4){transition-delay:300ms !important}
