@@ -31,7 +31,7 @@ const api = async (path, options={}) => {
 
 function Logo({studioOnly=false}) {
   return <div className="brand" aria-label={studioOnly ? "TaalLab" : "TrackDeliver by TaalLab"}>
-    <span className="brand-logo" aria-hidden="true"><img src="/logo.svg" alt="" /></span>
+    <span className="brand-logo" aria-hidden="true"><img src="/logo.png" alt="" /></span>
     <span>{studioOnly ? "TaalLab" : <>TrackDeliver <small>by TaalLab</small></>}</span>
   </div>;
 }
