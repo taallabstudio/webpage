@@ -54,7 +54,6 @@ html{scroll-behavior:smooth}
   .reveal-stagger>*:nth-child(3){transition-delay:.14s}
   .reveal-stagger>*:nth-child(4){transition-delay:.19s}
   .reveal-stagger>*:nth-child(5){transition-delay:.24s}
-  .reveal-stagger>*{opacity:1;transform:translateY(0)}
 }
 
 
@@ -363,5 +362,47 @@ html{scroll-behavior:smooth}
     opacity:1!important;
     transform:none!important;
     transition:none!important;
+  }
+}
+
+
+/* Reliable whole-page scroll motion */
+@media(prefers-reduced-motion:no-preference){
+  .site-section,
+  .contact-section{
+    --section-progress:0;
+  }
+
+  .site-section.reveal-on-scroll .section-heading,
+  .site-section.reveal-on-scroll .studio-copy,
+  .site-section.reveal-on-scroll .booking-intro,
+  .site-section.reveal-on-scroll .booking-form,
+  .contact-section.reveal-on-scroll .contact-inner{
+    transform:translate3d(0, calc((1 - var(--section-progress)) * 14px), 0);
+    transition:transform .9s cubic-bezier(.16,1,.3,1);
+  }
+
+  .site-section.reveal-on-scroll.is-visible .section-heading,
+  .site-section.reveal-on-scroll.is-visible .studio-copy,
+  .site-section.reveal-on-scroll.is-visible .booking-intro,
+  .site-section.reveal-on-scroll.is-visible .booking-form,
+  .contact-section.reveal-on-scroll.is-visible .contact-inner{
+    transform:translate3d(0,0,0);
+  }
+
+  .studio-photo{
+    transform:
+      scale(calc(1.07 - var(--section-progress) * .05))
+      translate3d(0, calc((.5 - var(--section-progress)) * 24px), 0);
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .site-section.reveal-on-scroll .section-heading,
+  .site-section.reveal-on-scroll .studio-copy,
+  .site-section.reveal-on-scroll .booking-intro,
+  .site-section.reveal-on-scroll .booking-form,
+  .contact-section.reveal-on-scroll .contact-inner{
+    transform:none!important;
   }
 }
