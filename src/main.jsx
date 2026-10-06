@@ -241,7 +241,7 @@ function Landing() {
     </header>
 
     <img
-      className="hero-headphones"
+      className="scroll-headphone"
       src="/headphones.webp"
       alt=""
       aria-hidden="true"
