@@ -934,3 +934,50 @@ html{scroll-behavior:smooth}
 #contact .scroll-reveal-item:nth-child(2){transition-delay:100ms !important}
 #contact .scroll-reveal-item:nth-child(3){transition-delay:200ms !important}
 #contact .scroll-reveal-item:nth-child(4){transition-delay:300ms !important}
+
+
+/* FINAL TUTORIAL SCROLL REVEAL
+   IntersectionObserver toggles .show.
+   Fade + translate on enter and reverse on exit. */
+.landing .site-section.reveal-on-scroll .reveal,
+.landing .contact-section.reveal-on-scroll .reveal {
+  opacity:0 !important;
+  transform:translate3d(0,60px,0) !important;
+  transition:opacity 900ms ease, transform 900ms ease !important;
+  will-change:opacity,transform;
+}
+.landing .site-section.reveal-on-scroll .reveal.show,
+.landing .contact-section.reveal-on-scroll .reveal.show {
+  opacity:1 !important;
+  transform:translate3d(0,0,0) !important;
+}
+
+#services .service-card.reveal:nth-child(1){transition-delay:0ms !important}
+#services .service-card.reveal:nth-child(2){transition-delay:100ms !important}
+#services .service-card.reveal:nth-child(3){transition-delay:200ms !important}
+#services .service-card.reveal:nth-child(4){transition-delay:300ms !important}
+#services .service-card.reveal:nth-child(5){transition-delay:400ms !important}
+
+#studio .equipment-list .reveal:nth-child(1){transition-delay:0ms !important}
+#studio .equipment-list .reveal:nth-child(2){transition-delay:100ms !important}
+#studio .equipment-list .reveal:nth-child(3){transition-delay:200ms !important}
+#studio .equipment-list .reveal:nth-child(4){transition-delay:300ms !important}
+
+#book-session .booking-detail:nth-child(1){transition-delay:0ms !important}
+#book-session .booking-detail:nth-child(2){transition-delay:120ms !important}
+
+#contact .contact-grid .reveal:nth-child(1){transition-delay:0ms !important}
+#contact .contact-grid .reveal:nth-child(2){transition-delay:100ms !important}
+#contact .contact-grid .reveal:nth-child(3){transition-delay:200ms !important}
+#contact .contact-grid .reveal:nth-child(4){transition-delay:300ms !important}
+
+@media(max-width:760px){
+  .landing .site-section.reveal-on-scroll .reveal,
+  .landing .contact-section.reveal-on-scroll .reveal{
+    transform:translate3d(0,35px,0) !important;
+  }
+  .landing .site-section.reveal-on-scroll .reveal.show,
+  .landing .contact-section.reveal-on-scroll .reveal.show{
+    transform:translate3d(0,0,0) !important;
+  }
+}
