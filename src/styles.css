@@ -1017,7 +1017,7 @@ html{scroll-behavior:smooth}
   margin:0;
   display:block;
   object-fit:contain;
-  transform:translate3d(-50%,-50%,0);
+  transform:none;
   transform-origin:50% 50%;
   pointer-events:none;
   user-select:none;
@@ -1056,6 +1056,24 @@ html{scroll-behavior:smooth}
 
 @media(prefers-reduced-motion:reduce){
   .scroll-headphone{
-    transform:translate3d(-50%,-50%,0) !important;
+    transform:none !important;
   }
+}
+
+/* Keep the fixed headphone visually behind the studio copy without
+   sacrificing text contrast. The soft panel is only a readability layer. */
+.landing #studio .studio-copy{
+  position:relative;
+  isolation:isolate;
+}
+.landing #studio .studio-copy::before{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  inset:-34px -42px;
+  border-radius:32px;
+  background:rgba(244,246,248,.86);
+  box-shadow:0 18px 55px rgba(244,246,248,.55);
+  backdrop-filter:blur(3px);
+  pointer-events:none;
 }
