@@ -46,38 +46,197 @@ function IconFor({kind}) {
 }
 
 function Landing() {
+  const [bookingSent, setBookingSent] = useState(false);
+
+  function submitBooking(e) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const subject = encodeURIComponent(`TaalLab session booking — ${form.get("service")}`);
+    const body = encodeURIComponent(
+      `Name: ${form.get("name")}\nEmail: ${form.get("email")}\nWhatsApp: ${form.get("whatsapp") || "Not provided"}\nService: ${form.get("service")}\nPreferred date: ${form.get("date") || "Flexible"}\n\nMessage:\n${form.get("message") || ""}`
+    );
+    window.location.href = `mailto:taallabstudio@gmail.com?subject=${subject}&body=${body}`;
+    setBookingSent(true);
+  }
+
   return <main className="landing" id="home">
     <div className="landing-glow" />
+
     <header className="landing-nav">
       <a className="studio-brand" href="#home" aria-label="TaalLab home"><Logo studioOnly /></a>
+
       <nav className="studio-nav" aria-label="Main navigation">
         <a href="#home">Home</a>
-        <a href="#shop">Shop</a>
-        <a href="#book-session">Book Session</a>
-        <a href="#tracks">Tracks</a>
-        <a href="#contact">Contact</a>
+
+        <div className="nav-dropdown">
+          <a href="#services">Services <span className="nav-caret">⌄</span></a>
+          <div className="nav-menu">
+            <a href="#music-production">Music Production</a>
+            <a href="#recording">Recording</a>
+            <a href="#mixing">Mixing</a>
+            <a href="#mastering">Mastering</a>
+            <a href="#dubbing">Dubbing / Voice Over</a>
+          </div>
+        </div>
+
+        <div className="nav-dropdown">
+          <a href="#studio">Studio <span className="nav-caret">⌄</span></a>
+          <div className="nav-menu">
+            <a href="#studio">The Studio</a>
+            <a href="#equipment">Equipment &amp; Setup</a>
+          </div>
+        </div>
+
+        <a href="#tracks">Tracks / Work</a>
+        <a href="#book-session">Book a Session</a>
+
+        <div className="nav-dropdown">
+          <a href="#contact">Contact <span className="nav-caret">⌄</span></a>
+          <div className="nav-menu nav-menu-right">
+            <a href="#contact-email">Email</a>
+            <a href="#contact-instagram">Instagram</a>
+            <a href="#contact-whatsapp">WhatsApp</a>
+            <a href="#contact-location">Location</a>
+          </div>
+        </div>
       </nav>
+
       <div className="landing-auth">
         <a className="login-nav-btn secondary" href="/login">Sign up</a>
         <a className="login-nav-btn" href="/login">Login</a>
       </div>
     </header>
-    <div className="landing-center">
-      <div className="eyebrow"><span className="dot" /> TAAL LAB • RECORDING &amp; MUSIC PRODUCTION</div>
-      <h1>Sound that feels<br/>like you.</h1>
-      <p>Recording, production, mixing and mastering for artists who care about every detail.</p>
-      <div className="hero-actions">
-        <a className="primary-btn" href="#book-session">Book a session <ChevronRight size={16}/></a>
-        <a className="hero-link" href="#tracks">Listen to our work <ChevronRight size={16}/></a>
+
+    <section className="hero-section">
+      <div className="hero-copy">
+        <div className="eyebrow"><span className="dot" /> TAAL LAB • RECORDING &amp; MUSIC PRODUCTION</div>
+        <h1>Sound that feels<br/><em>like you.</em></h1>
+        <p>Music production, recording, mixing and mastering for artists who care about every detail.</p>
+        <div className="hero-actions">
+          <a className="primary-btn" href="#book-session">Book a session <ChevronRight size={16}/></a>
+          <a className="hero-link" href="#tracks">Listen to our work <ChevronRight size={16}/></a>
+        </div>
       </div>
-    </div>
-    <section className="studio-section" id="shop" aria-label="Shop"></section>
-    <section className="studio-section" id="book-session" aria-label="Book a session"></section>
-    <section className="studio-section" id="tracks" aria-label="Tracks"></section>
-    <section className="studio-section" id="contact" aria-label="Contact"></section>
+      <div className="hero-note">
+        <span>TAAL LAB</span>
+        <small>Music • Voice • Production</small>
+      </div>
+    </section>
+
+    <section className="site-section services-section" id="services">
+      <div className="section-heading">
+        <span className="section-kicker">WHAT WE DO</span>
+        <h2>Everything your<br/><em>sound</em> needs.</h2>
+        <p>From the first idea to the final master, TaalLab gives your project a focused space to become what you imagined.</p>
+      </div>
+      <div className="service-grid">
+        {[
+          ["01","Music Production","From arrangement and sound design to the finished production.","music-production"],
+          ["02","Recording","Clean, detailed recording for vocals, instruments and voice work.","recording"],
+          ["03","Mixing","A balanced, powerful mix that gives every element its place.","mixing"],
+          ["04","Mastering","Final polish, translation and loudness for release-ready audio.","mastering"],
+          ["05","Dubbing / Voice Over","Professional voice recording, dubbing and spoken-word production.","dubbing"]
+        ].map(([num,title,desc,id]) =>
+          <article className="service-card" id={id} key={id}>
+            <span>{num}</span>
+            <h3>{title}</h3>
+            <p>{desc}</p>
+            <a href="#book-session">Enquire <ChevronRight size={15}/></a>
+          </article>
+        )}
+      </div>
+    </section>
+
+    <section className="site-section studio-section-new" id="studio">
+      <div className="studio-visual" aria-label="TaalLab studio photo placeholder">
+        <div className="studio-visual-grid" />
+        <div className="studio-mark">TL</div>
+        <div className="studio-visual-label"><span>TAAL LAB</span><small>RECORDING STUDIO</small></div>
+      </div>
+      <div className="studio-copy">
+        <span className="section-kicker">THE STUDIO</span>
+        <h2>A focused room for<br/><em>great sound.</em></h2>
+        <p>TaalLab is a dedicated recording and music-production studio built for artists, creators and projects that deserve attention to detail.</p>
+        <p>Bring an idea, a finished song or simply a voice. We'll help you shape it into something you can be proud of.</p>
+        <div className="equipment-list" id="equipment">
+          <div><strong>01</strong><span>Recording &amp; vocal production</span></div>
+          <div><strong>02</strong><span>Music production &amp; arrangement</span></div>
+          <div><strong>03</strong><span>Mixing &amp; mastering workflow</span></div>
+          <div><strong>04</strong><span>Voice over &amp; dubbing setup</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section className="site-section tracks-section" id="tracks">
+      <div className="section-heading section-heading-row">
+        <div>
+          <span className="section-kicker">SELECTED WORK</span>
+          <h2>Tracks / <em>Work.</em></h2>
+        </div>
+        <p>Music produced, recorded and shaped at TaalLab. Add your releases here as the catalogue grows.</p>
+      </div>
+      <div className="track-grid">
+        <article className="track-card featured">
+          <div className="track-art"><span>TL</span></div>
+          <div className="track-info"><span>TAAL LAB • 001</span><h3>Your next release</h3><p>Artist / Project name</p></div>
+          <button className="track-play" aria-label="Play track"><Play size={17} fill="currentColor"/></button>
+        </article>
+        <article className="track-card">
+          <div className="track-art alt"><span>TL</span></div>
+          <div className="track-info"><span>TAAL LAB • 002</span><h3>Studio session</h3><p>Artist / Project name</p></div>
+          <button className="track-play" aria-label="Play track"><Play size={17} fill="currentColor"/></button>
+        </article>
+        <article className="track-card">
+          <div className="track-art third"><span>TL</span></div>
+          <div className="track-info"><span>TAAL LAB • 003</span><h3>Production work</h3><p>Artist / Project name</p></div>
+          <button className="track-play" aria-label="Play track"><Play size={17} fill="currentColor"/></button>
+        </article>
+      </div>
+    </section>
+
+    <section className="site-section booking-section" id="book-session">
+      <div className="booking-intro">
+        <span className="section-kicker">BOOK A SESSION</span>
+        <h2>Let's make<br/><em>something.</em></h2>
+        <p>Tell us what you're working on and what you need. We'll get back to you with the next steps.</p>
+        <div className="booking-detail"><span>01</span><div><strong>Choose a service</strong><small>Recording, production, mixing, mastering or voice work.</small></div></div>
+        <div className="booking-detail"><span>02</span><div><strong>Tell us about the project</strong><small>Give us your preferred date and a little context.</small></div></div>
+      </div>
+      <form className="booking-form" onSubmit={submitBooking}>
+        <div className="form-row">
+          <label>Name<input name="name" required placeholder="Your name" /></label>
+          <label>Email<input name="email" type="email" required placeholder="you@example.com" /></label>
+        </div>
+        <div className="form-row">
+          <label>WhatsApp <span>(optional)</span><input name="whatsapp" placeholder="+91..." /></label>
+          <label>Service<select name="service" defaultValue="Music Production">
+            <option>Music Production</option><option>Recording</option><option>Mixing</option><option>Mastering</option><option>Dubbing / Voice Over</option>
+          </select></label>
+        </div>
+        <label>Preferred date <span>(optional)</span><input name="date" type="date" /></label>
+        <label>Message <span>(optional)</span><textarea name="message" rows="5" placeholder="Tell us about your project..." /></label>
+        <button className="primary-btn" type="submit">Send booking enquiry <ChevronRight size={16}/></button>
+        {bookingSent && <p className="booking-note">Your email app should have opened with the enquiry. If it didn't, email us directly at taallabstudio@gmail.com.</p>}
+      </form>
+    </section>
+
+    <section className="contact-section" id="contact">
+      <div className="contact-inner">
+        <div>
+          <span className="section-kicker">GET IN TOUCH</span>
+          <h2>Come make<br/><em>some noise.</em></h2>
+        </div>
+        <div className="contact-grid">
+          <a id="contact-email" href="mailto:taallabstudio@gmail.com"><span>Email</span><strong>taallabstudio@gmail.com</strong></a>
+          <a id="contact-instagram" href="https://www.instagram.com/taallabstudio" target="_blank" rel="noopener noreferrer"><span>Instagram</span><strong>@taallabstudio</strong></a>
+          <div id="contact-whatsapp"><span>WhatsApp</span><strong>Contact us for the studio number</strong></div>
+          <div id="contact-location"><span>Location</span><strong>TaalLab Studio • India</strong></div>
+        </div>
+      </div>
+      <footer><Logo studioOnly/><span>© 2026 TaalLab. Music, recording &amp; production.</span></footer>
+    </section>
   </main>;
 }
-
 function Header({admin=false, onLogout}) {
   return <header className="topbar">
     <Logo />
