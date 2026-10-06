@@ -48,27 +48,62 @@ function Landing() {
   const [bookingSent, setBookingSent] = useState(false);
 
   useEffect(() => {
-    // Scroll reveal — follows the supplied IntersectionObserver tutorial:
-    // .reveal starts hidden/down, and .show brings it into place.
-    const revealElements = document.querySelectorAll(".landing .reveal");
+    // Scroll reveal based on the supplied Coding2GO tutorial.
+    // IntersectionObserver is the primary trigger. A tiny scroll-position
+    // fallback is also used so the animation cannot fail silently in a
+    // browser/environment where observer callbacks are delayed.
+    const revealElements = Array.from(
+      document.querySelectorAll(".landing .reveal")
+    );
+
+    if (!revealElements.length) return;
+
+    const setVisibility = (element, visible) => {
+      element.classList.toggle("show", visible);
+    };
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("show");
-          } else {
-            entry.target.classList.remove("show");
-          }
+          setVisibility(entry.target, entry.isIntersecting);
         });
       },
       {
-        threshold: 0.12,
-        rootMargin: "0px 0px -8% 0px",
+        threshold: 0.01,
+        rootMargin: "0px 0px -5% 0px",
       }
     );
 
-    revealElements.forEach((el) => observer.observe(el));
+    revealElements.forEach((element) => observer.observe(element));
+
+    // Fallback/initial sync: calculate viewport visibility directly.
+    const syncReveals = () => {
+      const viewportHeight = window.innerHeight;
+
+      revealElements.forEach((element) => {
+        const rect = element.getBoundingClientRect();
+        const visible =
+          rect.bottom > viewportHeight * 0.08 &&
+          rect.top < viewportHeight * 0.92;
+
+        setVisibility(element, visible);
+      });
+    };
+
+    let revealRaf = 0;
+    const onRevealScroll = () => {
+      if (!revealRaf) {
+        revealRaf = requestAnimationFrame(() => {
+          revealRaf = 0;
+          syncReveals();
+        });
+      }
+    };
+
+    syncReveals();
+    window.addEventListener("scroll", onRevealScroll, { passive: true });
+    window.addEventListener("resize", syncReveals);
+
 
 
     // Keep the existing hero scroll animation untouched.
@@ -98,6 +133,9 @@ function Landing() {
 
     return () => {
       observer.disconnect();
+      window.removeEventListener("scroll", onRevealScroll);
+      window.removeEventListener("resize", syncReveals);
+      if (revealRaf) cancelAnimationFrame(revealRaf);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", updateHero);
       if (raf) cancelAnimationFrame(raf);
