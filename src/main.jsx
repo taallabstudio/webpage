@@ -146,21 +146,6 @@ function Landing() {
       stage.style.setProperty("--hero-progress", progress.toFixed(4));
       stage.classList.toggle("hero-exiting", progress > 0.34);
 
-      const heroHeadphones = document.querySelector(".landing > .hero-headphones");
-      if (heroHeadphones) {
-        const maxPageScroll = Math.max(
-          document.documentElement.scrollHeight - viewportHeight,
-          1
-        );
-        const pageProgress = Math.min(
-          1,
-          Math.max(0, window.scrollY / maxPageScroll)
-        );
-        heroHeadphones.style.setProperty(
-          "--headphone-page-rotation",
-          (pageProgress * 720).toFixed(2) + "deg"
-        );
-      }
     };
 
     const onScroll = () => {
