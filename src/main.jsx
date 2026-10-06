@@ -47,6 +47,23 @@ function IconFor({kind}) {
 function Landing() {
   const [bookingSent, setBookingSent] = useState(false);
 
+  useEffect(() => {
+    const revealItems = document.querySelectorAll(".landing .reveal-on-scroll");
+    if (!revealItems.length) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: "0px 0px -7% 0px" });
+
+    revealItems.forEach((item) => observer.observe(item));
+    return () => observer.disconnect();
+  }, []);
+
   function submitBooking(e) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -121,13 +138,13 @@ function Landing() {
       </div>
     </section>
 
-    <section className="site-section services-section" id="services">
+    <section className="site-section services-section reveal-on-scroll" id="services">
       <div className="section-heading">
         <span className="section-kicker">WHAT WE DO</span>
         <h2>Everything your<br/><em>sound</em> needs.</h2>
         <p>From the first idea to the final master, TaalLab gives your project a focused space to become what you imagined.</p>
       </div>
-      <div className="service-grid">
+      <div className="service-grid reveal-stagger">
         {[
           ["01","Music Production","From arrangement and sound design to the finished production.","music-production"],
           ["02","Recording","Clean, detailed recording for vocals, instruments and voice work.","recording"],
@@ -145,7 +162,7 @@ function Landing() {
       </div>
     </section>
 
-    <section className="site-section studio-section-new" id="studio">
+    <section className="site-section studio-section-new reveal-on-scroll" id="studio">
       <div className="studio-visual" aria-label="TaalLab studio photo placeholder">
         <div className="studio-visual-grid" />
         <div className="studio-mark">TL</div>
@@ -165,7 +182,7 @@ function Landing() {
       </div>
     </section>
 
-    <section className="site-section booking-section" id="book-session">
+    <section className="site-section booking-section reveal-on-scroll" id="book-session">
       <div className="booking-intro">
         <span className="section-kicker">BOOK A SESSION</span>
         <h2>Let's make<br/><em>something.</em></h2>
@@ -191,7 +208,7 @@ function Landing() {
       </form>
     </section>
 
-    <section className="contact-section" id="contact">
+    <section className="contact-section reveal-on-scroll" id="contact">
       <div className="contact-inner">
         <div>
           <span className="section-kicker">GET IN TOUCH</span>
