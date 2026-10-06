@@ -652,7 +652,42 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   </div>;
 }
 
+function TransferFilterBar({value,onChange,deletedCount,onClearDeleted}) {
+  return <div className="transfer-filter-bar">
+    <div className="transfer-filter-group">
+      <span>Show</span>
+      {[
+        ["all","All"],
+        ["active","Active"],
+        ["deleted","Deleted"],
+      ].map(([key,label])=>
+        <button key={key} className={value===key?"active":""} onClick={()=>onChange(key)}>{label}</button>
+      )}
+    </div>
+    {deletedCount>0&&<button className="danger-btn" onClick={onClearDeleted}><Trash2 size={15}/> Clear deleted list</button>}
+  </div>;
+}
+
+function filterTransfers(transfers,filter){
+  if(filter==="active") return transfers.filter(t=>t.status==="active");
+  if(filter==="deleted") return transfers.filter(t=>t.status==="deleted");
+  return transfers;
+}
+
 function Dashboard({stats,transfers,onOpen}) {
+  const [filter,setFilter]=useState("all");
+  const [clearing,setClearing]=useState(false);
+  const visible=filterTransfers(transfers,filter);
+  const deletedCount=transfers.filter(t=>t.status==="deleted").length;
+
+  async function clearDeleted(){
+    if(!deletedCount||clearing)return;
+    if(!confirm("Permanently clear the deleted transfer list? This cannot be undone."))return;
+    setClearing(true);
+    try{await api("/admin/transfers/deleted",{method:"DELETE"});location.reload();}
+    catch(e){alert(e.message);setClearing(false);}
+  }
+
   const cards=[
     ["Active transfers",stats?.active_transfers||0,FolderOpen],
     ["Total files",stats?.total_files||0,File],
@@ -663,20 +698,48 @@ function Dashboard({stats,transfers,onOpen}) {
   ];
   return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">TAALLAB TRANSFER</span><h1>Dashboard</h1><p>Everything you need to manage client deliveries.</p></div><button className="primary-btn" onClick={()=>location.href="/admin/upload"}><Plus/> New Transfer</button></div>
     <div className="stat-grid">{cards.map(([label,value,Icon])=><div className="stat-card" key={label}><div className="stat-icon"><Icon/></div><span>{label}</span><strong>{value}</strong></div>)}</div>
-    <section className="panel"><div className="panel-head"><div><h2>Recent transfers</h2><p>Client deliveries and download activity.</p></div><button className="ghost-btn" onClick={()=>location.href="/admin"}>View all <ChevronRight/></button></div><TransferTable transfers={transfers.slice(0,8)} onOpen={onOpen}/></section>
+    <section className="panel"><div className="panel-head"><div><h2>Recent transfers</h2><p>Client deliveries and download activity.</p></div><button className="ghost-btn" onClick={()=>location.href="/admin"}>View all <ChevronRight/></button></div>
+      <TransferFilterBar value={filter} onChange={setFilter} deletedCount={deletedCount} onClearDeleted={clearDeleted}/>
+      <TransferTable transfers={visible.slice(0,8)} onOpen={onOpen}/>
+    </section>
   </div>;
 }
 
 function Transfers({transfers,onOpen}) {
-  return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">MANAGE</span><h1>Transfers</h1><p>All active and expired client deliveries.</p></div><a className="primary-btn" href="/admin/upload"><Plus/> New Transfer</a></div><section className="panel"><TransferTable transfers={transfers} onOpen={onOpen}/></section></div>;
+  const [filter,setFilter]=useState("all");
+  const [clearing,setClearing]=useState(false);
+  const visible=filterTransfers(transfers,filter);
+  const deletedCount=transfers.filter(t=>t.status==="deleted").length;
+
+  async function clearDeleted(){
+    if(!deletedCount||clearing)return;
+    if(!confirm("Permanently clear the deleted transfer list? This cannot be undone."))return;
+    setClearing(true);
+    try{await api("/admin/transfers/deleted",{method:"DELETE"});location.reload();}
+    catch(e){alert(e.message);setClearing(false);}
+  }
+
+  return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">MANAGE</span><h1>Transfers</h1><p>All active and deleted client deliveries.</p></div><a className="primary-btn" href="/admin/upload"><Plus/> New Transfer</a></div><section className="panel">
+      <div className="panel-head"><div><h2>Transfers</h2><p>Filter active or deleted deliveries.</p></div></div>
+      <TransferFilterBar value={filter} onChange={setFilter} deletedCount={deletedCount} onClearDeleted={clearDeleted}/>
+      <TransferTable transfers={visible} onOpen={onOpen}/>
+    </section></div>;
 }
 
 function TransferTable({transfers,onOpen}) {
-  return <div className="table-wrap"><table><thead><tr><th>Transfer</th><th>Created</th><th>Expires</th><th>Files</th><th>Size</th><th>Downloads</th><th>Status</th><th></th></tr></thead><tbody>
-    {transfers.map(t=><tr key={t.id}><td><button className="table-link" onClick={()=>onOpen(t)}>{t.id}</button>{t.recipient_email&&<small>To: {t.recipient_email}</small>}{t.message&&<small>{t.message.slice(0,46)}{t.message.length>46?"…":""}</small>}</td><td>{fmtDate(t.created_at)}</td><td>{fmtDate(t.expires_at)}</td><td>{t.file_count}</td><td>{formatBytes(t.total_size)}</td><td>{t.downloads}</td><td><span className={`status ${t.status}`}>{t.status}</span></td><td><button className="icon-btn"><MoreHorizontal/></button></td></tr>)}
+  return <div className="table-wrap"><table><thead><tr><th>File / transfer</th><th>Created</th><th>Expires</th><th>Files</th><th>Size</th><th>Downloads</th><th>Status</th><th></th></tr></thead><tbody>
+    {transfers.map(t=><tr key={t.id}>
+      <td>
+        <button className="table-link" onClick={()=>onOpen(t)}>{t.file_name||"Untitled transfer"}</button>
+        {t.recipient_email&&<small>To: {t.recipient_email}</small>}
+        {t.file_count>1&&<small>+ {t.file_count-1} more file{t.file_count-1===1?"":"s"}</small>}
+      </td>
+      <td>{fmtDate(t.created_at)}</td><td>{fmtDate(t.expires_at)}</td><td>{t.file_count}</td><td>{formatBytes(t.total_size)}</td><td>{t.downloads}</td>
+      <td><span className={`status ${t.status}`}>{t.status}</span></td>
+      <td><button className="icon-btn"><MoreHorizontal/></button></td>
+    </tr>)}
   </tbody></table></div>;
 }
-
 function Upload({onDone}) {
   const [files,setFiles]=useState([]);
   const [message,setMessage]=useState("");
