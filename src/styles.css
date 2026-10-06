@@ -516,3 +516,32 @@ html{scroll-behavior:smooth}
     transition:none !important;
   }
 }
+
+
+/* Final, scroll-position-driven reveals: each piece fades in independently. */
+@media(prefers-reduced-motion:no-preference){
+  .landing .site-section .section-heading,
+  .landing .site-section .scroll-reveal,
+  .landing .contact-section .contact-inner > div:first-child,
+  .landing .contact-section .contact-grid > *{
+    opacity:var(--piece-progress,0) !important;
+    transform:translate3d(0,calc((1 - var(--piece-progress,0)) * 30px),0) !important;
+    transition:none !important;
+    will-change:opacity,transform;
+  }
+
+  .landing .services-section .service-card:nth-child(2){transition-delay:0s}
+  .landing .services-section .service-card:nth-child(3){transition-delay:0s}
+  .landing .services-section .service-card:nth-child(4){transition-delay:0s}
+  .landing .services-section .service-card:nth-child(5){transition-delay:0s}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .landing .site-section .section-heading,
+  .landing .site-section .scroll-reveal,
+  .landing .contact-section .contact-inner > div:first-child,
+  .landing .contact-section .contact-grid > *{
+    opacity:1 !important;
+    transform:none !important;
+  }
+}
