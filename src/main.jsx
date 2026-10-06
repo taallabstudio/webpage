@@ -49,8 +49,6 @@ function Landing() {
 
   useEffect(() => {
     const revealItems = document.querySelectorAll(".landing .reveal-on-scroll");
-    if (!revealItems.length) return;
-
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
@@ -61,7 +59,32 @@ function Landing() {
     }, { threshold: 0.12, rootMargin: "0px 0px -7% 0px" });
 
     revealItems.forEach((item) => observer.observe(item));
-    return () => observer.disconnect();
+
+    const stage = document.querySelector(".hero-scroll-stage");
+    if (!stage) return () => observer.disconnect();
+
+    let raf = 0;
+    const updateHero = () => {
+      raf = 0;
+      const rect = stage.getBoundingClientRect();
+      const scrollable = Math.max(stage.offsetHeight - window.innerHeight, 1);
+      const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
+      stage.style.setProperty("--hero-progress", progress.toFixed(4));
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(updateHero);
+    };
+
+    updateHero();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", updateHero);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", updateHero);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   function submitBooking(e) {
@@ -122,19 +145,33 @@ function Landing() {
       </div>
     </header>
 
-    <section className="hero-section">
-      <div className="hero-copy">
-        <div className="eyebrow"><span className="dot" /> TAAL LAB • RECORDING &amp; MUSIC PRODUCTION</div>
-        <h1>Sound that feels<br/><em>like you.</em></h1>
-        <p>Music production, recording, mixing and mastering for artists who care about every detail.</p>
-        <div className="hero-actions">
-          <a className="primary-btn" href="#book-session">Book a session <ChevronRight size={16}/></a>
-          
+    <section className="hero-scroll-stage" aria-label="TaalLab introduction">
+      <div className="hero-sticky">
+        <div className="hero-section">
+          <div className="hero-copy">
+            <div className="eyebrow"><span className="dot" /> TAAL LAB • RECORDING &amp; MUSIC PRODUCTION</div>
+            <h1>Sound that feels<br/><em>like you.</em></h1>
+            <p>Music production, recording, mixing and mastering for artists who care about every detail.</p>
+            <div className="hero-actions">
+              <a className="primary-btn" href="#book-session">Book a session <ChevronRight size={16}/></a>
+            </div>
+          </div>
+
+          <div className="hero-art" aria-hidden="true">
+            <div className="hero-art-glow" />
+            <div className="hero-art-ring ring-one" />
+            <div className="hero-art-ring ring-two" />
+            <img className="hero-headphones" src="/headphones.webp" alt="" />
+            <span className="hero-art-caption">LISTEN<br/>FEEL<br/>CREATE</span>
+          </div>
+
+          <div className="hero-note">
+            <span>TAAL LAB</span>
+            <small>Music • Voice • Production</small>
+          </div>
         </div>
-      </div>
-      <div className="hero-note">
-        <span>TAAL LAB</span>
-        <small>Music • Voice • Production</small>
+
+        <div className="hero-scroll-hint"><span>SCROLL TO EXPLORE</span><i /></div>
       </div>
     </section>
 
