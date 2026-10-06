@@ -48,6 +48,10 @@ function Landing() {
   const [bookingSent, setBookingSent] = useState(false);
 
   useEffect(() => {
+    // Intersection Observer approach:
+    // when an element enters the viewport -> add "scroll-show";
+    // when it leaves -> remove it again. This makes the animation
+    // play both ways: down = fade in, up = fade out.
     const revealItems = Array.from(
       document.querySelectorAll(
         ".landing .site-section .section-heading, " +
@@ -56,55 +60,59 @@ function Landing() {
         ".landing .contact-section .contact-grid > *"
       )
     );
-    const motionSections = document.querySelectorAll(
-      ".landing .site-section, .landing .contact-section"
+
+    revealItems.forEach((item) => {
+      item.classList.add("scroll-reveal-item");
+      item.classList.remove("scroll-show");
+    });
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("scroll-show");
+          } else {
+            entry.target.classList.remove("scroll-show");
+          }
+        });
+      },
+      {
+        threshold: 0.15,
+        rootMargin: "0px 0px -10% 0px",
+      }
     );
+
+    revealItems.forEach((item) => observer.observe(item));
+
+    // Keep the existing hero scroll animation untouched.
     const stage = document.querySelector(".hero-scroll-stage");
     let raf = 0;
 
-    // One scroll loop controls the hero AND every section below it.
-    // Elements transition between "out" and "in" as they cross the viewport.
-    const updateScrollMotion = () => {
+    const updateHero = () => {
       raf = 0;
+      if (!stage) return;
+
       const viewportHeight = window.innerHeight;
+      const rect = stage.getBoundingClientRect();
+      const scrollable = Math.max(stage.offsetHeight - viewportHeight, 1);
+      const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
 
-      if (stage) {
-        const rect = stage.getBoundingClientRect();
-        const scrollable = Math.max(stage.offsetHeight - viewportHeight, 1);
-        const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
-        stage.style.setProperty("--hero-progress", progress.toFixed(4));
-        stage.classList.toggle("hero-exiting", progress > 0.34);
-      }
-
-      motionSections.forEach((section) => {
-        const rect = section.getBoundingClientRect();
-        const progress = Math.min(
-          1,
-          Math.max(0, (viewportHeight - rect.top) / (viewportHeight + rect.height))
-        );
-        section.style.setProperty("--section-progress", progress.toFixed(4));
-      });
-
-      revealItems.forEach((item) => {
-        const rect = item.getBoundingClientRect();
-        const enterLine = viewportHeight * 0.88;
-        const leaveLine = viewportHeight * 0.08;
-        const visible = rect.top < enterLine && rect.bottom > leaveLine;
-        item.dataset.scrollReveal = visible ? "in" : "out";
-      });
+      stage.style.setProperty("--hero-progress", progress.toFixed(4));
+      stage.classList.toggle("hero-exiting", progress > 0.34);
     };
 
     const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(updateScrollMotion);
+      if (!raf) raf = requestAnimationFrame(updateHero);
     };
 
-    updateScrollMotion();
+    updateHero();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", updateScrollMotion);
+    window.addEventListener("resize", updateHero);
 
     return () => {
+      observer.disconnect();
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", updateScrollMotion);
+      window.removeEventListener("resize", updateHero);
       if (raf) cancelAnimationFrame(raf);
     };
   }, []);
