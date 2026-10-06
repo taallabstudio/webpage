@@ -56,17 +56,16 @@ function Landing() {
         ".landing .contact-section .contact-grid > *"
       )
     );
-    const motionSections = document.querySelectorAll(".landing .site-section, .landing .contact-section");
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const motionSections = document.querySelectorAll(
+      ".landing .site-section, .landing .contact-section"
+    );
+    const stage = document.querySelector(".hero-scroll-stage");
     let raf = 0;
 
-    // Use the same scroll loop as the working hero animation.
-    // Each content piece gets its own .is-visible state based on its
-    // actual position in the viewport. This avoids IntersectionObserver
-    // timing/browser differences entirely.
+    // One scroll loop controls the hero AND every section below it.
+    // Elements transition between "out" and "in" as they cross the viewport.
     const updateScrollMotion = () => {
       raf = 0;
-
       const viewportHeight = window.innerHeight;
 
       if (stage) {
@@ -86,23 +85,14 @@ function Landing() {
         section.style.setProperty("--section-progress", progress.toFixed(4));
       });
 
-      if (!reducedMotion.matches) {
-        revealItems.forEach((item) => {
-          const rect = item.getBoundingClientRect();
-          const enterLine = viewportHeight * 0.84;
-          const leaveLine = viewportHeight * 0.12;
-          const visible =
-            rect.top < enterLine &&
-            rect.bottom > leaveLine;
-
-          item.dataset.scrollReveal = visible ? "in" : "out";
-        });
-      } else {
-        revealItems.forEach((item) => { item.dataset.scrollReveal = "in"; });
-      }
+      revealItems.forEach((item) => {
+        const rect = item.getBoundingClientRect();
+        const enterLine = viewportHeight * 0.88;
+        const leaveLine = viewportHeight * 0.08;
+        const visible = rect.top < enterLine && rect.bottom > leaveLine;
+        item.dataset.scrollReveal = visible ? "in" : "out";
+      });
     };
-
-    const stage = document.querySelector(".hero-scroll-stage");
 
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(updateScrollMotion);
@@ -112,30 +102,9 @@ function Landing() {
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", updateScrollMotion);
 
-    const onMotionPreferenceChange = () => {
-      if (reducedMotion.matches) {
-        document.documentElement.classList.add("reduce-motion-runtime");
-      } else {
-        document.documentElement.classList.remove("reduce-motion-runtime");
-      }
-      updateScrollMotion();
-    };
-
-    if (reducedMotion.addEventListener) {
-      reducedMotion.addEventListener("change", onMotionPreferenceChange);
-    } else {
-      reducedMotion.addListener(onMotionPreferenceChange);
-    }
-    onMotionPreferenceChange();
-
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", updateScrollMotion);
-      if (reducedMotion.removeEventListener) {
-        reducedMotion.removeEventListener("change", onMotionPreferenceChange);
-      } else {
-        reducedMotion.removeListener(onMotionPreferenceChange);
-      }
       if (raf) cancelAnimationFrame(raf);
     };
   }, []);
