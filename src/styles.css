@@ -571,3 +571,79 @@ html{scroll-behavior:smooth}
     transition:none !important;
   }
 }
+
+
+/* =========================================================
+   TaalLab scroll reveal — deterministic fallback
+   This is intentionally outside motion media queries so the
+   homepage animation cannot be accidentally disabled by a
+   browser/OS motion preference.
+   ========================================================= */
+.landing .scroll-piece{
+  opacity:0 !important;
+  transform:translate3d(0,32px,0) !important;
+  transition:opacity .75s cubic-bezier(.16,1,.3,1),transform .75s cubic-bezier(.16,1,.3,1) !important;
+  will-change:opacity,transform;
+}
+.landing .scroll-piece.is-visible{
+  opacity:1 !important;
+  transform:translate3d(0,0,0) !important;
+}
+
+/* Section containers themselves stay visible; their contents reveal. */
+.landing .site-section.reveal-on-scroll,
+.landing .contact-section.reveal-on-scroll{
+  opacity:1 !important;
+  transform:none !important;
+}
+
+/* Services */
+.landing #services .section-heading{opacity:0;transform:translate3d(0,32px,0);transition:opacity .75s cubic-bezier(.16,1,.3,1),transform .75s cubic-bezier(.16,1,.3,1)}
+.landing #services.is-visible .section-heading{opacity:1;transform:none}
+.landing #services .service-card{opacity:0;transform:translate3d(0,32px,0);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
+.landing #services .service-card.is-visible{opacity:1;transform:none}
+.landing #services .service-card:nth-child(1){transition-delay:.08s}
+.landing #services .service-card:nth-child(2){transition-delay:.18s}
+.landing #services .service-card:nth-child(3){transition-delay:.28s}
+.landing #services .service-card:nth-child(4){transition-delay:.38s}
+.landing #services .service-card:nth-child(5){transition-delay:.48s}
+
+/* Studio */
+.landing #studio .studio-photo-wrap,
+.landing #studio .studio-copy{
+  opacity:0;
+  transform:translate3d(0,32px,0);
+  transition:opacity .85s cubic-bezier(.16,1,.3,1),transform .85s cubic-bezier(.16,1,.3,1);
+}
+.landing #studio .studio-photo-wrap.is-visible{opacity:1;transform:none;transition-delay:.05s}
+.landing #studio .studio-copy.is-visible{opacity:1;transform:none;transition-delay:.20s}
+
+/* Booking */
+.landing #book-session .booking-intro,
+.landing #book-session .booking-form{
+  opacity:0;
+  transform:translate3d(0,32px,0);
+  transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1);
+}
+.landing #book-session .booking-intro.is-visible{opacity:1;transform:none}
+.landing #book-session .booking-form.is-visible{opacity:1;transform:none;transition-delay:.16s}
+
+/* Contact */
+.landing #contact .contact-inner > div:first-child,
+.landing #contact .contact-grid{
+  opacity:0;
+  transform:translate3d(0,32px,0);
+  transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1);
+}
+.landing #contact .contact-inner > div:first-child.is-visible,
+.landing #contact .contact-grid.is-visible{opacity:1;transform:none}
+.landing #contact .contact-grid > *{
+  opacity:0;
+  transform:translate3d(0,22px,0);
+  transition:opacity .65s cubic-bezier(.16,1,.3,1),transform .65s cubic-bezier(.16,1,.3,1);
+}
+.landing #contact .contact-grid.is-visible > *{opacity:1;transform:none}
+.landing #contact .contact-grid.is-visible > :nth-child(1){transition-delay:.18s}
+.landing #contact .contact-grid.is-visible > :nth-child(2){transition-delay:.28s}
+.landing #contact .contact-grid.is-visible > :nth-child(3){transition-delay:.38s}
+.landing #contact .contact-grid.is-visible > :nth-child(4){transition-delay:.48s}
