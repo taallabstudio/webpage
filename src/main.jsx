@@ -120,7 +120,7 @@ function Landing() {
       stage.style.setProperty("--hero-progress", progress.toFixed(4));
       stage.classList.toggle("hero-exiting", progress > 0.34);
 
-      const heroHeadphones = stage.querySelector(".hero-headphones");
+      const heroHeadphones = document.querySelector(".landing > .hero-headphones");
       if (heroHeadphones) {
         const maxPageScroll = Math.max(
           document.documentElement.scrollHeight - viewportHeight,
@@ -150,9 +150,6 @@ function Landing() {
       window.removeEventListener("scroll", onRevealScroll);
       window.removeEventListener("resize", syncReveals);
       if (revealRaf) cancelAnimationFrame(revealRaf);
-      window.removeEventListener("scroll", onHeadphoneScroll);
-      window.removeEventListener("resize", updateScrollHeadphone);
-      if (headphoneRaf) cancelAnimationFrame(headphoneRaf);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", updateHero);
       if (raf) cancelAnimationFrame(raf);
@@ -216,8 +213,14 @@ function Landing() {
       </div>
     </header>
 
+    <img
+      className="hero-headphones"
+      src="/headphones.webp"
+      alt=""
+      aria-hidden="true"
+    />
+
     <section className="hero-scroll-stage" aria-label="TaalLab introduction">
-      <img className="hero-headphones" src="/headphones.webp" alt="" aria-hidden="true" />
       <div className="hero-sticky">
         <div className="hero-section">
           <div className="hero-copy">
