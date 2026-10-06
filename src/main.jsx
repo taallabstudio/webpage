@@ -4,7 +4,7 @@ import {
   ArrowDownToLine, ArrowLeft, Check, ChevronRight, Clock3, Copy, Download,
   Eye, File, FileAudio, FileImage, FileText, FileVideo, FolderOpen, Gauge,
   HardDrive, Link2, LockKeyhole, LogOut, Menu, MessageSquare, MoreHorizontal, Plus, RefreshCw, Search, Settings, ShieldCheck, Trash2, UploadCloud,
-  UserRound, X
+  UserRound, X, ChevronDown, Mail, MapPin, MessageCircle, Phone
 } from "lucide-react";
 import "./styles.css";
 
@@ -202,7 +202,7 @@ function Landing() {
         <a href="#home">Home</a>
 
         <div className="nav-dropdown">
-          <a href="#services">Services <span className="nav-caret">⌄</span></a>
+          <a href="#services">Services <ChevronDown className="nav-caret" size={13} strokeWidth={1.8} aria-hidden="true" /></a>
           <div className="nav-menu">
             <a href="#music-production">Music Production</a>
             <a href="#recording">Recording</a>
@@ -213,7 +213,7 @@ function Landing() {
         </div>
 
         <div className="nav-dropdown">
-          <a href="#studio">Studio <span className="nav-caret">⌄</span></a>
+          <a href="#studio">Studio <ChevronDown className="nav-caret" size={13} strokeWidth={1.8} aria-hidden="true" /></a>
           <div className="nav-menu">
             <a href="#studio">The Studio</a>
             <a href="#equipment">Equipment &amp; Setup</a>
@@ -223,7 +223,7 @@ function Landing() {
         <a href="#book-session">Book a Session</a>
 
         <div className="nav-dropdown">
-          <a href="#contact">Contact <span className="nav-caret">⌄</span></a>
+          <a href="#contact">Contact <ChevronDown className="nav-caret" size={13} strokeWidth={1.8} aria-hidden="true" /></a>
           <div className="nav-menu nav-menu-right">
             <a href="#contact-email">Email</a>
             <a href="#contact-instagram">Instagram</a>
@@ -346,10 +346,22 @@ function Landing() {
           <h2>Come make<br/><em>some noise.</em></h2>
         </div>
         <div className="contact-grid reveal">
-          <a className="reveal" id="contact-email" href="mailto:contact@taallab.work"><span>Email</span><strong>contact@taallab.work</strong></a>
-          <a className="reveal" id="contact-instagram" href="https://www.instagram.com/taallabstudio" target="_blank" rel="noopener noreferrer"><span>Instagram</span><strong>@taallabstudio</strong></a>
-          <div className="reveal" id="contact-whatsapp"><span>WhatsApp</span><strong>Contact us for the studio number</strong></div>
-          <a className="reveal" id="contact-location" href="https://share.google/gHDTeuoEYJrjQpcFk" target="_blank" rel="noopener noreferrer"><span>Location</span><strong>Open TaalLab Studio in Maps</strong></a>
+          <a className="reveal contact-card" id="contact-email" href="mailto:contact@taallab.work">
+            <Mail className="contact-card-icon" size={22} strokeWidth={1.7} aria-hidden="true" />
+            <span>Email</span><strong>contact@taallab.work</strong>
+          </a>
+          <a className="reveal contact-card" id="contact-instagram" href="https://www.instagram.com/taallabstudio" target="_blank" rel="noopener noreferrer">
+            <MessageCircle className="contact-card-icon" size={22} strokeWidth={1.7} aria-hidden="true" />
+            <span>Instagram</span><strong>@taallabstudio</strong>
+          </a>
+          <div className="reveal contact-card" id="contact-whatsapp">
+            <MessageCircle className="contact-card-icon" size={22} strokeWidth={1.7} aria-hidden="true" />
+            <span>WhatsApp</span><strong>Contact us for the studio number</strong>
+          </div>
+          <a className="reveal contact-card" id="contact-location" href="https://share.google/gHDTeuoEYJrjQpcFk" target="_blank" rel="noopener noreferrer">
+            <MapPin className="contact-card-icon" size={22} strokeWidth={1.7} aria-hidden="true" />
+            <span>Location</span><strong>Open TaalLab Studio in Maps</strong>
+          </a>
         </div>
       </div>
       <footer><Logo studioOnly/><span>© 2026 TaalLab. Music, recording &amp; production.</span></footer>
