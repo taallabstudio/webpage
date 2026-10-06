@@ -989,15 +989,15 @@ html{scroll-behavior:smooth}
    and sits behind the important content layers.
    ========================================================= */
 .scroll-headphone{
-  --headphone-x:68vw;
-  --headphone-y:42vh;
+  --headphone-x:70vw;
+  --headphone-y:48vh;
   --headphone-rotation:0deg;
-  --headphone-scale:.78;
+  --headphone-scale:.72;
   --headphone-opacity:0;
   position:fixed;
   left:var(--headphone-x);
   top:var(--headphone-y);
-  width:min(40vw,560px);
+  width:min(22vw,300px);
   height:auto;
   z-index:0;
   pointer-events:none;
@@ -1008,7 +1008,7 @@ html{scroll-behavior:smooth}
     rotate(var(--headphone-rotation))
     scale(var(--headphone-scale));
   transform-origin:center;
-  filter:drop-shadow(0 30px 42px rgba(10,54,88,.16));
+  filter:drop-shadow(0 22px 30px rgba(10,54,88,.13));
   will-change:left,top,opacity,transform;
 }
 
@@ -1020,7 +1020,7 @@ html{scroll-behavior:smooth}
 
 @media(max-width:760px){
   .scroll-headphone{
-    width:min(62vw,360px);
-    --headphone-scale:.72;
+    width:min(38vw,220px);
+    --headphone-scale:.68;
   }
 }
