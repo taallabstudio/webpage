@@ -91,25 +91,23 @@ function Landing() {
       // Drive every homepage piece directly from its viewport position.
       // This makes the reveal reliable even if IntersectionObserver is delayed
       // or a browser has unusual intersection/scroll behavior.
-      if (!reducedMotion.matches) {
-        const revealPieces = document.querySelectorAll(
-          ".landing .site-section .section-heading, " +
-          ".landing .site-section .scroll-reveal, " +
-          ".landing .contact-section .contact-inner > div:first-child, " +
-          ".landing .contact-section .contact-grid > *"
-        );
+      const revealPieces = document.querySelectorAll(
+        ".landing .site-section .section-heading, " +
+        ".landing .site-section .scroll-reveal, " +
+        ".landing .contact-section .contact-inner > div:first-child, " +
+        ".landing .contact-section .contact-grid > *"
+      );
 
-        revealPieces.forEach((piece) => {
-          const rect = piece.getBoundingClientRect();
-          const revealStart = window.innerHeight * 0.92;
-          const revealEnd = window.innerHeight * 0.48;
-          const pieceProgress = Math.min(
-            1,
-            Math.max(0, (revealStart - rect.top) / (revealStart - revealEnd))
-          );
-          piece.style.setProperty("--piece-progress", pieceProgress.toFixed(4));
-        });
-      }
+      revealPieces.forEach((piece) => {
+        const rect = piece.getBoundingClientRect();
+        const revealStart = window.innerHeight * 0.94;
+        const revealEnd = window.innerHeight * 0.52;
+        const pieceProgress = Math.min(
+          1,
+          Math.max(0, (revealStart - rect.top) / (revealStart - revealEnd))
+        );
+        piece.style.setProperty("--piece-progress", pieceProgress.toFixed(4));
+      });
     };
 
     const onScroll = () => {
