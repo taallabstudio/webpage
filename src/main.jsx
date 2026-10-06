@@ -114,6 +114,8 @@ function Landing() {
 
     if (scrollHeadphone && landing) {
       gsap.set(scrollHeadphone, {
+        xPercent: -50,
+        yPercent: -50,
         rotation: 0,
         transformOrigin: "50% 50%",
       });
@@ -124,8 +126,12 @@ function Landing() {
         scrollTrigger: {
           trigger: landing,
           start: "top top",
-          end: "bottom bottom",
+          end: () => "+=" + Math.max(
+            document.documentElement.scrollHeight - window.innerHeight,
+            1
+          ),
           scrub: true,
+          invalidateOnRefresh: true,
         },
       });
     }
