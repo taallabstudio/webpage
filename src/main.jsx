@@ -56,13 +56,11 @@ function Landing() {
 
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("is-visible");
-        }
+        entry.target.classList.toggle("is-visible", entry.isIntersecting);
       });
     }, {
-      threshold: [0, 0.08, 0.2],
-      rootMargin: "0px 0px -8% 0px"
+      threshold: 0.12,
+      rootMargin: "0px 0px -10% 0px"
     });
 
     revealItems.forEach((item) => observer.observe(item));
@@ -88,26 +86,7 @@ function Landing() {
         section.style.setProperty("--section-progress", progress.toFixed(4));
       });
 
-      // Drive every homepage piece directly from its viewport position.
-      // This makes the reveal reliable even if IntersectionObserver is delayed
-      // or a browser has unusual intersection/scroll behavior.
-      const revealPieces = document.querySelectorAll(
-        ".landing .site-section .section-heading, " +
-        ".landing .site-section .scroll-reveal, " +
-        ".landing .contact-section .contact-inner > div:first-child, " +
-        ".landing .contact-section .contact-grid > *"
-      );
 
-      revealPieces.forEach((piece) => {
-        const rect = piece.getBoundingClientRect();
-        const revealStart = window.innerHeight * 0.94;
-        const revealEnd = window.innerHeight * 0.52;
-        const pieceProgress = Math.min(
-          1,
-          Math.max(0, (revealStart - rect.top) / (revealStart - revealEnd))
-        );
-        piece.style.setProperty("--piece-progress", pieceProgress.toFixed(4));
-      });
     };
 
     const onScroll = () => {
