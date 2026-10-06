@@ -46,17 +46,35 @@ function IconFor({kind}) {
 }
 
 function Landing() {
-  return <main className="landing">
+  return <main className="landing" id="home">
     <div className="landing-glow" />
     <header className="landing-nav">
-      <Logo />
-      <a className="login-nav-btn" href="/login"><UserRound size={16}/> Login</a>
+      <div className="landing-auth">
+        <a className="login-nav-btn secondary" href="/login">Sign up</a>
+        <a className="login-nav-btn" href="/login">Login</a>
+      </div>
+      <nav className="studio-nav" aria-label="Main navigation">
+        <a href="#home">Home</a>
+        <a href="#shop">Shop</a>
+        <a href="#book-session">Book Session</a>
+        <a href="#tracks">Tracks</a>
+        <a href="#contact">Contact</a>
+      </nav>
+      <a className="studio-brand" href="#home" aria-label="TaalLab home"><Logo /></a>
     </header>
     <div className="landing-center">
-      <div className="eyebrow"><span className="dot" /> TrackDeliver by TaalLab</div>
-      <h1>Page in building</h1>
-      <p>Thank you for working with TaalLab.</p>
+      <div className="eyebrow"><span className="dot" /> TAAL LAB • RECORDING &amp; MUSIC PRODUCTION</div>
+      <h1>Sound that feels<br/>like you.</h1>
+      <p>Recording, production, mixing and mastering for artists who care about every detail.</p>
+      <div className="hero-actions">
+        <a className="primary-btn" href="#book-session">Book a session <ChevronRight size={16}/></a>
+        <a className="hero-link" href="#tracks">Listen to our work <ChevronRight size={16}/></a>
+      </div>
     </div>
+    <section className="studio-section" id="shop" aria-label="Shop"></section>
+    <section className="studio-section" id="book-session" aria-label="Book a session"></section>
+    <section className="studio-section" id="tracks" aria-label="Tracks"></section>
+    <section className="studio-section" id="contact" aria-label="Contact"></section>
   </main>;
 }
 
