@@ -48,31 +48,30 @@ function Landing() {
   const [bookingSent, setBookingSent] = useState(false);
 
   useEffect(() => {
-    const revealItems = document.querySelectorAll(".landing .reveal-on-scroll, .landing .scroll-reveal");
+    const revealItems = Array.from(
+      document.querySelectorAll(
+        ".landing .site-section .section-heading, " +
+        ".landing .site-section .scroll-reveal, " +
+        ".landing .contact-section .contact-inner > div:first-child, " +
+        ".landing .contact-section .contact-grid > *"
+      )
+    );
     const motionSections = document.querySelectorAll(".landing .site-section, .landing .contact-section");
-
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let raf = 0;
 
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        entry.target.classList.toggle("is-visible", entry.isIntersecting);
-      });
-    }, {
-      threshold: 0.12,
-      rootMargin: "0px 0px -10% 0px"
-    });
-
-    revealItems.forEach((item) => observer.observe(item));
-
-    const stage = document.querySelector(".hero-scroll-stage");
-
+    // Use the same scroll loop as the working hero animation.
+    // Each content piece gets its own .is-visible state based on its
+    // actual position in the viewport. This avoids IntersectionObserver
+    // timing/browser differences entirely.
     const updateScrollMotion = () => {
       raf = 0;
 
+      const viewportHeight = window.innerHeight;
+
       if (stage) {
         const rect = stage.getBoundingClientRect();
-        const scrollable = Math.max(stage.offsetHeight - window.innerHeight, 1);
+        const scrollable = Math.max(stage.offsetHeight - viewportHeight, 1);
         const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
         stage.style.setProperty("--hero-progress", progress.toFixed(4));
         stage.classList.toggle("hero-exiting", progress > 0.34);
@@ -82,13 +81,28 @@ function Landing() {
         const rect = section.getBoundingClientRect();
         const progress = Math.min(
           1,
-          Math.max(0, (window.innerHeight - rect.top) / (window.innerHeight + rect.height))
+          Math.max(0, (viewportHeight - rect.top) / (viewportHeight + rect.height))
         );
         section.style.setProperty("--section-progress", progress.toFixed(4));
       });
 
+      if (!reducedMotion.matches) {
+        revealItems.forEach((item) => {
+          const rect = item.getBoundingClientRect();
+          const enterLine = viewportHeight * 0.84;
+          const leaveLine = viewportHeight * 0.12;
+          const visible =
+            rect.top < enterLine &&
+            rect.bottom > leaveLine;
 
+          item.classList.toggle("is-visible", visible);
+        });
+      } else {
+        revealItems.forEach((item) => item.classList.add("is-visible"));
+      }
     };
+
+    const stage = document.querySelector(".hero-scroll-stage");
 
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(updateScrollMotion);
@@ -115,7 +129,6 @@ function Landing() {
     onMotionPreferenceChange();
 
     return () => {
-      observer.disconnect();
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", updateScrollMotion);
       if (reducedMotion.removeEventListener) {
