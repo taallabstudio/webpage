@@ -104,7 +104,37 @@ function Landing() {
     window.addEventListener("scroll", onRevealScroll, { passive: true });
     window.addEventListener("resize", syncReveals);
 
+    // Scroll-driven headphone: a separate layer that travels down the page,
+    // rotates with scroll, and stays behind the important content.
+    const scrollHeadphone = document.querySelector(".scroll-headphone");
+    let headphoneRaf = 0;
 
+    const updateScrollHeadphone = () => {
+      headphoneRaf = 0;
+      if (!scrollHeadphone) return;
+
+      const maxScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+      const progress = Math.min(1, Math.max(0, window.scrollY / maxScroll));
+      const heroFade = Math.min(1, Math.max(0, (window.scrollY - window.innerHeight * 0.42) / (window.innerHeight * 0.55)));
+      const x = 68 - progress * 52;
+      const y = 42 + progress * 48;
+      const rotation = progress * 720;
+      const scale = 0.52 + progress * 0.22;
+
+      scrollHeadphone.style.setProperty("--headphone-x", x.toFixed(3) + "vw");
+      scrollHeadphone.style.setProperty("--headphone-y", y.toFixed(3) + "vh");
+      scrollHeadphone.style.setProperty("--headphone-rotation", rotation.toFixed(2) + "deg");
+      scrollHeadphone.style.setProperty("--headphone-scale", scale.toFixed(3));
+      scrollHeadphone.style.setProperty("--headphone-opacity", heroFade.toFixed(3));
+    };
+
+    const onHeadphoneScroll = () => {
+      if (!headphoneRaf) headphoneRaf = requestAnimationFrame(updateScrollHeadphone);
+    };
+
+    updateScrollHeadphone();
+    window.addEventListener("scroll", onHeadphoneScroll, { passive: true });
+    window.addEventListener("resize", updateScrollHeadphone);
 
     // Keep the existing hero scroll animation untouched.
     const stage = document.querySelector(".hero-scroll-stage");
@@ -136,6 +166,9 @@ function Landing() {
       window.removeEventListener("scroll", onRevealScroll);
       window.removeEventListener("resize", syncReveals);
       if (revealRaf) cancelAnimationFrame(revealRaf);
+      window.removeEventListener("scroll", onHeadphoneScroll);
+      window.removeEventListener("resize", updateScrollHeadphone);
+      if (headphoneRaf) cancelAnimationFrame(headphoneRaf);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", updateHero);
       if (raf) cancelAnimationFrame(raf);
@@ -155,6 +188,12 @@ function Landing() {
 
   return <main className="landing" id="home">
     <div className="landing-glow" />
+    <img
+      className="scroll-headphone"
+      src="/headphones.webp"
+      alt=""
+      aria-hidden="true"
+    />
 
     <header className="landing-nav">
       <a className="studio-brand" href="#home" aria-label="TaalLab home"><Logo studioOnly /></a>
