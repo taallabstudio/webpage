@@ -1021,3 +1021,56 @@ html{scroll-behavior:smooth}
 
 
 
+
+
+/* FINAL FIXED HEADPHONE LAYER
+   One headphone only: fixed to the viewport, behind all page content.
+   Its rotation is driven by total page scroll: 0 -> 720deg. */
+.landing{
+  overflow:visible;
+}
+.hero-scroll-stage .hero-headphones{
+  position:fixed;
+  z-index:0;
+  left:70%;
+  top:50%;
+  width:min(34vw,500px);
+  height:auto;
+  margin:0;
+  transform:
+    translate3d(-50%,-50%,0)
+    rotate(var(--headphone-page-rotation,0deg))
+    scale(.86);
+  transform-origin:center center;
+  opacity:1;
+  pointer-events:none;
+  filter:drop-shadow(0 35px 45px rgba(10,54,88,.18));
+  will-change:transform;
+}
+.hero-scroll-stage .hero-art{
+  transform:none !important;
+}
+.hero-scroll-stage.hero-exiting .hero-art{
+  transform:none !important;
+}
+.hero-scroll-stage .hero-section,
+.landing > .site-section,
+.landing > .contact-section{
+  position:relative;
+  z-index:1;
+}
+.landing-nav{
+  z-index:20;
+}
+
+@media(max-width:760px){
+  .hero-scroll-stage .hero-headphones{
+    left:50%;
+    top:62%;
+    width:min(68vw,380px);
+    transform:
+      translate3d(-50%,-50%,0)
+      rotate(var(--headphone-page-rotation,0deg))
+      scale(.82);
+  }
+}
