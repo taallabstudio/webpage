@@ -95,10 +95,10 @@ function Landing() {
             rect.top < enterLine &&
             rect.bottom > leaveLine;
 
-          item.classList.toggle("is-visible", visible);
+          item.dataset.scrollReveal = visible ? "in" : "out";
         });
       } else {
-        revealItems.forEach((item) => item.classList.add("is-visible"));
+        revealItems.forEach((item) => { item.dataset.scrollReveal = "in"; });
       }
     };
 
