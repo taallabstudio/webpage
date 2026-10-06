@@ -545,3 +545,29 @@ html{scroll-behavior:smooth}
     transform:none !important;
   }
 }
+
+
+/* Homepage scroll reveals — intentionally outside the reduced-motion media query.
+   The page's reveal animation is controlled by --piece-progress in main.jsx. */
+.landing .site-section .section-heading,
+.landing .site-section .scroll-reveal,
+.landing .contact-section .contact-inner > div:first-child,
+.landing .contact-section .contact-grid > *{
+  opacity:var(--piece-progress,0) !important;
+  transform:translate3d(0,calc((1 - var(--piece-progress,0)) * 30px),0) !important;
+  transition:none !important;
+  will-change:opacity,transform;
+}
+
+@media(prefers-reduced-motion:reduce){
+  /* Keep the user's requested scroll reveal active; the reveal itself is
+     lightweight opacity/translate motion and is driven by scroll position. */
+  .landing .site-section .section-heading,
+  .landing .site-section .scroll-reveal,
+  .landing .contact-section .contact-inner > div:first-child,
+  .landing .contact-section .contact-grid > *{
+    opacity:var(--piece-progress,0) !important;
+    transform:translate3d(0,calc((1 - var(--piece-progress,0)) * 30px),0) !important;
+    transition:none !important;
+  }
+}
