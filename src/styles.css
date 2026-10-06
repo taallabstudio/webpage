@@ -156,23 +156,6 @@ html{scroll-behavior:smooth}
   filter:blur(16px);
   transform:scale(calc(1 + var(--hero-progress) * .42));
 }
-.hero-headphones{
-  --headphone-page-rotation:0deg;
-  position:fixed;
-  z-index:0;
-  left:70%;
-  top:50%;
-  width:min(34vw,500px);
-  height:auto;
-  object-fit:contain;
-  transform:
-    translate3d(-50%,-50%,0)
-    rotate(var(--headphone-page-rotation))
-    scale(.86);
-  filter:drop-shadow(0 35px 45px rgba(10,54,88,.18));
-  will-change:transform;
-  pointer-events:none;
-}
 .hero-art-ring{
   position:absolute;
   z-index:1;
@@ -295,22 +278,12 @@ html{scroll-behavior:smooth}
     bottom:-4%;
     transform:translate3d(calc(50% - var(--hero-progress) * 2vw),calc(var(--hero-progress) * -35px),0);
   }
-  .hero-headphones{
-    left:50%;
-    top:62%;
-    width:min(68vw,380px);
-    transform:
-      translate3d(-50%,-50%,0)
-      rotate(var(--headphone-page-rotation))
-      scale(.82);
-  }
   .hero-scroll-stage .hero-note{display:none}
   .hero-scroll-hint{left:22px;bottom:22px}
   .hero-art-caption{right:7%;bottom:18%}
 }
 @media(prefers-reduced-motion:reduce){
   .hero-scroll-stage{height:100vh}
-  .hero-headphones{transform:translate3d(-50%,-50%,0) scale(.86)!important}
   .hero-copy,.hero-art,.hero-art-ring,.hero-art-caption,.hero-scroll-stage .hero-note,.hero-scroll-hint{transform:none!important;opacity:1!important}
   .hero-scroll-hint{display:none}
 }
@@ -765,7 +738,6 @@ html{scroll-behavior:smooth}
 .hero-scroll-stage .hero-copy h1,
 .hero-scroll-stage .hero-copy p,
 .hero-scroll-stage .hero-actions,
-.hero-scroll-stage .hero-headphones,
 .hero-scroll-stage .hero-art-ring,
 .hero-scroll-stage .hero-art-caption{
   transition:
@@ -1023,110 +995,67 @@ html{scroll-behavior:smooth}
 
 
 
-/* FINAL FIXED HEADPHONE LAYER
-   One headphone only: fixed to the viewport, behind all page content.
-   Its rotation is driven by total page scroll: 0 -> 720deg. */
+
+/* =========================================================
+   GSAP SCROLLTRIGGER HEADPHONE
+   Based on the supplied Gravity Coding tutorial:
+   a fixed element is controlled by a scrubbed ScrollTrigger.
+   ========================================================= */
 .landing{
   overflow:visible;
 }
-.hero-scroll-stage .hero-headphones{
+
+/* The headphone sits above section backgrounds but below
+   every actual piece of page content. */
+.scroll-headphone{
   position:fixed;
-  z-index:0;
   left:70%;
   top:50%;
   width:min(34vw,500px);
   height:auto;
+  z-index:3;
   margin:0;
-  transform:
-    translate3d(-50%,-50%,0)
-    rotate(var(--headphone-page-rotation,0deg))
-    scale(.86);
-  transform-origin:center center;
-  opacity:1;
+  display:block;
+  object-fit:contain;
+  transform:translate3d(-50%,-50%,0);
+  transform-origin:50% 50%;
   pointer-events:none;
+  user-select:none;
   filter:drop-shadow(0 35px 45px rgba(10,54,88,.18));
   will-change:transform;
 }
-.hero-scroll-stage .hero-art{
-  transform:none !important;
-}
-.hero-scroll-stage.hero-exiting .hero-art{
-  transform:none !important;
-}
-.hero-scroll-stage .hero-section,
-.landing > .site-section,
-.landing > .contact-section{
-  position:relative;
-  z-index:1;
-}
-.landing-nav{
-  z-index:20;
-}
 
-@media(max-width:760px){
-  .hero-scroll-stage .hero-headphones{
-    left:50%;
-    top:62%;
-    width:min(68vw,380px);
-    transform:
-      translate3d(-50%,-50%,0)
-      rotate(var(--headphone-page-rotation,0deg))
-      scale(.82);
-  }
-}
-
-
-/* FINAL FIX — the headphone lives directly under .landing so it can truly
-   remain fixed while every page section scrolls above it. */
-.landing > .hero-headphones{
-  position:fixed !important;
-  z-index:1 !important;
-  left:70% !important;
-  top:50% !important;
-  width:min(34vw,500px) !important;
-  height:auto !important;
-  margin:0 !important;
-  object-fit:contain !important;
-  transform:
-    translate3d(-50%,-50%,0)
-    rotate(var(--headphone-page-rotation,0deg))
-    scale(.86) !important;
-  transform-origin:center center !important;
-  opacity:1 !important;
-  pointer-events:none !important;
-  filter:drop-shadow(0 35px 45px rgba(10,54,88,.18)) !important;
-  will-change:transform;
-}
-/* Layer order:
-   page backgrounds → fixed headphone → page content → navigation */
-.landing > .hero-scroll-stage{
-  position:relative;
-  z-index:auto;
-}
-.landing > .site-section,
-.landing > .contact-section{
-  position:relative;
-  z-index:2;
-}
 .landing > .landing-nav{
   position:absolute;
   z-index:20;
 }
 
+/* Section backgrounds stay in the normal page layer.
+   Their contents are explicitly raised above the headphone. */
+.landing > .hero-scroll-stage,
+.landing > .site-section,
+.landing > .contact-section{
+  position:relative;
+  z-index:auto !important;
+}
+
+.landing > .hero-scroll-stage > .hero-sticky,
+.landing > .site-section > *,
+.landing > .contact-section > *{
+  position:relative;
+  z-index:4;
+}
+
 @media(max-width:760px){
-  .landing > .hero-headphones{
-    left:50% !important;
-    top:62% !important;
-    width:min(68vw,380px) !important;
-    transform:
-      translate3d(-50%,-50%,0)
-      rotate(var(--headphone-page-rotation,0deg))
-      scale(.82) !important;
+  .scroll-headphone{
+    left:50%;
+    top:62%;
+    width:min(68vw,380px);
   }
 }
 
 @media(prefers-reduced-motion:reduce){
-  .landing > .hero-headphones{
-    transform:translate3d(-50%,-50%,0) scale(.86) !important;
+  .scroll-headphone{
+    transform:translate3d(-50%,-50%,0) !important;
   }
 }
