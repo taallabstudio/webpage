@@ -48,7 +48,7 @@ function Landing() {
   const [bookingSent, setBookingSent] = useState(false);
 
   useEffect(() => {
-    const revealItems = document.querySelectorAll(".landing .reveal-on-scroll");
+    const revealItems = document.querySelectorAll(".landing .reveal-on-scroll, .landing .scroll-reveal");
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
@@ -61,6 +61,7 @@ function Landing() {
     revealItems.forEach((item) => observer.observe(item));
 
     const stage = document.querySelector(".hero-scroll-stage");
+    const studio = document.querySelector(".studio-section-new");
     if (!stage) return () => observer.disconnect();
 
     let raf = 0;
@@ -70,6 +71,12 @@ function Landing() {
       const scrollable = Math.max(stage.offsetHeight - window.innerHeight, 1);
       const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
       stage.style.setProperty("--hero-progress", progress.toFixed(4));
+
+      if (studio) {
+        const sr = studio.getBoundingClientRect();
+        const sp = Math.min(1, Math.max(0, (window.innerHeight - sr.top) / (window.innerHeight + sr.height)));
+        studio.style.setProperty("--studio-progress", sp.toFixed(4));
+      }
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(updateHero);
@@ -189,7 +196,7 @@ function Landing() {
           ["04","Mastering","Final polish, translation and loudness for release-ready audio.","mastering"],
           ["05","Dubbing / Voice Over","Professional voice recording, dubbing and spoken-word production.","dubbing"]
         ].map(([num,title,desc,id]) =>
-          <article className="service-card" id={id} key={id}>
+          <article className="service-card scroll-reveal" id={id} key={id}>
             <span>{num}</span>
             <h3>{title}</h3>
             <p>{desc}</p>
@@ -200,34 +207,34 @@ function Landing() {
     </section>
 
     <section className="site-section studio-section-new reveal-on-scroll" id="studio">
-      <div className="studio-visual" aria-label="TaalLab studio photo placeholder">
-        <div className="studio-visual-grid" />
-        <div className="studio-mark">TL</div>
+      <div className="studio-visual studio-photo-wrap scroll-reveal" aria-label="TaalLab recording studio">
+        <img className="studio-photo" src="/studio.webp" alt="TaalLab recording studio" />
+        <div className="studio-photo-overlay" />
         <div className="studio-visual-label"><span>TAAL LAB</span><small>RECORDING STUDIO</small></div>
       </div>
-      <div className="studio-copy">
+      <div className="studio-copy scroll-reveal">
         <span className="section-kicker">THE STUDIO</span>
         <h2>A focused room for<br/><em>great sound.</em></h2>
         <p>TaalLab is a dedicated recording and music-production studio built for artists, creators and projects that deserve attention to detail.</p>
         <p>Bring an idea, a finished song or simply a voice. We'll help you shape it into something you can be proud of.</p>
         <div className="equipment-list" id="equipment">
-          <div><strong>01</strong><span>Recording &amp; vocal production</span></div>
-          <div><strong>02</strong><span>Music production &amp; arrangement</span></div>
-          <div><strong>03</strong><span>Mixing &amp; mastering workflow</span></div>
-          <div><strong>04</strong><span>Voice over &amp; dubbing setup</span></div>
+          <div className="scroll-reveal"><strong>01</strong><span>Recording &amp; vocal production</span></div>
+          <div className="scroll-reveal"><strong>02</strong><span>Music production &amp; arrangement</span></div>
+          <div className="scroll-reveal"><strong>03</strong><span>Mixing &amp; mastering workflow</span></div>
+          <div className="scroll-reveal"><strong>04</strong><span>Voice over &amp; dubbing setup</span></div>
         </div>
       </div>
     </section>
 
     <section className="site-section booking-section reveal-on-scroll" id="book-session">
-      <div className="booking-intro">
+      <div className="booking-intro scroll-reveal">
         <span className="section-kicker">BOOK A SESSION</span>
         <h2>Let's make<br/><em>something.</em></h2>
         <p>Tell us what you're working on and what you need. We'll get back to you with the next steps.</p>
         <div className="booking-detail"><span>01</span><div><strong>Choose a service</strong><small>Recording, production, mixing, mastering or voice work.</small></div></div>
         <div className="booking-detail"><span>02</span><div><strong>Tell us about the project</strong><small>Give us your preferred date and a little context.</small></div></div>
       </div>
-      <form className="booking-form" onSubmit={submitBooking}>
+      <form className="booking-form scroll-reveal" onSubmit={submitBooking}>
         <div className="form-row">
           <label>Name<input name="name" required placeholder="Your name" /></label>
           <label>Email<input name="email" type="email" required placeholder="you@example.com" /></label>
@@ -251,7 +258,7 @@ function Landing() {
           <span className="section-kicker">GET IN TOUCH</span>
           <h2>Come make<br/><em>some noise.</em></h2>
         </div>
-        <div className="contact-grid">
+        <div className="contact-grid scroll-reveal">
           <a id="contact-email" href="mailto:contact@taallab.work"><span>Email</span><strong>contact@taallab.work</strong></a>
           <a id="contact-instagram" href="https://www.instagram.com/taallabstudio" target="_blank" rel="noopener noreferrer"><span>Instagram</span><strong>@taallabstudio</strong></a>
           <div id="contact-whatsapp"><span>WhatsApp</span><strong>Contact us for the studio number</strong></div>
