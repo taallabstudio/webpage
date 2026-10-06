@@ -648,3 +648,118 @@ html{scroll-behavior:smooth}
 .landing #contact .contact-grid.is-visible > :nth-child(2){transition-delay:.28s}
 .landing #contact .contact-grid.is-visible > :nth-child(3){transition-delay:.38s}
 .landing #contact .contact-grid.is-visible > :nth-child(4){transition-delay:.48s}
+
+
+/* =========================================================
+   Final scroll-reveal system
+   CSS transitions handle the actual fade/translate.
+   IntersectionObserver only toggles .is-visible.
+   ========================================================= */
+.landing .site-section.reveal-on-scroll,
+.landing .contact-section.reveal-on-scroll{
+  opacity:1 !important;
+  transform:none !important;
+}
+
+/* Generic pieces */
+.landing .site-section .section-heading,
+.landing .site-section .scroll-reveal,
+.landing .contact-section .contact-inner > div:first-child,
+.landing .contact-section .contact-grid > *{
+  opacity:0 !important;
+  transform:translate3d(0,32px,0) !important;
+  transition:
+    opacity .9s cubic-bezier(.22,1,.36,1),
+    transform .9s cubic-bezier(.22,1,.36,1) !important;
+  will-change:opacity,transform;
+}
+
+.landing .site-section .section-heading.is-visible,
+.landing .site-section .scroll-reveal.is-visible,
+.landing .contact-section .contact-inner > div:first-child.is-visible,
+.landing .contact-section .contact-grid > *.is-visible{
+  opacity:1 !important;
+  transform:translate3d(0,0,0) !important;
+}
+
+/* Services — sequential cards */
+#services .service-card:nth-child(1){transition-delay:.08s !important}
+#services .service-card:nth-child(2){transition-delay:.18s !important}
+#services .service-card:nth-child(3){transition-delay:.28s !important}
+#services .service-card:nth-child(4){transition-delay:.38s !important}
+#services .service-card:nth-child(5){transition-delay:.48s !important}
+
+/* Studio */
+#studio .studio-photo-wrap{transition-delay:.06s !important}
+#studio .studio-copy{transition-delay:.20s !important}
+
+/* Booking */
+#book-session .booking-intro{transition-delay:.04s !important}
+#book-session .booking-form{transition-delay:.18s !important}
+
+/* Contact cards */
+#contact .contact-grid > :nth-child(1){transition-delay:.12s !important}
+#contact .contact-grid > :nth-child(2){transition-delay:.22s !important}
+#contact .contact-grid > :nth-child(3){transition-delay:.32s !important}
+#contact .contact-grid > :nth-child(4){transition-delay:.42s !important}
+
+/* Hero: remove the abrupt scroll-variable fade/rotation.
+   A class toggle now lets CSS transition smoothly between states. */
+.hero-scroll-stage .hero-copy,
+.hero-scroll-stage .hero-art,
+.hero-scroll-stage .hero-note{
+  opacity:1;
+  transform:translate3d(0,0,0);
+  transition:
+    opacity 1s cubic-bezier(.22,1,.36,1),
+    transform 1s cubic-bezier(.22,1,.36,1);
+}
+
+.hero-scroll-stage .hero-copy h1,
+.hero-scroll-stage .hero-copy p,
+.hero-scroll-stage .hero-actions,
+.hero-scroll-stage .hero-headphones,
+.hero-scroll-stage .hero-art-ring,
+.hero-scroll-stage .hero-art-caption{
+  transition:
+    opacity 1s cubic-bezier(.22,1,.36,1),
+    transform 1s cubic-bezier(.22,1,.36,1);
+}
+
+.hero-scroll-stage.hero-exiting .hero-copy{
+  opacity:0;
+  transform:translate3d(0,-42px,0);
+}
+.hero-scroll-stage.hero-exiting .hero-art{
+  opacity:0;
+  transform:translate3d(0,42px,0);
+}
+.hero-scroll-stage.hero-exiting .hero-note{
+  opacity:0;
+  transform:translate3d(0,24px,0);
+}
+
+/* Don't let the old scroll-progress rules fight the new hero transition. */
+.hero-scroll-stage .hero-copy,
+.hero-scroll-stage .hero-art,
+.hero-scroll-stage .hero-note{
+  filter:none;
+}
+.hero-scroll-stage .hero-copy h1,
+.hero-scroll-stage .hero-copy p,
+.hero-scroll-stage .hero-actions,
+.hero-scroll-stage .hero-headphones,
+.hero-scroll-stage .hero-art-ring,
+.hero-scroll-stage .hero-art-caption{
+  opacity:1;
+}
+
+/* Mobile uses the same fade/translate behavior. */
+@media(max-width:760px){
+  .hero-scroll-stage.hero-exiting .hero-copy{
+    transform:translate3d(0,-28px,0);
+  }
+  .hero-scroll-stage.hero-exiting .hero-art{
+    transform:translate3d(0,28px,0);
+  }
+}
