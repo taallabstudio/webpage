@@ -75,6 +75,7 @@ function Landing() {
         const scrollable = Math.max(stage.offsetHeight - window.innerHeight, 1);
         const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
         stage.style.setProperty("--hero-progress", progress.toFixed(4));
+        stage.classList.toggle("hero-exiting", progress > 0.34);
       }
 
       motionSections.forEach((section) => {
