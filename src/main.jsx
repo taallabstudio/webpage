@@ -49,10 +49,7 @@ function Landing() {
   return <main className="landing" id="home">
     <div className="landing-glow" />
     <header className="landing-nav">
-      <div className="landing-auth">
-        <a className="login-nav-btn secondary" href="/login">Sign up</a>
-        <a className="login-nav-btn" href="/login">Login</a>
-      </div>
+      <a className="studio-brand" href="#home" aria-label="TaalLab home"><Logo studioOnly /></a>
       <nav className="studio-nav" aria-label="Main navigation">
         <a href="#home">Home</a>
         <a href="#shop">Shop</a>
@@ -60,7 +57,10 @@ function Landing() {
         <a href="#tracks">Tracks</a>
         <a href="#contact">Contact</a>
       </nav>
-      <a className="studio-brand" href="#home" aria-label="TaalLab home"><Logo studioOnly /></a>
+      <div className="landing-auth">
+        <a className="login-nav-btn secondary" href="/login">Sign up</a>
+        <a className="login-nav-btn" href="/login">Login</a>
+      </div>
     </header>
     <div className="landing-center">
       <div className="eyebrow"><span className="dot" /> TAAL LAB • RECORDING &amp; MUSIC PRODUCTION</div>
