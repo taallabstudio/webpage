@@ -217,6 +217,7 @@ function Landing() {
     </header>
 
     <section className="hero-scroll-stage" aria-label="TaalLab introduction">
+      <img className="hero-headphones" src="/headphones.webp" alt="" aria-hidden="true" />
       <div className="hero-sticky">
         <div className="hero-section">
           <div className="hero-copy">
@@ -232,7 +233,6 @@ function Landing() {
             <div className="hero-art-glow" />
             <div className="hero-art-ring ring-one" />
             <div className="hero-art-ring ring-two" />
-            <img className="hero-headphones" src="/headphones.webp" alt="" />
             <span className="hero-art-caption">LISTEN<br/>FEEL<br/>CREATE</span>
           </div>
 
