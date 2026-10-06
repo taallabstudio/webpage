@@ -269,10 +269,10 @@ function Landing() {
           <h2>Come make<br/><em>some noise.</em></h2>
         </div>
         <div className="contact-grid reveal">
-          <a id="contact-email" href="mailto:contact@taallab.work"><span>Email</span><strong>contact@taallab.work</strong></a>
-          <a id="contact-instagram" href="https://www.instagram.com/taallabstudio" target="_blank" rel="noopener noreferrer"><span>Instagram</span><strong>@taallabstudio</strong></a>
-          <div id="contact-whatsapp"><span>WhatsApp</span><strong>Contact us for the studio number</strong></div>
-          <a id="contact-location" href="https://share.google/gHDTeuoEYJrjQpcFk" target="_blank" rel="noopener noreferrer"><span>Location</span><strong>Open TaalLab Studio in Maps</strong></a>
+          <a className="reveal" id="contact-email" href="mailto:contact@taallab.work"><span>Email</span><strong>contact@taallab.work</strong></a>
+          <a className="reveal" id="contact-instagram" href="https://www.instagram.com/taallabstudio" target="_blank" rel="noopener noreferrer"><span>Instagram</span><strong>@taallabstudio</strong></a>
+          <div className="reveal" id="contact-whatsapp"><span>WhatsApp</span><strong>Contact us for the studio number</strong></div>
+          <a className="reveal" id="contact-location" href="https://share.google/gHDTeuoEYJrjQpcFk" target="_blank" rel="noopener noreferrer"><span>Location</span><strong>Open TaalLab Studio in Maps</strong></a>
         </div>
       </div>
       <footer><Logo studioOnly/><span>© 2026 TaalLab. Music, recording &amp; production.</span></footer>
