@@ -49,47 +49,79 @@ function Landing() {
 
   useEffect(() => {
     const revealItems = document.querySelectorAll(".landing .reveal-on-scroll, .landing .scroll-reveal");
+    const motionSections = document.querySelectorAll(".landing .site-section, .landing .contact-section");
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let raf = 0;
+
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
           entry.target.classList.add("is-visible");
-          observer.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.08, rootMargin: "0px 0px -12% 0px" });
+    }, {
+      threshold: [0, 0.08, 0.2],
+      rootMargin: "0px 0px -8% 0px"
+    });
 
     revealItems.forEach((item) => observer.observe(item));
 
     const stage = document.querySelector(".hero-scroll-stage");
-    const studio = document.querySelector(".studio-section-new");
-    if (!stage) return () => observer.disconnect();
 
-    let raf = 0;
-    const updateHero = () => {
+    const updateScrollMotion = () => {
       raf = 0;
-      const rect = stage.getBoundingClientRect();
-      const scrollable = Math.max(stage.offsetHeight - window.innerHeight, 1);
-      const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
-      stage.style.setProperty("--hero-progress", progress.toFixed(4));
 
-      if (studio) {
-        const sr = studio.getBoundingClientRect();
-        const sp = Math.min(1, Math.max(0, (window.innerHeight - sr.top) / (window.innerHeight + sr.height)));
-        studio.style.setProperty("--studio-progress", sp.toFixed(4));
+      if (stage) {
+        const rect = stage.getBoundingClientRect();
+        const scrollable = Math.max(stage.offsetHeight - window.innerHeight, 1);
+        const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
+        stage.style.setProperty("--hero-progress", progress.toFixed(4));
       }
-    };
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(updateHero);
+
+      motionSections.forEach((section) => {
+        const rect = section.getBoundingClientRect();
+        const progress = Math.min(
+          1,
+          Math.max(0, (window.innerHeight - rect.top) / (window.innerHeight + rect.height))
+        );
+        section.style.setProperty("--section-progress", progress.toFixed(4));
+      });
     };
 
-    updateHero();
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(updateScrollMotion);
+    };
+
+    updateScrollMotion();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", updateHero);
+    window.addEventListener("resize", updateScrollMotion);
+
+    const onMotionPreferenceChange = () => {
+      if (reducedMotion.matches) {
+        document.documentElement.classList.add("reduce-motion-runtime");
+      } else {
+        document.documentElement.classList.remove("reduce-motion-runtime");
+      }
+      updateScrollMotion();
+    };
+
+    if (reducedMotion.addEventListener) {
+      reducedMotion.addEventListener("change", onMotionPreferenceChange);
+    } else {
+      reducedMotion.addListener(onMotionPreferenceChange);
+    }
+    onMotionPreferenceChange();
 
     return () => {
       observer.disconnect();
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", updateHero);
+      window.removeEventListener("resize", updateScrollMotion);
+      if (reducedMotion.removeEventListener) {
+        reducedMotion.removeEventListener("change", onMotionPreferenceChange);
+      } else {
+        reducedMotion.removeListener(onMotionPreferenceChange);
+      }
       if (raf) cancelAnimationFrame(raf);
     };
   }, []);
