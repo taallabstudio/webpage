@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { createRoot } from "react-dom/client";
+import { createPortal } from "react-dom";
 import {
   ArrowDownToLine, ArrowLeft, Check, ChevronRight, Clock3, Copy, Download,
   Eye, File, FileAudio, FileImage, FileText, FileVideo, FolderOpen, Gauge,
@@ -229,12 +230,15 @@ function Landing() {
       </div>
     </header>
 
-    <img
-      className="scroll-headphone"
-      src="/headphones.webp"
-      alt=""
-      aria-hidden="true"
-    />
+    {typeof document !== "undefined" && createPortal(
+      <img
+        className="scroll-headphone"
+        src="/headphones.webp"
+        alt=""
+        aria-hidden="true"
+      />,
+      document.body
+    )}
 
     <section className="hero-scroll-stage" aria-label="TaalLab introduction">
       <div className="hero-sticky">
