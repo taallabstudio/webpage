@@ -1203,3 +1203,46 @@ html{scroll-behavior:smooth}
 .booking-error-note{
   color:#b7443a;
 }
+
+
+/* Account security toggle */
+.security-setting-card{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  padding:16px 18px;
+  margin-top:18px;
+  border:1px solid #dfe4e9;
+  border-radius:14px;
+  background:#f8fafb;
+}
+.security-setting-card strong{display:block}
+.security-setting-card small{display:block;margin-top:5px;color:#6c7886;line-height:1.45}
+.toggle-control{position:relative;display:inline-flex;align-items:center;margin:0;cursor:pointer}
+.toggle-control input{position:absolute;opacity:0;pointer-events:none}
+.toggle-track{
+  width:48px;
+  height:28px;
+  border-radius:999px;
+  background:#cbd2da;
+  display:flex;
+  align-items:center;
+  padding:3px;
+  transition:background .2s ease;
+}
+.toggle-thumb{
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 1px 4px rgba(0,0,0,.2);
+  transform:translateX(0);
+  transition:transform .2s ease;
+}
+.toggle-control input:checked + .toggle-track{background:#147ce5}
+.toggle-control input:checked + .toggle-track .toggle-thumb{transform:translateX(20px)}
+.toggle-control input:focus-visible + .toggle-track{outline:3px solid rgba(20,124,229,.22);outline-offset:3px}
+@media(max-width:700px){
+  .security-setting-card{align-items:flex-start}
+}
