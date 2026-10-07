@@ -132,6 +132,24 @@ async function ensureSupportSchema(env: Env) {
   }
 
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_transfers_user_id ON transfers(user_id)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS email_verification_tokens (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_email_verification_user ON email_verification_tokens(user_id)").run();
+
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS two_factor_challenges (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    code_hash TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_2fa_challenges_user ON two_factor_challenges(user_id)").run();
+
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS booking_rate_limits (
     identity TEXT PRIMARY KEY,
     last_sent_at INTEGER NOT NULL
@@ -310,7 +328,7 @@ async function verifyTwoFactor(req: Request, env: Env) {
     "SELECT c.*,u.email,u.role,u.status,u.email_verified_at FROM two_factor_challenges c JOIN users u ON u.id=c.user_id WHERE c.id=? LIMIT 1"
   ).bind(challengeId).first();
 
-  if (!challenge || challenge.status !== "active" || !challenge.email_verified_at || Number(challenge.expires_at) <= now()) {
+  if (!challenge || !challenge.email_verified_at || challenge.status === "disabled" || Number(challenge.expires_at) <= now()) {
     return json({ error: "That sign-in code has expired. Please sign in again." }, { status: 401 });
   }
   if (Number(challenge.attempts) >= 5) {
@@ -343,7 +361,7 @@ async function resendTwoFactor(req: Request, env: Env) {
   const old: any = await env.DB.prepare(
     "SELECT c.*,u.email,u.email_verified_at,u.status FROM two_factor_challenges c JOIN users u ON u.id=c.user_id WHERE c.id=? LIMIT 1"
   ).bind(challengeId).first();
-  if (!old || old.status !== "active" || !old.email_verified_at) return json({ error: "Sign-in challenge not found. Please sign in again." }, { status: 401 });
+  if (!old || !old.email_verified_at || old.status !== "active") return json({ error: "Sign-in challenge not found. Please sign in again." }, { status: 401 });
   if (now() - Number(old.created_at) < 45) return json({ error: "Please wait before requesting another code.", retryAfter: 45 - (now() - Number(old.created_at)) }, { status: 429 });
 
   const code = randomCode();
