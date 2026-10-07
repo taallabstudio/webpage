@@ -1051,7 +1051,7 @@ html{scroll-behavior:smooth}
 @media(max-width:760px){
   .scroll-headphone{
     left:50%;
-    top:72%;
+    top:82%;
     width:min(76vw,380px);
     margin-left:calc(min(76vw,380px) / -2);
     margin-top:calc(min(76vw,380px) / -2);
