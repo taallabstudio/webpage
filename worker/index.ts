@@ -471,6 +471,90 @@ contact@taallab.work`;
   return { sent: true, id: data?.id || null };
 }
 
+async function sendBookingEmail(
+  env: Env,
+  booking: {
+    name: string;
+    email: string;
+    whatsapp: string;
+    service: string;
+    date: string;
+    message: string;
+  },
+) {
+  const escapeHtml = (value: string) =>
+    String(value || "").replace(/[&<>"]/g, (c) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+    } as any)[c]);
+
+  const name = String(booking.name || "").trim().slice(0, 120);
+  const email = normalizeEmail(booking.email).slice(0, 254);
+  const whatsapp = String(booking.whatsapp || "").trim().slice(0, 80);
+  const service = String(booking.service || "").trim().slice(0, 120);
+  const date = String(booking.date || "").trim().slice(0, 40);
+  const message = String(booking.message || "").trim().slice(0, 4000);
+
+  if (!name || !email || !email.includes("@") || !service) {
+    return { sent: false, error: "Please provide your name, email and service." };
+  }
+
+  const subject = `New TaalLab booking enquiry — ${service}`;
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#172033">
+      <h2 style="margin-bottom:8px">New booking enquiry</h2>
+      <p style="color:#687080">Someone submitted the TaalLab booking form.</p>
+      <div style="padding:18px;background:#f4f5f7;border-radius:12px;margin:20px 0">
+        <p><strong>Name:</strong> ${escapeHtml(name)}</p>
+        <p><strong>Email:</strong> ${escapeHtml(email)}</p>
+        <p><strong>WhatsApp:</strong> ${escapeHtml(whatsapp || "Not provided")}</p>
+        <p><strong>Service:</strong> ${escapeHtml(service)}</p>
+        <p><strong>Preferred date:</strong> ${escapeHtml(date || "Flexible")}</p>
+      </div>
+      <div style="padding:18px;border:1px solid #e4e7eb;border-radius:12px">
+        <strong>Message</strong>
+        <p style="white-space:pre-wrap;margin-bottom:0">${escapeHtml(message || "No message provided.")}</p>
+      </div>
+    </div>
+  `;
+  const text = `New TaalLab booking enquiry
+
+Name: ${name}
+Email: ${email}
+WhatsApp: ${whatsapp || "Not provided"}
+Service: ${service}
+Preferred date: ${date || "Flexible"}
+
+Message:
+${message || "No message provided."}`;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "TaalLab Website <contact@taallab.work>",
+      to: ["contact@taallab.work"],
+      reply_to: email,
+      subject,
+      html,
+      text,
+    }),
+  });
+
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.error("Booking email failed", response.status, data);
+    return { sent: false, error: data?.message || data?.error || `Email provider returned HTTP ${response.status}` };
+  }
+
+  return { sent: true, id: data?.id || null };
+}
+
 async function getAccessToken(env: Env) {
   const encrypted = await getSetting(env, SETTINGS_REFRESH);
   if (!encrypted) throw new Error("Google Drive is not connected. Connect Google Drive from the admin page.");
@@ -753,6 +837,20 @@ export default {
     const url = new URL(req.url);
     try {
       await ensureSupportSchema(env);
+
+      if (url.pathname === "/api/booking" && req.method === "POST") {
+        const body = await req.json().catch(() => ({}));
+        const result = await sendBookingEmail(env, {
+          name: String(body.name || ""),
+          email: String(body.email || ""),
+          whatsapp: String(body.whatsapp || ""),
+          service: String(body.service || ""),
+          date: String(body.date || ""),
+          message: String(body.message || ""),
+        });
+        if (!result.sent) return json({ error: result.error || "Could not send booking enquiry." }, { status: 502 });
+        return json({ ok: true });
+      }
 
       if (url.pathname === "/api/auth/setup" && req.method === "POST") return authSetup(req, env);
       if ((url.pathname === "/api/auth/login" || url.pathname === "/api/admin/login") && req.method === "POST") return authLogin(req, env);
