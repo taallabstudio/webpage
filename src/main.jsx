@@ -32,6 +32,7 @@ const api = async (path, options={}) => {
     const error = new Error(data.error || "Request failed");
     error.status = res.status;
     error.retryAfter = Number(data.retryAfter || res.headers.get("Retry-After") || 0);
+    error.needsVerification = !!data.needsVerification;
     throw error;
   }
   return data;
@@ -492,6 +493,7 @@ function Login({onLogin}) {
   const [setupSecret,setSetupSecret]=useState("");
   const [twoFactor,setTwoFactor]=useState(false);
   const [resendCooldown,setResendCooldown]=useState(0);
+  const [verificationRequired,setVerificationRequired]=useState(false);
 
   useEffect(()=>{
     if (!resendCooldown) return;
@@ -525,12 +527,14 @@ function Login({onLogin}) {
         setCode("");
         setNotice(`We sent a 6-digit sign-in code to ${result.email}.`);
       } else if (result.needsVerification) {
+        setVerificationRequired(true);
         setNotice("Account created. Check your email and verify your address before signing in.");
       } else {
         onLogin();
       }
     } catch(e) {
       setError(e.message);
+      if (e.needsVerification) setVerificationRequired(true);
       if (e.retryAfter) setResendCooldown(e.retryAfter);
     }
   }
@@ -560,6 +564,7 @@ function Login({onLogin}) {
         body:JSON.stringify({email})
       });
       setResendCooldown(60);
+      setVerificationRequired(false);
       setNotice("If the account needs verification, a new verification email has been sent.");
     } catch(e) {
       setError(e.message);
@@ -597,7 +602,7 @@ function Login({onLogin}) {
       {notice&&<div className="success-pill">{notice}</div>}
       <button className="primary-btn full">{setup?"Create admin & verify email":"Sign in"}</button>
     </form>
-    {!setup && notice && <button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendVerification}>
+    {!setup && verificationRequired && <button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendVerification}>
       {resendCooldown>0?`Resend verification in ${resendCooldown}s`:"Resend verification email"}
     </button>}
     <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSetup(v=>!v);setError("");setNotice("");}}>
