@@ -484,29 +484,123 @@ function Preview({file,onClose}) {
 function Login({onLogin}) {
   const [email,setEmail]=useState("");
   const [password,setPassword]=useState("");
+  const [code,setCode]=useState("");
+  const [challengeId,setChallengeId]=useState("");
   const [error,setError]=useState("");
+  const [notice,setNotice]=useState(new URLSearchParams(location.search).get("verified")==="1" ? "Email verified. You can sign in now." : "");
   const [setup,setSetup]=useState(false);
   const [setupSecret,setSetupSecret]=useState("");
+  const [twoFactor,setTwoFactor]=useState(false);
+  const [resendCooldown,setResendCooldown]=useState(0);
+
+  useEffect(()=>{
+    if (!resendCooldown) return;
+    const timer=window.setInterval(()=>setResendCooldown(v=>Math.max(0,v-1)),1000);
+    return ()=>window.clearInterval(timer);
+  },[resendCooldown]);
+
   async function submit(e) {
-    e.preventDefault(); setError("");
+    e.preventDefault(); setError(""); setNotice("");
     try {
+      if (twoFactor) {
+        await api("/auth/2fa/verify",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({challenge_id:challengeId,code})
+        });
+        onLogin();
+        return;
+      }
+
       const body=setup?{email,password,setup_secret:setupSecret}:{email,password};
-      await api(setup?"/auth/setup":"/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-      onLogin();
-    } catch(e){setError(e.message)}
+      const result=await api(setup?"/auth/setup":"/auth/login",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(body)
+      });
+
+      if (result.requiresTwoFactor) {
+        setChallengeId(result.challengeId);
+        setTwoFactor(true);
+        setCode("");
+        setNotice(`We sent a 6-digit sign-in code to ${result.email}.`);
+      } else if (result.needsVerification) {
+        setNotice("Account created. Check your email and verify your address before signing in.");
+      } else {
+        onLogin();
+      }
+    } catch(e) {
+      setError(e.message);
+      if (e.retryAfter) setResendCooldown(e.retryAfter);
+    }
   }
+
+  async function resendCode(){
+    setError("");
+    try {
+      await api("/auth/2fa/resend",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({challenge_id:challengeId})
+      });
+      setResendCooldown(45);
+      setNotice("A new sign-in code has been sent.");
+    } catch(e) {
+      setError(e.message);
+      if(e.retryAfter) setResendCooldown(e.retryAfter);
+    }
+  }
+
+  async function resendVerification(){
+    setError("");
+    try {
+      await api("/auth/resend-verification",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email})
+      });
+      setResendCooldown(60);
+      setNotice("If the account needs verification, a new verification email has been sent.");
+    } catch(e) {
+      setError(e.message);
+      if(e.retryAfter) setResendCooldown(e.retryAfter);
+    }
+  }
+
+  if(twoFactor) return <div className="login-page"><div className="login-card">
+    <Logo/><div className="login-icon"><ShieldCheck/></div>
+    <h1>Check your email</h1>
+    <p>Enter the 6-digit code we sent to <strong>{email}</strong>.</p>
+    <form onSubmit={submit}>
+      <label>Verification code<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="\\d{6}" value={code} onChange={e=>setCode(e.target.value.replace(/\\D/g,"").slice(0,6))} autoFocus required/></label>
+      {error&&<div className="error-box">{error}</div>}
+      {notice&&<div className="success-pill">{notice}</div>}
+      <button className="primary-btn full" disabled={code.length!==6}>Verify & sign in</button>
+    </form>
+    <button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendCode}>
+      {resendCooldown>0?`Resend code in ${resendCooldown}s`:"Resend code"}
+    </button>
+    <button className="ghost-btn full" style={{marginTop:8}} onClick={()=>{setTwoFactor(false);setChallengeId("");setCode("");setError("");setNotice("");}}>
+      Back to sign in
+    </button>
+  </div></div>;
+
   return <div className="login-page"><div className="login-card">
     <Logo/><div className="login-icon"><ShieldCheck/></div>
     <h1>{setup?"Create admin account":"Sign in"}</h1>
     <p>{setup?"Set up the first TaalLab administrator.":"Manage TaalLab transfers securely."}</p>
     <form onSubmit={submit}>
       <label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus required/></label>
-      {setup&&<label>{setup?"Setup secret / current admin password":"Setup secret"}<input type="password" value={setupSecret} onChange={e=>setSetupSecret(e.target.value)} required/></label>}
+      {setup&&<label>Setup secret<input type="password" value={setupSecret} onChange={e=>setSetupSecret(e.target.value)} required/></label>}
       <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} minLength={8} required/></label>
       {error&&<div className="error-box">{error}</div>}
-      <button className="primary-btn full">{setup?"Create admin & sign in":"Sign in"}</button>
+      {notice&&<div className="success-pill">{notice}</div>}
+      <button className="primary-btn full">{setup?"Create admin & verify email":"Sign in"}</button>
     </form>
-    <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSetup(v=>!v);setError("")}}>
+    {!setup && notice && <button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendVerification}>
+      {resendCooldown>0?`Resend verification in ${resendCooldown}s`:"Resend verification email"}
+    </button>}
+    <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSetup(v=>!v);setError("");setNotice("");}}>
       {setup?"Back to sign in":"First-time setup"}
     </button>
   </div></div>;
@@ -662,10 +756,35 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [newPassword,setNewPassword]=useState("");
   const [message,setMessage]=useState("");
   const [error,setError]=useState("");
+  const [twoFactorEnabled,setTwoFactorEnabled]=useState(Number(user?.two_factor_enabled)!==0);
+  const [securityPassword,setSecurityPassword]=useState("");
+  const [securityMessage,setSecurityMessage]=useState("");
+  const [securityError,setSecurityError]=useState("");
+  const [securitySaving,setSecuritySaving]=useState(false);
+
   async function change(e){
     e.preventDefault();setMessage("");setError("");
-    try{await api("/account/password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({current_password:currentPassword,new_password:newPassword})});setCurrentPassword("");setNewPassword("");setMessage("Password changed successfully.");onPasswordChanged()}catch(e){setError(e.message)}
+    try{
+      await api("/account/password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({current_password:currentPassword,new_password:newPassword})});
+      setCurrentPassword("");setNewPassword("");setMessage("Password changed successfully.");onPasswordChanged();
+    }catch(e){setError(e.message)}
   }
+
+  async function saveSecurity(e){
+    e.preventDefault();setSecurityMessage("");setSecurityError("");setSecuritySaving(true);
+    try{
+      const d=await api("/account/security",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({current_password:securityPassword,two_factor_enabled:twoFactorEnabled})
+      });
+      setSecurityPassword("");
+      setSecurityMessage(d.two_factor_enabled?"Two-step verification is now enabled.":"Two-step verification is now turned off.");
+      onPasswordChanged();
+    }catch(e){setSecurityError(e.message)}
+    finally{setSecuritySaving(false)}
+  }
+
   const [driveConnected,setDriveConnected]=useState(null);
   const [driveError,setDriveError]=useState("");
   useEffect(()=>{
@@ -674,7 +793,27 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   },[showGoogleDrive]);
 
   return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">ACCOUNT</span><h1>Account</h1><p>{user?.email} • {user?.role}</p></div></div>
-    <section className="panel" style={{maxWidth:620,padding:24}}><h2>Change password</h2><form onSubmit={change}>
+    <section className="panel" style={{maxWidth:620,padding:24}}>
+      <h2>Security</h2>
+      <p className="muted" style={{marginTop:6}}>Email verification is required for every account. Two-step verification adds a one-time code sent to your email after your password.</p>
+      <div className="security-setting-card">
+        <div>
+          <strong>Two-step verification</strong>
+          <small>{twoFactorEnabled?"Enabled — a code is required at every sign-in.":"Opted out — password only."}</small>
+        </div>
+        <label className="toggle-control">
+          <input type="checkbox" checked={twoFactorEnabled} onChange={e=>setTwoFactorEnabled(e.target.checked)}/>
+          <span className="toggle-track"><span className="toggle-thumb"/></span>
+        </label>
+      </div>
+      <form onSubmit={saveSecurity} style={{marginTop:16}}>
+        <label>Current password<input type="password" value={securityPassword} onChange={e=>setSecurityPassword(e.target.value)} placeholder="Required to change this setting" required/></label>
+        {securityError&&<div className="error-box">{securityError}</div>}
+        {securityMessage&&<div className="success-pill">{securityMessage}</div>}
+        <button className="primary-btn" disabled={securitySaving}>{securitySaving?"Saving…":"Save security setting"}</button>
+      </form>
+    </section>
+    <section className="panel" style={{maxWidth:620,padding:24,marginTop:18}}><h2>Change password</h2><form onSubmit={change}>
       <label>Current password<input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} required/></label>
       <label>New password<input type="password" minLength={8} value={newPassword} onChange={e=>setNewPassword(e.target.value)} required/></label>
       {error&&<div className="error-box">{error}</div>}{message&&<div className="success-pill">{message}</div>}
