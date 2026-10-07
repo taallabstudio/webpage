@@ -114,8 +114,6 @@ function Landing() {
 
     if (scrollHeadphone && landing) {
       gsap.set(scrollHeadphone, {
-        xPercent: -50,
-        yPercent: -50,
         rotation: 0,
         transformOrigin: "50% 50%",
       });
