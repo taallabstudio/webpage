@@ -28,7 +28,12 @@ const DEMO = {
 const api = async (path, options={}) => {
   const res = await fetch(`/api${path}`, { credentials:"include", ...options });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Request failed");
+  if (!res.ok) {
+    const error = new Error(data.error || "Request failed");
+    error.status = res.status;
+    error.retryAfter = Number(data.retryAfter || res.headers.get("Retry-After") || 0);
+    throw error;
+  }
   return data;
 };
 
@@ -51,6 +56,7 @@ function Landing() {
   const [bookingSent, setBookingSent] = useState(false);
   const [bookingSending, setBookingSending] = useState(false);
   const [bookingError, setBookingError] = useState("");
+  const [bookingCooldown, setBookingCooldown] = useState(0);
 
   useEffect(() => {
     // Scroll reveal based on the supplied Coding2GO tutorial.
@@ -175,9 +181,17 @@ function Landing() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!bookingCooldown) return;
+    const timer = window.setInterval(() => {
+      setBookingCooldown((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [bookingCooldown]);
+
   async function submitBooking(e) {
     e.preventDefault();
-    if (bookingSending) return;
+    if (bookingSending || bookingCooldown > 0) return;
     setBookingSending(true);
     setBookingSent(false);
     setBookingError("");
@@ -200,6 +214,7 @@ function Landing() {
       e.currentTarget.reset();
       e.currentTarget.querySelector('select[name="service"]').value = "Music Production";
     } catch (error) {
+      if (error.retryAfter > 0) setBookingCooldown(error.retryAfter);
       setBookingError(error.message || "Could not send your enquiry. Please try again.");
     } finally {
       setBookingSending(false);
@@ -356,8 +371,8 @@ function Landing() {
         </div>
         <label>Preferred date <span>(optional)</span><input name="date" type="date" /></label>
         <label>Message <span>(optional)</span><textarea name="message" rows="5" placeholder="Tell us about your project..." /></label>
-        <button className="primary-btn booking-submit-btn" type="submit" disabled={bookingSending}>
-          {bookingSending ? <><RefreshCw className="spin" size={16}/> Sending…</> : bookingSent ? <><Check size={16}/> Enquiry sent</> : <>Send booking enquiry <ChevronRight size={16}/></>}
+        <button className="primary-btn booking-submit-btn" type="submit" disabled={bookingSending || bookingCooldown > 0}>
+          {bookingSending ? <><RefreshCw className="spin" size={16}/> Sending…</> : bookingCooldown > 0 ? <>Try again in {Math.ceil(bookingCooldown / 60)} min</> : bookingSent ? <><Check size={16}/> Enquiry sent</> : <>Send booking enquiry <ChevronRight size={16}/></>}
         </button>
         {bookingSent && <p className="booking-note booking-success-note">Thanks! Your enquiry has been sent to TaalLab. We'll get back to you soon.</p>}
         {bookingError && <p className="booking-note booking-error-note">{bookingError}</p>}
