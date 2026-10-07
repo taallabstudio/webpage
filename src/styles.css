@@ -1015,9 +1015,11 @@ html{scroll-behavior:smooth}
   height:auto;
   z-index:15;
   margin:0;
+  margin-left:calc(min(34vw,500px) / -2);
+  margin-top:calc(min(34vw,500px) / -2);
   display:block;
   object-fit:contain;
-  transform:translate3d(-50%,-50%,0);
+  transform:none;
   transform-origin:50% 50%;
   pointer-events:none;
   user-select:none;
@@ -1051,12 +1053,15 @@ html{scroll-behavior:smooth}
     left:50%;
     top:52%;
     width:min(76vw,380px);
+    margin-left:calc(min(76vw,380px) / -2);
+    margin-top:calc(min(76vw,380px) / -2);
   }
 
   .hero-scroll-stage .hero-art{
     left:50%;
     right:auto;
-    transform:translate3d(calc(-50% - var(--hero-progress) * 2vw),calc(var(--hero-progress) * -35px),0);
+    margin-left:calc(min(94vw,520px) / -2);
+    transform:translate3d(calc(var(--hero-progress) * -2vw),calc(var(--hero-progress) * -35px),0);
   }
 }
 
