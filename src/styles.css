@@ -1183,3 +1183,23 @@ html{scroll-behavior:smooth}
   0%{opacity:0;transform:scale(.5) rotate(-12deg)}
   100%{opacity:1;transform:scale(1) rotate(0)}
 }
+
+
+/* Booking form status */
+.booking-submit-btn{
+  min-width:190px;
+  transition:transform .16s ease,filter .2s ease,background-color .2s ease;
+}
+.booking-submit-btn:active:not(:disabled){
+  transform:scale(.97);
+}
+.booking-submit-btn:disabled{
+  opacity:.8;
+  cursor:wait;
+}
+.booking-success-note{
+  color:#277a4a;
+}
+.booking-error-note{
+  color:#b7443a;
+}
