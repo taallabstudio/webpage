@@ -121,6 +121,10 @@ async function ensureSupportSchema(env: Env) {
     }
   }
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_transfers_user_id ON transfers(user_id)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS booking_rate_limits (
+    identity TEXT PRIMARY KEY,
+    last_sent_at INTEGER NOT NULL
+  )`).run();
 }
 
 function normalizeEmail(value: unknown) {
@@ -469,6 +473,45 @@ contact@taallab.work`;
   }
 
   return { sent: true, id: data?.id || null };
+}
+
+const BOOKING_COOLDOWN_SECONDS = 15 * 60;
+
+async function bookingRateLimit(env: Env, email: string, ip: string) {
+  const identities = [`email:${email}`, `ip:${ip}`];
+  const rows: any = await env.DB.prepare(
+    "SELECT identity,last_sent_at FROM booking_rate_limits WHERE identity IN (?,?)"
+  ).bind(...identities).all();
+
+  const current = now();
+  const latest = Math.max(
+    ...((rows.results || []).map((row: any) => Number(row.last_sent_at) || 0)),
+    0,
+  );
+  const remaining = BOOKING_COOLDOWN_SECONDS - (current - latest);
+
+  if (remaining > 0) {
+    return {
+      allowed: false,
+      retryAfter: remaining,
+    };
+  }
+
+  return { allowed: true, retryAfter: 0 };
+}
+
+async function markBookingSent(env: Env, email: string, ip: string) {
+  const sentAt = now();
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO booking_rate_limits(identity,last_sent_at)
+      VALUES(?,?)
+      ON CONFLICT(identity) DO UPDATE SET last_sent_at=excluded.last_sent_at`)
+      .bind(`email:${email}`, sentAt),
+    env.DB.prepare(`INSERT INTO booking_rate_limits(identity,last_sent_at)
+      VALUES(?,?)
+      ON CONFLICT(identity) DO UPDATE SET last_sent_at=excluded.last_sent_at`)
+      .bind(`ip:${ip}`, sentAt),
+  ]);
 }
 
 async function sendBookingEmail(
@@ -840,15 +883,35 @@ export default {
 
       if (url.pathname === "/api/booking" && req.method === "POST") {
         const body = await req.json().catch(() => ({}));
+        const email = normalizeEmail(body.email);
+        const ip = req.headers.get("CF-Connecting-IP") || req.headers.get("X-Forwarded-For")?.split(",")[0].trim() || "unknown";
+
+        const limit = await bookingRateLimit(env, email, ip);
+        if (!limit.allowed) {
+          const minutes = Math.ceil(limit.retryAfter / 60);
+          return json(
+            {
+              error: `For spam protection, please wait about ${minutes} minute${minutes === 1 ? "" : "s"} before sending another enquiry.`,
+              retryAfter: limit.retryAfter,
+            },
+            {
+              status: 429,
+              headers: { "Retry-After": String(limit.retryAfter) },
+            },
+          );
+        }
+
         const result = await sendBookingEmail(env, {
           name: String(body.name || ""),
-          email: String(body.email || ""),
+          email,
           whatsapp: String(body.whatsapp || ""),
           service: String(body.service || ""),
           date: String(body.date || ""),
           message: String(body.message || ""),
         });
         if (!result.sent) return json({ error: result.error || "Could not send booking enquiry." }, { status: 502 });
+
+        await markBookingSent(env, email, ip);
         return json({ ok: true });
       }
 
