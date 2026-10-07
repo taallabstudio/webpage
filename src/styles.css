@@ -1151,3 +1151,35 @@ html{scroll-behavior:smooth}
     color:#5f6873;
   }
 }
+
+
+/* Copy-link confirmation feedback */
+.copy-link-btn{
+  transition:
+    transform .16s ease,
+    background-color .2s ease,
+    border-color .2s ease,
+    color .2s ease,
+    box-shadow .2s ease;
+}
+.copy-link-btn:active{
+  transform:scale(.94);
+}
+.copy-link-btn.copied{
+  color:#277a4a;
+  background:#e6f7ed;
+  border-color:#c5ead4;
+  animation:copy-link-pop .28s cubic-bezier(.22,1,.36,1);
+}
+.copy-link-btn.copied svg{
+  animation:copy-link-check .28s cubic-bezier(.22,1,.36,1);
+}
+@keyframes copy-link-pop{
+  0%{transform:scale(.94)}
+  60%{transform:scale(1.06)}
+  100%{transform:scale(1)}
+}
+@keyframes copy-link-check{
+  0%{opacity:0;transform:scale(.5) rotate(-12deg)}
+  100%{opacity:1;transform:scale(1) rotate(0)}
+}
