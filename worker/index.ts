@@ -120,6 +120,17 @@ async function ensureSupportSchema(env: Env) {
       if (!exists) throw e;
     }
   }
+  const userColumns: any = await env.DB.prepare("PRAGMA table_info(users)").all();
+  const hasEmailVerified = (userColumns.results || []).some((col: any) => col.name === "email_verified_at");
+  if (!hasEmailVerified) {
+    await env.DB.prepare("ALTER TABLE users ADD COLUMN email_verified_at INTEGER").run();
+    await env.DB.prepare("UPDATE users SET email_verified_at=created_at WHERE email_verified_at IS NULL").run();
+  }
+  const hasTwoFactor = (userColumns.results || []).some((col: any) => col.name === "two_factor_enabled");
+  if (!hasTwoFactor) {
+    await env.DB.prepare("ALTER TABLE users ADD COLUMN two_factor_enabled INTEGER NOT NULL DEFAULT 1").run();
+  }
+
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_transfers_user_id ON transfers(user_id)").run();
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS booking_rate_limits (
     identity TEXT PRIMARY KEY,
@@ -131,10 +142,98 @@ function normalizeEmail(value: unknown) {
   return String(value || "").trim().toLowerCase();
 }
 
+async function hashText(value: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return base64Url(new Uint8Array(digest));
+}
+
+function randomCode() {
+  const bytes = crypto.getRandomValues(new Uint32Array(1));
+  return String(bytes[0] % 1000000).padStart(6, "0");
+}
+
+async function sendAuthEmail(env: Env, to: string, subject: string, html: string, text: string, idempotencyKey: string) {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify({
+      from: "TaalLab <contact@taallab.work>",
+      to: [to],
+      subject,
+      html,
+      text,
+    }),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.error("Auth email failed", response.status, data);
+    return { sent: false, error: data?.message || data?.error || `Email provider returned HTTP ${response.status}` };
+  }
+  return { sent: true, id: data?.id || null };
+}
+
+async function createEmailVerification(env: Env, user: any) {
+  const recent: any = await env.DB.prepare(
+    "SELECT created_at FROM email_verification_tokens WHERE user_id=? ORDER BY created_at DESC LIMIT 1"
+  ).bind(user.id).first();
+  if (recent && now() - Number(recent.created_at) < 60) {
+    return { sent: false, rateLimited: true, retryAfter: 60 - (now() - Number(recent.created_at)) };
+  }
+
+  await env.DB.prepare("DELETE FROM email_verification_tokens WHERE user_id=?").bind(user.id).run();
+  const token = randomToken(32);
+  const tokenHash = await hashText(token);
+  const createdAt = now();
+  await env.DB.prepare(
+    "INSERT INTO email_verification_tokens(token_hash,user_id,created_at,expires_at) VALUES(?,?,?,?)"
+  ).bind(tokenHash, user.id, createdAt, createdAt + 86400).run();
+
+  const link = `${origin(env)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+  const safeEmail = String(user.email).replace(/[&<>"]/g, (x) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" } as any)[x]);
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033">
+      <h2>Verify your TaalLab email</h2>
+      <p>Confirm that <strong>${safeEmail}</strong> belongs to you so you can access TrackDeliver.</p>
+      <p style="margin:28px 0"><a href="${link}" style="display:inline-block;background:#147ce5;color:white;text-decoration:none;padding:13px 20px;border-radius:8px;font-weight:600">Verify email address</a></p>
+      <p style="font-size:13px;color:#687080">This verification link expires in 24 hours.</p>
+      <p style="font-size:13px;color:#687080">If you did not create this account, you can ignore this email.</p>
+      <p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.work</p>
+    </div>`;
+  const text = `Verify your TaalLab email: ${link}
+
+This link expires in 24 hours.
+If you did not create this account, you can ignore this email.
+
+TaalLab
+contact@taallab.work`;
+  return sendAuthEmail(env, user.email, "Verify your TaalLab email", html, text, `verify-email:${user.id}:${createdAt}`);
+}
+
+async function sendTwoFactorCode(env: Env, user: any, challengeId: string, code: string) {
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033">
+      <h2>Your TaalLab sign-in code</h2>
+      <p>Use this one-time code to finish signing in:</p>
+      <div style="font-size:32px;font-weight:700;letter-spacing:8px;margin:24px 0">${code}</div>
+      <p style="font-size:13px;color:#687080">The code expires in 10 minutes and can only be used a limited number of times.</p>
+      <p style="font-size:13px;color:#687080">If you did not try to sign in, change your password and contact TaalLab.</p>
+      <p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.work</p>
+    </div>`;
+  const text = `Your TaalLab sign-in code is: ${code}
+
+This code expires in 10 minutes.
+If you did not try to sign in, change your password and contact TaalLab.`;
+  return sendAuthEmail(env, user.email, "Your TaalLab sign-in code", html, text, `login-2fa:${challengeId}`);
+}
+
 async function getSessionUser(req: Request, env: Env) {
   const sid = parseCookie(req, "taallab_session");
   if (!sid) return null;
-  const row: any = await env.DB.prepare(`SELECT u.id,u.email,u.role,u.status,u.created_at,u.updated_at
+  const row: any = await env.DB.prepare(`SELECT u.id,u.email,u.role,u.status,u.created_at,u.updated_at,u.email_verified_at,u.two_factor_enabled
     FROM sessions s JOIN users u ON u.id=s.user_id
     WHERE s.id=? AND s.expires_at>? AND u.status='active' LIMIT 1`)
     .bind(sid, now()).first();
@@ -166,11 +265,32 @@ async function authLogin(req: Request, env: Env) {
   const password = String(body.password || "");
   if (!email || !password) return json({ error: "Email and password are required." }, { status: 400 });
 
-  const user: any = await env.DB.prepare("SELECT id,email,password_hash,role,status FROM users WHERE email=? LIMIT 1")
+  const user: any = await env.DB.prepare("SELECT id,email,password_hash,role,status,email_verified_at,two_factor_enabled FROM users WHERE email=? LIMIT 1")
     .bind(email).first();
 
   if (!user || user.status !== "active" || !(await passwordMatches(password, String(user.password_hash)))) {
     return json({ error: "Invalid email or password." }, { status: 401 });
+  }
+
+  if (!user.email_verified_at) {
+    return json({ error: "Please verify your email address before signing in.", needsVerification: true }, { status: 403 });
+  }
+
+  if (Number(user.two_factor_enabled) !== 0) {
+    const challengeId = randomToken(24);
+    const code = randomCode();
+    const createdAt = now();
+    await env.DB.prepare("DELETE FROM two_factor_challenges WHERE user_id=?").bind(user.id).run();
+    await env.DB.prepare(
+      "INSERT INTO two_factor_challenges(id,user_id,code_hash,created_at,expires_at,attempts) VALUES(?,?,?,?,?,0)"
+    ).bind(challengeId, user.id, await hashText(code), createdAt, createdAt + 600).run();
+
+    const emailResult = await sendTwoFactorCode(env, user, challengeId, code);
+    if (!emailResult.sent) {
+      await env.DB.prepare("DELETE FROM two_factor_challenges WHERE id=?").bind(challengeId).run();
+      return json({ error: "We could not send the sign-in code. Please try again." }, { status: 502 });
+    }
+    return json({ ok: true, requiresTwoFactor: true, challengeId, email: user.email });
   }
 
   const sid = await createUserSession(env, user.id);
@@ -178,6 +298,92 @@ async function authLogin(req: Request, env: Env) {
     { ok: true, user: { id: user.id, email: user.email, role: user.role } },
     { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400) } },
   );
+}
+
+async function verifyTwoFactor(req: Request, env: Env) {
+  const body = await req.json().catch(() => ({}));
+  const challengeId = String(body.challenge_id || "");
+  const code = String(body.code || "").replace(/\D/g, "");
+  if (!challengeId || code.length !== 6) return json({ error: "Enter the 6-digit sign-in code." }, { status: 400 });
+
+  const challenge: any = await env.DB.prepare(
+    "SELECT c.*,u.email,u.role,u.status,u.email_verified_at FROM two_factor_challenges c JOIN users u ON u.id=c.user_id WHERE c.id=? LIMIT 1"
+  ).bind(challengeId).first();
+
+  if (!challenge || challenge.status !== "active" || !challenge.email_verified_at || Number(challenge.expires_at) <= now()) {
+    return json({ error: "That sign-in code has expired. Please sign in again." }, { status: 401 });
+  }
+  if (Number(challenge.attempts) >= 5) {
+    return json({ error: "Too many incorrect codes. Please sign in again." }, { status: 429 });
+  }
+
+  const correct = await hashText(code);
+  if (correct !== String(challenge.code_hash)) {
+    await env.DB.prepare("UPDATE two_factor_challenges SET attempts=attempts+1 WHERE id=?").bind(challengeId).run();
+    return json({ error: "Incorrect sign-in code." }, { status: 401 });
+  }
+
+  const consumed: any = await env.DB.prepare(
+    "DELETE FROM two_factor_challenges WHERE id=? AND attempts<5 AND expires_at>?"
+  ).bind(challengeId, now()).run();
+  if (Number(consumed?.meta?.changes || 0) !== 1) {
+    return json({ error: "That sign-in code is no longer valid. Please sign in again." }, { status: 401 });
+  }
+
+  const sid = await createUserSession(env, challenge.user_id);
+  return json(
+    { ok: true, user: { id: challenge.user_id, email: challenge.email, role: challenge.role } },
+    { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400) } },
+  );
+}
+
+async function resendTwoFactor(req: Request, env: Env) {
+  const body = await req.json().catch(() => ({}));
+  const challengeId = String(body.challenge_id || "");
+  const old: any = await env.DB.prepare(
+    "SELECT c.*,u.email,u.email_verified_at,u.status FROM two_factor_challenges c JOIN users u ON u.id=c.user_id WHERE c.id=? LIMIT 1"
+  ).bind(challengeId).first();
+  if (!old || old.status !== "active" || !old.email_verified_at) return json({ error: "Sign-in challenge not found. Please sign in again." }, { status: 401 });
+  if (now() - Number(old.created_at) < 45) return json({ error: "Please wait before requesting another code.", retryAfter: 45 - (now() - Number(old.created_at)) }, { status: 429 });
+
+  const code = randomCode();
+  const createdAt = now();
+  await env.DB.prepare("UPDATE two_factor_challenges SET code_hash=?,created_at=?,expires_at=?,attempts=0 WHERE id=?")
+    .bind(await hashText(code), createdAt, createdAt + 600, challengeId).run();
+  const result = await sendTwoFactorCode(env, old, challengeId, code);
+  if (!result.sent) return json({ error: "We could not send another sign-in code. Please try again." }, { status: 502 });
+  return json({ ok: true });
+}
+
+async function resendVerification(req: Request, env: Env) {
+  const body = await req.json().catch(() => ({}));
+  const email = normalizeEmail(body.email);
+  if (!email) return json({ error: "Enter your email address." }, { status: 400 });
+  const user: any = await env.DB.prepare("SELECT id,email,email_verified_at,status FROM users WHERE email=? LIMIT 1").bind(email).first();
+  if (!user || user.status !== "active") return json({ ok: true });
+  if (user.email_verified_at) return json({ ok: true, alreadyVerified: true });
+  const result = await createEmailVerification(env, user);
+  if (result.rateLimited) return json({ error: "Please wait before requesting another verification email.", retryAfter: result.retryAfter }, { status: 429 });
+  if (!result.sent) return json({ error: "We could not send the verification email. Please try again." }, { status: 502 });
+  return json({ ok: true });
+}
+
+async function verifyEmail(req: Request, env: Env) {
+  const url = new URL(req.url);
+  const token = url.searchParams.get("token") || "";
+  if (!token) return new Response("Invalid verification link.", { status: 400 });
+  const tokenHash = await hashText(token);
+  const row: any = await env.DB.prepare(
+    "SELECT user_id,expires_at FROM email_verification_tokens WHERE token_hash=? LIMIT 1"
+  ).bind(tokenHash).first();
+  if (!row || Number(row.expires_at) <= now()) {
+    return new Response("This verification link is invalid or has expired. Please request a new one from the sign-in page.", { status: 410 });
+  }
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET email_verified_at=?,updated_at=? WHERE id=?").bind(now(), now(), row.user_id),
+    env.DB.prepare("DELETE FROM email_verification_tokens WHERE user_id=?").bind(row.user_id),
+  ]);
+  return Response.redirect(`${origin(env)}/login?verified=1`, 302);
 }
 
 async function authLogout(req: Request, env: Env) {
@@ -206,19 +412,40 @@ async function authSetup(req: Request, env: Env) {
 
   const id = randomToken(16);
   const hash = await hashPassword(password);
-  await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status) VALUES(?,?,?,?,?,?,?)")
-    .bind(id, email, hash, "admin", now(), now(), "active").run();
+  const createdAt = now();
+  await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status,email_verified_at,two_factor_enabled) VALUES(?,?,?,?,?,?,?,?,?)")
+    .bind(id, email, hash, "admin", createdAt, createdAt, "active", null, 1).run();
 
-  const sid = await createUserSession(env, id);
-  return json(
-    { ok: true, user: { id, email, role: "admin" } },
-    { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400) } },
-  );
+  const verification = await createEmailVerification(env, { id, email });
+  if (!verification.sent) {
+    return json({ error: "The admin account was created, but the verification email could not be sent. Use Resend verification from the sign-in page.", needsVerification: true }, { status: 502 });
+  }
+  return json({ ok: true, needsVerification: true });
 }
 
 async function currentUser(env: Env, req: Request) {
   const user = await getSessionUser(req, env);
   return user ? json({ authenticated: true, user }) : json({ authenticated: false });
+}
+
+async function updateSecuritySettings(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  const body = await req.json().catch(() => ({}));
+  const currentPassword = String(body.current_password || "");
+  const enabled = body.two_factor_enabled;
+  if (enabled !== true && enabled !== false) return json({ error: "Choose whether two-step verification is enabled." }, { status: 400 });
+
+  const row: any = await env.DB.prepare("SELECT password_hash,email_verified_at FROM users WHERE id=?").bind(user.id).first();
+  if (!row || !(await passwordMatches(currentPassword, String(row.password_hash)))) {
+    return json({ error: "Current password is incorrect." }, { status: 401 });
+  }
+  if (enabled && !row.email_verified_at) {
+    return json({ error: "Verify your email before enabling two-step verification." }, { status: 400 });
+  }
+
+  await env.DB.prepare("UPDATE users SET two_factor_enabled=?,updated_at=? WHERE id=?")
+    .bind(enabled ? 1 : 0, now(), user.id).run();
+  return json({ ok: true, two_factor_enabled: enabled });
 }
 
 async function changeOwnPassword(req: Request, env: Env) {
@@ -260,10 +487,15 @@ async function createManagedUser(req: Request, env: Env) {
 
   const id = randomToken(16);
   const hash = await hashPassword(password);
-  await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status) VALUES(?,?,?,?,?,?,?)")
-    .bind(id, email, hash, role, now(), now(), "active").run();
+  const createdAt = now();
+  await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status,email_verified_at,two_factor_enabled) VALUES(?,?,?,?,?,?,?,?,?)")
+    .bind(id, email, hash, role, createdAt, createdAt, "active", null, 1).run();
 
-  return json({ ok: true, user: { id, email, role, status: "active" } }, { status: 201 });
+  const verification = await createEmailVerification(env, { id, email });
+  if (!verification.sent) {
+    return json({ error: "Account created, but the verification email could not be sent.", verificationSent: false }, { status: 502 });
+  }
+  return json({ ok: true, user: { id, email, role, status: "active", verificationSent: true } }, { status: 201 });
 }
 
 async function updateManagedUser(req: Request, env: Env, id: string) {
@@ -916,10 +1148,15 @@ export default {
       }
 
       if (url.pathname === "/api/auth/setup" && req.method === "POST") return authSetup(req, env);
+      if (url.pathname === "/api/auth/2fa/verify" && req.method === "POST") return verifyTwoFactor(req, env);
+      if (url.pathname === "/api/auth/2fa/resend" && req.method === "POST") return resendTwoFactor(req, env);
+      if (url.pathname === "/api/auth/resend-verification" && req.method === "POST") return resendVerification(req, env);
+      if (url.pathname === "/api/auth/verify-email" && req.method === "GET") return verifyEmail(req, env);
       if ((url.pathname === "/api/auth/login" || url.pathname === "/api/admin/login") && req.method === "POST") return authLogin(req, env);
       if ((url.pathname === "/api/auth/logout" || url.pathname === "/api/admin/logout") && req.method === "POST") return authLogout(req, env);
       if (url.pathname === "/api/auth/me" && req.method === "GET") return currentUser(env, req);
       if (url.pathname === "/api/account/password" && req.method === "POST") return changeOwnPassword(req, env);
+      if (url.pathname === "/api/account/security" && req.method === "POST") return updateSecuritySettings(req, env);
 
       if (url.pathname === "/api/admin/users" && req.method === "GET") {
         await requireAdmin(req, env);
@@ -1225,6 +1462,10 @@ export default {
   },
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(cleanup(env));
+    ctx.waitUntil(Promise.all([
+      cleanup(env),
+      env.DB.prepare("DELETE FROM email_verification_tokens WHERE expires_at<=?").bind(now()).run(),
+      env.DB.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").bind(now()).run(),
+    ]));
   },
 } satisfies ExportedHandler<Env>;
