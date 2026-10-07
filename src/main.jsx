@@ -753,6 +753,17 @@ function Upload({onDone}) {
   const [created,setCreated]=useState(null);
   const [recipientInfo,setRecipientInfo]=useState(null);
   const [progress,setProgress]=useState({done:0,total:0,active:""});
+  const [copiedLink,setCopiedLink]=useState(null);
+
+  async function copyLink(value,key){
+    try{
+      await navigator.clipboard.writeText(value);
+      setCopiedLink(key);
+      window.setTimeout(()=>setCopiedLink(current=>current===key?null:current),1800);
+    }catch(e){
+      alert("Could not copy the link.");
+    }
+  }
   const addFiles=e=>setFiles(prev=>[...prev,...Array.from(e.target.files||[])].map((f,i)=>f.id?f:Object.assign(f,{id:crypto.randomUUID()})));
   const drop=e=>{e.preventDefault();setFiles(prev=>[...prev,...Array.from(e.dataTransfer.files||[])].map(f=>Object.assign(f,{id:crypto.randomUUID()})))};
   async function upload(){
@@ -792,8 +803,8 @@ function Upload({onDone}) {
     }catch(e){alert(e.message)}finally{setUploading(false)}
   }
   if(created) return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">TRANSFER CREATED</span><h1>Ready to send</h1><p>Your TaalLab transfer is live for the configured expiration window.</p></div></div>
-    <div className="created-card"><div className="success-large"><Check/></div><h2>Transfer Created</h2>{recipientInfo?.userCreated&&<div className="success-pill" style={{marginBottom:16}}>Client account created for {recipientInfo.email}. Temporary password: <strong>{recipientInfo.temporaryPassword}</strong></div>}{!recipientInfo&&<div className="muted" style={{marginBottom:16}}>Link-only transfer — no client account was assigned.</div>}<label>Transfer Link<div className="copy-row"><input readOnly value={created.transferUrl}/><button className="ghost-btn" onClick={()=>navigator.clipboard.writeText(created.transferUrl)}><Copy/> Copy Link</button></div></label>
-      <h3>Files</h3>{created.files.map(f=><div className="created-file" key={f.id}><IconFor kind={f.kind}/><div><strong>{f.name}</strong><small>{formatBytes(f.size)} • Expires {fmtDate(f.expires_at)}</small></div><button className="ghost-btn" onClick={()=>navigator.clipboard.writeText(f.downloadUrl)}><Link2/> Copy link</button></div>)}
+    <div className="created-card"><div className="success-large"><Check/></div><h2>Transfer Created</h2>{recipientInfo?.userCreated&&<div className="success-pill" style={{marginBottom:16}}>Client account created for {recipientInfo.email}. Temporary password: <strong>{recipientInfo.temporaryPassword}</strong></div>}{!recipientInfo&&<div className="muted" style={{marginBottom:16}}>Link-only transfer — no client account was assigned.</div>}<label>Transfer Link<div className="copy-row"><input readOnly value={created.transferUrl}/><button className={`ghost-btn copy-link-btn${copiedLink==="transfer"?" copied":""}`} onClick={()=>copyLink(created.transferUrl,"transfer")} aria-live="polite">{copiedLink==="transfer"?<Check/>:<Copy/>}{copiedLink==="transfer"?"Copied!":"Copy Link"}</button></div></label>
+      <h3>Files</h3>{created.files.map(f=><div className="created-file" key={f.id}><IconFor kind={f.kind}/><div><strong>{f.name}</strong><small>{formatBytes(f.size)} • Expires {fmtDate(f.expires_at)}</small></div><button className={`ghost-btn copy-link-btn${copiedLink===f.id?" copied":""}`} onClick={()=>copyLink(f.downloadUrl,f.id)} aria-live="polite">{copiedLink===f.id?<Check/>:<Link2/>}{copiedLink===f.id?"Copied!":"Copy link"}</button></div>)}
       <button className="primary-btn" onClick={onDone}>Back to dashboard</button>
     </div></div>;
   return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">NEW TRANSFER</span><h1>Send files</h1><p>Upload large studio assets and create a private client link.</p></div></div>
