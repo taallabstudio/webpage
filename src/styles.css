@@ -1053,7 +1053,7 @@ html{scroll-behavior:smooth}
     width:min(76vw,380px);
   }
 
-  .hero-art{
+  .hero-scroll-stage .hero-art{
     left:50%;
     right:auto;
     transform:translate3d(calc(-50% - var(--hero-progress) * 2vw),calc(var(--hero-progress) * -35px),0);
