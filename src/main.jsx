@@ -49,6 +49,8 @@ function IconFor({kind}) {
 
 function Landing() {
   const [bookingSent, setBookingSent] = useState(false);
+  const [bookingSending, setBookingSending] = useState(false);
+  const [bookingError, setBookingError] = useState("");
 
   useEffect(() => {
     // Scroll reveal based on the supplied Coding2GO tutorial.
@@ -173,15 +175,35 @@ function Landing() {
     };
   }, []);
 
-  function submitBooking(e) {
+  async function submitBooking(e) {
     e.preventDefault();
+    if (bookingSending) return;
+    setBookingSending(true);
+    setBookingSent(false);
+    setBookingError("");
+
     const form = new FormData(e.currentTarget);
-    const subject = encodeURIComponent(`TaalLab session booking — ${form.get("service")}`);
-    const body = encodeURIComponent(
-      `Name: ${form.get("name")}\nEmail: ${form.get("email")}\nWhatsApp: ${form.get("whatsapp") || "Not provided"}\nService: ${form.get("service")}\nPreferred date: ${form.get("date") || "Flexible"}\n\nMessage:\n${form.get("message") || ""}`
-    );
-    window.location.href = `mailto:contact@taallab.work?subject=${subject}&body=${body}`;
-    setBookingSent(true);
+    try {
+      await api("/booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.get("name"),
+          email: form.get("email"),
+          whatsapp: form.get("whatsapp"),
+          service: form.get("service"),
+          date: form.get("date"),
+          message: form.get("message"),
+        }),
+      });
+      setBookingSent(true);
+      e.currentTarget.reset();
+      e.currentTarget.querySelector('select[name="service"]').value = "Music Production";
+    } catch (error) {
+      setBookingError(error.message || "Could not send your enquiry. Please try again.");
+    } finally {
+      setBookingSending(false);
+    }
   }
 
   return <main className="landing" id="home">
@@ -334,8 +356,11 @@ function Landing() {
         </div>
         <label>Preferred date <span>(optional)</span><input name="date" type="date" /></label>
         <label>Message <span>(optional)</span><textarea name="message" rows="5" placeholder="Tell us about your project..." /></label>
-        <button className="primary-btn" type="submit">Send booking enquiry <ChevronRight size={16}/></button>
-        {bookingSent && <p className="booking-note">Your email app should have opened with the enquiry. If it didn't, email us directly at contact@taallab.work.</p>}
+        <button className="primary-btn booking-submit-btn" type="submit" disabled={bookingSending}>
+          {bookingSending ? <><RefreshCw className="spin" size={16}/> Sending…</> : bookingSent ? <><Check size={16}/> Enquiry sent</> : <>Send booking enquiry <ChevronRight size={16}/></>}
+        </button>
+        {bookingSent && <p className="booking-note booking-success-note">Thanks! Your enquiry has been sent to TaalLab. We'll get back to you soon.</p>}
+        {bookingError && <p className="booking-note booking-error-note">{bookingError}</p>}
       </form>
     </section>
 
