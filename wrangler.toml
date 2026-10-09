@@ -6,6 +6,7 @@ compatibility_date = "2026-10-01"
 APP_ORIGIN = "https://taallab.work"
 DEFAULT_EXPIRY_DAYS = "7"
 GOOGLE_CLIENT_ID = "904278224751-qihnpb2neuqouolbkjese0fg6ntemf83.apps.googleusercontent.com"
+GOOGLE_LOGIN_CLIENT_ID = "904278224751-h85rtgjbr9n29u5p09u59s593kls616p.apps.googleusercontent.com"
 
 [[d1_databases]]
 binding = "DB"
