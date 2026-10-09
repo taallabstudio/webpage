@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { createRoot } from "react-dom/client";
@@ -483,6 +483,7 @@ function Preview({file,onClose}) {
 }
 
 function Login({onLogin}) {
+  const codeInputs = useRef([]);
   const [email,setEmail]=useState("");
   const [password,setPassword]=useState("");
   const [code,setCode]=useState("");
@@ -575,7 +576,49 @@ function Login({onLogin}) {
     <h1>Check your email</h1>
     <p>Enter the 6-digit code we sent to <strong>{email}</strong>.</p>
     <form onSubmit={submit}>
-      <label>Verification code<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]{6}" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} autoFocus required/></label>
+      <label className="otp-label">Verification code</label>
+      <div className="otp-inputs" role="group" aria-label="Six-digit verification code" onPaste={e=>{
+        const pasted=e.clipboardData.getData("text").replace(/\D/g,"").slice(0,6);
+        if(!pasted) return;
+        e.preventDefault();
+        const digits=Array.from({length:6},(_,i)=>pasted[i]||"");
+        setCode(digits.join(""));
+        const target=Math.min(pasted.length,5);
+        codeInputs.current[target]?.focus();
+      }}>
+        {Array.from({length:6},(_,i)=><input
+          key={i}
+          ref={el=>codeInputs.current[i]=el}
+          className="otp-digit"
+          type="text"
+          inputMode="numeric"
+          autoComplete={i===0?"one-time-code":"off"}
+          aria-label={`Digit ${i+1} of 6`}
+          maxLength={6}
+          value={code[i]||""}
+          autoFocus={i===0}
+          required={i===0}
+          onChange={e=>{
+            const digits=e.target.value.replace(/\D/g,"").slice(0,6);
+            if(digits.length>1){
+              const next=Array.from({length:6},(_,j)=>digits[j]||"");
+              setCode(next.join(""));
+              codeInputs.current[Math.min(digits.length,5)]?.focus();
+              return;
+            }
+            const next=code.padEnd(6," ").split("");
+            next[i]=digits||"";
+            const joined=next.map(x=>x===" "?"":x).join("");
+            setCode(joined);
+            if(digits&&i<5) codeInputs.current[i+1]?.focus();
+          }}
+          onKeyDown={e=>{
+            if(e.key==="Backspace"&&!code[i]&&i>0) codeInputs.current[i-1]?.focus();
+            if(e.key==="ArrowLeft"&&i>0){e.preventDefault();codeInputs.current[i-1]?.focus();}
+            if(e.key==="ArrowRight"&&i<5){e.preventDefault();codeInputs.current[i+1]?.focus();}
+          }}
+        />)}
+      </div>
       {error&&<div className="error-box">{error}</div>}
       {notice&&<div className="success-pill">{notice}</div>}
       <button className="primary-btn full" disabled={code.length!==6}>Verify & sign in</button>
