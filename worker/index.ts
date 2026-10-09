@@ -413,6 +413,30 @@ async function authLogout(req: Request, env: Env) {
   return json({ ok: true }, { headers: { "set-cookie": cookie("taallab_session", "", 0) } });
 }
 
+async function authSignup(req: Request, env: Env) {
+  const body = await req.json().catch(() => ({}));
+  const email = normalizeEmail(body.email);
+  const password = String(body.password || "");
+
+  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, { status: 400 });
+  if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, { status: 400 });
+
+  const existing: any = await env.DB.prepare("SELECT id FROM users WHERE email=? LIMIT 1").bind(email).first();
+  if (existing) return json({ error: "An account with that email already exists. Sign in or request a verification email." }, { status: 409 });
+
+  const id = randomToken(16);
+  const hash = await hashPassword(password);
+  const createdAt = now();
+  await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status,email_verified_at,two_factor_enabled) VALUES(?,?,?,?,?,?,?,?,?)")
+    .bind(id, email, hash, "user", createdAt, createdAt, "active", null, 1).run();
+
+  const verification = await createEmailVerification(env, { id, email });
+  if (!verification.sent) {
+    return json({ error: "Your account was created, but the verification email could not be sent. Use Resend verification email below.", needsVerification: true, verificationSent: false }, { status: 502 });
+  }
+  return json({ ok: true, needsVerification: true });
+}
+
 async function authSetup(req: Request, env: Env) {
   const body = await req.json().catch(() => ({}));
   const setupSecret = String(body.setup_secret || "");
@@ -1165,6 +1189,7 @@ export default {
         return json({ ok: true });
       }
 
+      if (url.pathname === "/api/auth/signup" && req.method === "POST") return authSignup(req, env);
       if (url.pathname === "/api/auth/setup" && req.method === "POST") return authSetup(req, env);
       if (url.pathname === "/api/auth/2fa/verify" && req.method === "POST") return verifyTwoFactor(req, env);
       if (url.pathname === "/api/auth/2fa/resend" && req.method === "POST") return resendTwoFactor(req, env);
