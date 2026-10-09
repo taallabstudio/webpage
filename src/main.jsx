@@ -516,7 +516,7 @@ function Login({onLogin}) {
       const result=await api(signup?"/auth/signup":"/auth/login",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(body)
+        body:JSON.stringify({email,password})
       });
 
       if (result.requiresTwoFactor) {
@@ -575,7 +575,7 @@ function Login({onLogin}) {
     <h1>Check your email</h1>
     <p>Enter the 6-digit code we sent to <strong>{email}</strong>.</p>
     <form onSubmit={submit}>
-      <label>Verification code<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="\\d{6}" value={code} onChange={e=>setCode(e.target.value.replace(/\\D/g,"").slice(0,6))} autoFocus required/></label>
+      <label>Verification code<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]{6}" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} autoFocus required/></label>
       {error&&<div className="error-box">{error}</div>}
       {notice&&<div className="success-pill">{notice}</div>}
       <button className="primary-btn full" disabled={code.length!==6}>Verify & sign in</button>
@@ -599,7 +599,7 @@ function Login({onLogin}) {
       {notice&&<div className="success-pill">{notice}</div>}
       <button className="primary-btn full">{signup?"Sign up & verify email":"Sign in"}</button>
     </form>
-    {!setup && verificationRequired && <button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendVerification}>
+    {verificationRequired && <button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendVerification}>
       {resendCooldown>0?`Resend verification in ${resendCooldown}s`:"Resend verification email"}
     </button>}
     <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSignup(v=>!v);setError("");setNotice("");setVerificationRequired(false);}}>
