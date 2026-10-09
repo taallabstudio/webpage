@@ -245,7 +245,7 @@ async function sendTwoFactorCode(env: Env, user: any, challengeId: string, code:
 
 This code expires in 10 minutes.
 If you did not try to sign in, change your password and contact TaalLab.`;
-  return sendAuthEmail(env, user.email, "Your TaalLab sign-in code", html, text, `login-2fa:${challengeId}`);
+  return sendAuthEmail(env, user.email, "Your TaalLab sign-in code", html, text, `login-2fa:${challengeId}:${await hashText(code)}`);
 }
 
 async function getSessionUser(req: Request, env: Env) {
