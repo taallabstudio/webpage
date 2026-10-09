@@ -489,8 +489,7 @@ function Login({onLogin}) {
   const [challengeId,setChallengeId]=useState("");
   const [error,setError]=useState("");
   const [notice,setNotice]=useState(new URLSearchParams(location.search).get("verified")==="1" ? "Email verified. You can sign in now." : "");
-  const [setup,setSetup]=useState(false);
-  const [setupSecret,setSetupSecret]=useState("");
+  const [signup,setSignup]=useState(false);
   const [twoFactor,setTwoFactor]=useState(false);
   const [resendCooldown,setResendCooldown]=useState(0);
   const [verificationRequired,setVerificationRequired]=useState(false);
@@ -514,8 +513,7 @@ function Login({onLogin}) {
         return;
       }
 
-      const body=setup?{email,password,setup_secret:setupSecret}:{email,password};
-      const result=await api(setup?"/auth/setup":"/auth/login",{
+      const result=await api(signup?"/auth/signup":"/auth/login",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify(body)
@@ -592,21 +590,20 @@ function Login({onLogin}) {
 
   return <div className="login-page"><div className="login-card">
     <Logo/><div className="login-icon"><ShieldCheck/></div>
-    <h1>{setup?"Create admin account":"Sign in"}</h1>
-    <p>{setup?"Set up the first TaalLab administrator.":"Manage TaalLab transfers securely."}</p>
+    <h1>{signup?"Create account":"Sign in"}</h1>
+    <p>{signup?"Create your TrackDeliver account to receive TaalLab transfers.":"Manage TaalLab transfers securely."}</p>
     <form onSubmit={submit}>
       <label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus required/></label>
-      {setup&&<label>Setup secret<input type="password" value={setupSecret} onChange={e=>setSetupSecret(e.target.value)} required/></label>}
       <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} minLength={8} required/></label>
       {error&&<div className="error-box">{error}</div>}
       {notice&&<div className="success-pill">{notice}</div>}
-      <button className="primary-btn full">{setup?"Create admin & verify email":"Sign in"}</button>
+      <button className="primary-btn full">{signup?"Sign up & verify email":"Sign in"}</button>
     </form>
     {!setup && verificationRequired && <button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendVerification}>
       {resendCooldown>0?`Resend verification in ${resendCooldown}s`:"Resend verification email"}
     </button>}
-    <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSetup(v=>!v);setError("");setNotice("");}}>
-      {setup?"Back to sign in":"First-time setup"}
+    <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSignup(v=>!v);setError("");setNotice("");setVerificationRequired(false);}}>
+      {signup?"Back to sign in":"Sign up"}
     </button>
   </div></div>;
 }
