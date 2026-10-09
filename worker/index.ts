@@ -6,6 +6,8 @@ export interface Env {
   SESSION_SECRET: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
+  GOOGLE_LOGIN_CLIENT_ID?: string;
+  GOOGLE_LOGIN_CLIENT_SECRET?: string;
   RESEND_API_KEY: string;
 }
 
@@ -139,6 +141,12 @@ async function ensureSupportSchema(env: Env) {
     expires_at INTEGER NOT NULL
   )`).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_email_verification_user ON email_verification_tokens(user_id)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS google_identities (
+    google_sub TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`).run();
 
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS two_factor_challenges (
     id TEXT PRIMARY KEY,
@@ -418,7 +426,7 @@ async function authSignup(req: Request, env: Env) {
   const email = normalizeEmail(body.email);
   const password = String(body.password || "");
 
-  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, { status: 400 });
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, { status: 400 });
   if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, { status: 400 });
 
   const existing: any = await env.DB.prepare("SELECT id FROM users WHERE email=? LIMIT 1").bind(email).first();
@@ -631,6 +639,142 @@ async function setSetting(env: Env, key: string, value: string) {
   )
     .bind(key, value)
     .run();
+}
+
+
+function googleLoginRedirect(env: Env, params: Record<string, string> = {}) {
+  const url = new URL("/admin", origin(env));
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  return url;
+}
+
+async function googleAuthStart(_req: Request, env: Env) {
+  if (!env.GOOGLE_LOGIN_CLIENT_ID || !env.GOOGLE_LOGIN_CLIENT_SECRET) {
+    return new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: "Google sign-in is not configured yet." }).toString() } });
+  }
+  const state = randomToken(24);
+  const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  url.searchParams.set("client_id", env.GOOGLE_LOGIN_CLIENT_ID);
+  url.searchParams.set("redirect_uri", `${origin(env)}/api/auth/google/callback`);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", "openid email profile");
+  url.searchParams.set("state", state);
+  url.searchParams.set("prompt", "select_account");
+  url.searchParams.set("include_granted_scopes", "true");
+  return new Response(null, {
+    status: 302,
+    headers: { location: url.toString(), "set-cookie": cookie("google_login_state", state, 600) },
+  });
+}
+
+async function googleAuthCallback(req: Request, env: Env) {
+  const url = new URL(req.url);
+  const clearStateCookie = "google_login_state=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const fail = (message: string) => {
+    const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: message }).toString() } });
+    response.headers.append("set-cookie", clearStateCookie);
+    return response;
+  };
+  if (!env.GOOGLE_LOGIN_CLIENT_ID || !env.GOOGLE_LOGIN_CLIENT_SECRET) return fail("Google sign-in is not configured yet.");
+  const code = url.searchParams.get("code") || "";
+  const state = url.searchParams.get("state") || "";
+  const expectedState = parseCookie(req, "google_login_state");
+  if (!code || !state || !expectedState || state !== expectedState) return fail("Google sign-in expired or failed. Please try again.");
+
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: env.GOOGLE_LOGIN_CLIENT_ID,
+      client_secret: env.GOOGLE_LOGIN_CLIENT_SECRET,
+      redirect_uri: `${origin(env)}/api/auth/google/callback`,
+      grant_type: "authorization_code",
+    }),
+  });
+  const tokenData: any = await tokenResponse.json().catch(() => ({}));
+  if (!tokenResponse.ok || !tokenData.id_token) {
+    console.error("Google sign-in token exchange failed", tokenData.error || tokenResponse.status);
+    return fail("Google sign-in could not be completed. Please try again.");
+  }
+
+  const verifyResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(String(tokenData.id_token))}`);
+  const claims: any = await verifyResponse.json().catch(() => ({}));
+  const issuerOk = claims.iss === "accounts.google.com" || claims.iss === "https://accounts.google.com";
+  if (!verifyResponse.ok || claims.aud !== env.GOOGLE_LOGIN_CLIENT_ID || !issuerOk ||
+      !claims.sub || !claims.email || String(claims.email_verified) !== "true" ||
+      !Number.isFinite(Number(claims.exp)) || Number(claims.exp) <= now()) {
+    console.error("Google sign-in identity validation failed");
+    return fail("Google could not verify this account. Please try another Google account.");
+  }
+
+  const email = normalizeEmail(String(claims.email));
+  const googleSub = String(claims.sub);
+  let user: any = await env.DB.prepare(
+    "SELECT u.id,u.email,u.role,u.status,u.email_verified_at,u.two_factor_enabled FROM google_identities g JOIN users u ON u.id=g.user_id WHERE g.google_sub=? LIMIT 1"
+  ).bind(googleSub).first();
+
+  if (!user) {
+    user = await env.DB.prepare(
+      "SELECT id,email,role,status,email_verified_at,two_factor_enabled FROM users WHERE email=? LIMIT 1"
+    ).bind(email).first();
+
+    if (user && user.status !== "active") return fail("This TrackDeliver account is disabled. Contact TaalLab for help.");
+
+    if (!user) {
+      const id = randomToken(16);
+      const createdAt = now();
+      const passwordHash = await hashPassword(randomToken(32));
+      await env.DB.prepare(
+        "INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status,email_verified_at,two_factor_enabled) VALUES(?,?,?,?,?,?,?,?,?)"
+      ).bind(id, email, passwordHash, "user", createdAt, createdAt, "active", createdAt, 1).run();
+      user = { id, email, role: "user", status: "active", email_verified_at: createdAt, two_factor_enabled: 1 };
+    }
+
+    try {
+      await env.DB.prepare("INSERT INTO google_identities(google_sub,user_id,email,created_at) VALUES(?,?,?,?)")
+        .bind(googleSub, user.id, email, now()).run();
+    } catch (error) {
+      const linked: any = await env.DB.prepare(
+        "SELECT u.id,u.email,u.role,u.status,u.email_verified_at,u.two_factor_enabled FROM google_identities g JOIN users u ON u.id=g.user_id WHERE g.google_sub=? LIMIT 1"
+      ).bind(googleSub).first();
+      if (!linked) throw error;
+      user = linked;
+    }
+  }
+
+  if (!user || user.status !== "active") return fail("This TrackDeliver account is unavailable. Contact TaalLab for help.");
+  if (!user.email_verified_at) {
+    await env.DB.prepare("UPDATE users SET email_verified_at=?,updated_at=? WHERE id=?").bind(now(), now(), user.id).run();
+    user.email_verified_at = now();
+  }
+
+  if (Number(user.two_factor_enabled) !== 0) {
+    const challengeId = randomToken(24);
+    const code = randomCode();
+    const createdAt = now();
+    await env.DB.prepare("DELETE FROM two_factor_challenges WHERE user_id=?").bind(user.id).run();
+    await env.DB.prepare(
+      "INSERT INTO two_factor_challenges(id,user_id,code_hash,created_at,expires_at,attempts) VALUES(?,?,?,?,?,0)"
+    ).bind(challengeId, user.id, await hashText(code), createdAt, createdAt + 600).run();
+    const sent = await sendTwoFactorCode(env, user, challengeId, code);
+    if (!sent.sent) {
+      await env.DB.prepare("DELETE FROM two_factor_challenges WHERE id=?").bind(challengeId).run();
+      return fail("We could not send your TrackDeliver sign-in code. Please try again.");
+    }
+    const response = new Response(null, {
+      status: 302,
+      headers: { location: googleLoginRedirect(env, { google_2fa: "1", challenge_id: challengeId, email: user.email }).toString() },
+    });
+    response.headers.append("set-cookie", clearStateCookie);
+    return response;
+  }
+
+  const sid = await createUserSession(env, user.id);
+  const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env).toString() } });
+  response.headers.append("set-cookie", clearStateCookie);
+  response.headers.append("set-cookie", cookie("taallab_session", sid, 7 * 86400));
+  return response;
 }
 
 async function googleLogin(req: Request, env: Env) {
@@ -1214,6 +1358,8 @@ export default {
         await requireAdmin(req, env);
         return googleStatus(env);
       }
+      if (url.pathname === "/api/auth/google/start" && req.method === "GET") return googleAuthStart(req, env);
+      if (url.pathname === "/api/auth/google/callback" && req.method === "GET") return googleAuthCallback(req, env);
       if (url.pathname === "/api/google/login" && req.method === "GET") return googleLogin(req, env);
       if (url.pathname === "/api/google/callback" && req.method === "GET") return googleCallback(req, env);
 
