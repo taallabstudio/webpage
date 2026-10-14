@@ -16,11 +16,36 @@ const SETTINGS_REFRESH = "google_refresh_token";
 const SETTINGS_FOLDER = "google_drive_folder_id";
 const now = () => Math.floor(Date.now() / 1000);
 
-const json = (data: any, init: ResponseInit = {}) =>
-  new Response(JSON.stringify(data), {
-    ...init,
-    headers: { "content-type": "application/json; charset=utf-8", ...(init.headers || {}) },
-  });
+const SECURITY_HEADERS: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Cross-Origin-Resource-Policy": "same-site",
+  "Cache-Control": "no-store",
+};
+
+const json = (data: any, init: ResponseInit = {}) => {
+  const headers = new Headers(init.headers || {});
+  headers.set("content-type", "application/json; charset=utf-8");
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    if (!headers.has(key)) headers.set(key, value);
+  }
+  return new Response(JSON.stringify(data), { ...init, headers });
+};
+
+function addSecurityHeaders(response: Response) {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    if (!headers.has(key)) headers.set(key, value);
+  }
+  headers.set("Strict-Transport-Security", "max-age=31536000");
+  const contentType = headers.get("content-type") || "";
+  if (contentType.includes("text/html")) {
+    headers.set("Content-Security-Policy", "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; upgrade-insecure-requests");
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
 
 function randomToken(bytes = 24) {
   const a = crypto.getRandomValues(new Uint8Array(bytes));
@@ -88,7 +113,7 @@ async function passwordMatches(password: string, stored: string) {
   for (let i = 0; i < bits.length; i++) diff |= bits[i] ^ expected[i];
   return diff === 0;
 }
-const PASSWORD_ITERATIONS = 50000;
+const PASSWORD_ITERATIONS = 210000;
 
 async function hashPassword(password: string) {
   if (password.length < 8) throw new Error("Password must be at least 8 characters.");
@@ -103,65 +128,27 @@ async function hashPassword(password: string) {
   return `pbkdf2$${PASSWORD_ITERATIONS}$${base64Url(salt)}$${base64Url(bits)}`;
 }
 
-async function ensureSupportSchema(env: Env) {
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`).run();
-  const columns: any = await env.DB.prepare("PRAGMA table_info(files)").all();
-  const hasLastDownloaded = (columns.results || []).some((col: any) => col.name === "last_downloaded_at");
-  if (!hasLastDownloaded) {
-    await env.DB.prepare("ALTER TABLE files ADD COLUMN last_downloaded_at INTEGER").run();
-  }
-
-  const transferColumns: any = await env.DB.prepare("PRAGMA table_info(transfers)").all();
-  const hasTransferUser = (transferColumns.results || []).some((col: any) => col.name === "user_id");
-  if (!hasTransferUser) {
-    try {
-      await env.DB.prepare("ALTER TABLE transfers ADD COLUMN user_id TEXT").run();
-    } catch (e) {
-      const check: any = await env.DB.prepare("PRAGMA table_info(transfers)").all();
-      const exists = (check.results || []).some((col: any) => col.name === "user_id");
-      if (!exists) throw e;
+async function verifyRequiredSchema(env: Env) {
+  const required: Record<string, string[]> = {
+    files: ["last_downloaded_at"],
+    transfers: ["user_id"],
+    users: ["email_verified_at", "two_factor_enabled"],
+  };
+  for (const [table, expectedColumns] of Object.entries(required)) {
+    const result: any = await env.DB.prepare(`PRAGMA table_info(${table})`).all();
+    const available = new Set((result.results || []).map((column: any) => String(column.name)));
+    const missing = expectedColumns.filter((column) => !available.has(column));
+    if (missing.length) {
+      throw new Error(`Database schema is missing required columns for ${table}; apply the documented D1 migrations.`);
     }
   }
-  const userColumns: any = await env.DB.prepare("PRAGMA table_info(users)").all();
-  const hasEmailVerified = (userColumns.results || []).some((col: any) => col.name === "email_verified_at");
-  if (!hasEmailVerified) {
-    await env.DB.prepare("ALTER TABLE users ADD COLUMN email_verified_at INTEGER").run();
-    await env.DB.prepare("UPDATE users SET email_verified_at=created_at WHERE email_verified_at IS NULL").run();
+  const tables: any = await env.DB.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('app_settings','email_verification_tokens','google_identities','two_factor_challenges','booking_rate_limits','api_rate_limits')"
+  ).all();
+  const availableTables = new Set((tables.results || []).map((row: any) => String(row.name)));
+  for (const name of ["app_settings","email_verification_tokens","google_identities","two_factor_challenges","booking_rate_limits","api_rate_limits"]) {
+    if (!availableTables.has(name)) throw new Error("Database migration is required before serving requests.");
   }
-  const hasTwoFactor = (userColumns.results || []).some((col: any) => col.name === "two_factor_enabled");
-  if (!hasTwoFactor) {
-    await env.DB.prepare("ALTER TABLE users ADD COLUMN two_factor_enabled INTEGER NOT NULL DEFAULT 1").run();
-  }
-
-  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_transfers_user_id ON transfers(user_id)").run();
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS email_verification_tokens (
-    token_hash TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL
-  )`).run();
-  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_email_verification_user ON email_verification_tokens(user_id)").run();
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS google_identities (
-    google_sub TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL UNIQUE,
-    email TEXT NOT NULL,
-    created_at INTEGER NOT NULL
-  )`).run();
-
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS two_factor_challenges (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    code_hash TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL,
-    attempts INTEGER NOT NULL DEFAULT 0
-  )`).run();
-  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_2fa_challenges_user ON two_factor_challenges(user_id)").run();
-
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS booking_rate_limits (
-    identity TEXT PRIMARY KEY,
-    last_sent_at INTEGER NOT NULL
-  )`).run();
 }
 
 function normalizeEmail(value: unknown) {
@@ -895,40 +882,36 @@ contact@taallab.work`;
 
 const BOOKING_COOLDOWN_SECONDS = 15 * 60;
 
-async function bookingRateLimit(env: Env, email: string, ip: string) {
+async function reserveBookingRateLimit(env: Env, email: string, ip: string) {
   const identities = [`email:${email}`, `ip:${ip}`];
+  const current = now();
+  const cutoff = current - BOOKING_COOLDOWN_SECONDS;
+  const results: any = await env.DB.batch([
+    env.DB.prepare(`INSERT INTO booking_rate_limits(identity,last_sent_at)
+      VALUES(?,?)
+      ON CONFLICT(identity) DO UPDATE SET last_sent_at=excluded.last_sent_at
+      WHERE booking_rate_limits.last_sent_at<=?`)
+      .bind(identities[0], current, cutoff),
+    env.DB.prepare(`INSERT INTO booking_rate_limits(identity,last_sent_at)
+      VALUES(?,?)
+      ON CONFLICT(identity) DO UPDATE SET last_sent_at=excluded.last_sent_at
+      WHERE booking_rate_limits.last_sent_at<=?`)
+      .bind(identities[1], current, cutoff),
+  ]);
   const rows: any = await env.DB.prepare(
     "SELECT identity,last_sent_at FROM booking_rate_limits WHERE identity IN (?,?)"
   ).bind(...identities).all();
-
-  const current = now();
-  const latest = Math.max(
-    ...((rows.results || []).map((row: any) => Number(row.last_sent_at) || 0)),
-    0,
-  );
-  const remaining = BOOKING_COOLDOWN_SECONDS - (current - latest);
-
-  if (remaining > 0) {
-    return {
-      allowed: false,
-      retryAfter: remaining,
-    };
-  }
-
-  return { allowed: true, retryAfter: 0 };
+  const latest = Math.max(...((rows.results || []).map((row: any) => Number(row.last_sent_at) || 0)), 0);
+  const remaining = Math.max(1, BOOKING_COOLDOWN_SECONDS - (current - latest));
+  const bothReserved = Array.isArray(results) && results.length === 2 &&
+    results.every((result: any) => Number(result?.meta?.changes || 0) === 1);
+  return { allowed: bothReserved, retryAfter: bothReserved ? 0 : remaining, reservedAt: current };
 }
 
-async function markBookingSent(env: Env, email: string, ip: string) {
-  const sentAt = now();
+async function releaseBookingRateLimit(env: Env, email: string, ip: string, reservedAt: number) {
   await env.DB.batch([
-    env.DB.prepare(`INSERT INTO booking_rate_limits(identity,last_sent_at)
-      VALUES(?,?)
-      ON CONFLICT(identity) DO UPDATE SET last_sent_at=excluded.last_sent_at`)
-      .bind(`email:${email}`, sentAt),
-    env.DB.prepare(`INSERT INTO booking_rate_limits(identity,last_sent_at)
-      VALUES(?,?)
-      ON CONFLICT(identity) DO UPDATE SET last_sent_at=excluded.last_sent_at`)
-      .bind(`ip:${ip}`, sentAt),
+    env.DB.prepare("DELETE FROM booking_rate_limits WHERE identity=? AND last_sent_at=?").bind(`email:${email}`, reservedAt),
+    env.DB.prepare("DELETE FROM booking_rate_limits WHERE identity=? AND last_sent_at=?").bind(`ip:${ip}`, reservedAt),
   ]);
 }
 
@@ -1295,16 +1278,29 @@ async function cleanup(env: Env) {
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
+    const response = await (async (): Promise<Response> => {
     const url = new URL(req.url);
     try {
-      await ensureSupportSchema(env);
+      const mutating = !["GET", "HEAD", "OPTIONS"].includes(req.method.toUpperCase());
+      const hasSessionCookie = !!parseCookie(req, "taallab_session");
+      if (mutating && hasSessionCookie) {
+        const requestOrigin = req.headers.get("Origin");
+        if (!requestOrigin || requestOrigin !== origin(env)) {
+          return json({ error: "Request origin could not be verified." }, { status: 403 });
+        }
+      }
+
+      await verifyRequiredSchema(env);
+
+      const authLimitResponse = req.method === "POST" ? await enforceRateLimit(env, req, url.pathname) : null;
+      if (authLimitResponse) return authLimitResponse;
 
       if (url.pathname === "/api/booking" && req.method === "POST") {
         const body = await req.json().catch(() => ({}));
         const email = normalizeEmail(body.email);
         const ip = req.headers.get("CF-Connecting-IP") || req.headers.get("X-Forwarded-For")?.split(",")[0].trim() || "unknown";
 
-        const limit = await bookingRateLimit(env, email, ip);
+        const limit = await reserveBookingRateLimit(env, email, ip);
         if (!limit.allowed) {
           const minutes = Math.ceil(limit.retryAfter / 60);
           return json(
@@ -1319,6 +1315,7 @@ export default {
           );
         }
 
+        const reservedAt = limit.reservedAt;
         const result = await sendBookingEmail(env, {
           name: String(body.name || ""),
           email,
@@ -1327,9 +1324,10 @@ export default {
           date: String(body.date || ""),
           message: String(body.message || ""),
         });
-        if (!result.sent) return json({ error: result.error || "Could not send booking enquiry." }, { status: 502 });
-
-        await markBookingSent(env, email, ip);
+        if (!result.sent) {
+          await releaseBookingRateLimit(env, email, ip, reservedAt);
+          return json({ error: "Could not send booking enquiry. Please try again later." }, { status: 502 });
+        }
         return json({ ok: true });
       }
 
@@ -1644,10 +1642,13 @@ export default {
 
       return new Response("Not found", { status: 404 });
     } catch (error) {
-      console.error(error);
       if (error instanceof Response) return error;
-      return json({ error: error instanceof Error ? error.message : "Server error" }, { status: 500 });
+      const incidentId = randomToken(8);
+      console.error("Unhandled Worker error", { incidentId, name: error instanceof Error ? error.name : "UnknownError" });
+      return json({ error: "An unexpected server error occurred.", incidentId }, { status: 500 });
     }
+    })();
+    return addSecurityHeaders(response);
   },
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
@@ -1655,6 +1656,8 @@ export default {
       cleanup(env),
       env.DB.prepare("DELETE FROM email_verification_tokens WHERE expires_at<=?").bind(now()).run(),
       env.DB.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").bind(now()).run(),
+      env.DB.prepare("DELETE FROM booking_rate_limits WHERE last_sent_at<=?").bind(now() - 86400).run(),
+      env.DB.prepare("DELETE FROM api_rate_limits WHERE window_started_at<=?").bind(now() - 86400).run(),
     ]));
   },
 } satisfies ExportedHandler<Env>;
