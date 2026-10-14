@@ -16,11 +16,23 @@ const SETTINGS_REFRESH = "google_refresh_token";
 const SETTINGS_FOLDER = "google_drive_folder_id";
 const now = () => Math.floor(Date.now() / 1000);
 
-const json = (data: any, init: ResponseInit = {}) =>
-  new Response(JSON.stringify(data), {
-    ...init,
-    headers: { "content-type": "application/json; charset=utf-8", ...(init.headers || {}) },
-  });
+const SECURITY_HEADERS: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Cross-Origin-Resource-Policy": "same-site",
+  "Cache-Control": "no-store",
+};
+
+const json = (data: any, init: ResponseInit = {}) => {
+  const headers = new Headers(init.headers || {});
+  headers.set("content-type", "application/json; charset=utf-8");
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    if (!headers.has(key)) headers.set(key, value);
+  }
+  return new Response(JSON.stringify(data), { ...init, headers });
+};
 
 function randomToken(bytes = 24) {
   const a = crypto.getRandomValues(new Uint8Array(bytes));
@@ -88,7 +100,7 @@ async function passwordMatches(password: string, stored: string) {
   for (let i = 0; i < bits.length; i++) diff |= bits[i] ^ expected[i];
   return diff === 0;
 }
-const PASSWORD_ITERATIONS = 50000;
+const PASSWORD_ITERATIONS = 210000;
 
 async function hashPassword(password: string) {
   if (password.length < 8) throw new Error("Password must be at least 8 characters.");
@@ -105,6 +117,11 @@ async function hashPassword(password: string) {
 
 async function ensureSupportSchema(env: Env) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS api_rate_limits (
+    identity TEXT PRIMARY KEY,
+    window_started_at INTEGER NOT NULL,
+    request_count INTEGER NOT NULL
+  )`).run();
   const columns: any = await env.DB.prepare("PRAGMA table_info(files)").all();
   const hasLastDownloaded = (columns.results || []).some((col: any) => col.name === "last_downloaded_at");
   if (!hasLastDownloaded) {
@@ -162,6 +179,41 @@ async function ensureSupportSchema(env: Env) {
     identity TEXT PRIMARY KEY,
     last_sent_at INTEGER NOT NULL
   )`).run();
+}
+
+const AUTH_RATE_LIMITS: Record<string, { limit: number; windowSeconds: number }> = {
+  "/api/auth/login": { limit: 10, windowSeconds: 60 },
+  "/api/admin/login": { limit: 10, windowSeconds: 60 },
+  "/api/auth/signup": { limit: 5, windowSeconds: 900 },
+  "/api/auth/setup": { limit: 5, windowSeconds: 900 },
+  "/api/auth/2fa/verify": { limit: 5, windowSeconds: 300 },
+  "/api/auth/2fa/resend": { limit: 3, windowSeconds: 900 },
+  "/api/auth/resend-verification": { limit: 3, windowSeconds: 900 },
+  "/api/account/password": { limit: 5, windowSeconds: 900 },
+  "/api/account/security": { limit: 5, windowSeconds: 900 },
+};
+
+async function enforceRateLimit(env: Env, req: Request, route: string) {
+  const policy = AUTH_RATE_LIMITS[route];
+  if (!policy) return null;
+  const ip = req.headers.get("CF-Connecting-IP") || "unknown";
+  const identity = await hashText(`rate:${route}:${ip}`);
+  const current = now();
+  await env.DB.prepare(`INSERT INTO api_rate_limits(identity,window_started_at,request_count)
+    VALUES(?,?,1)
+    ON CONFLICT(identity) DO UPDATE SET
+      request_count=CASE WHEN api_rate_limits.window_started_at<=? THEN 1 ELSE api_rate_limits.request_count+1 END,
+      window_started_at=CASE WHEN api_rate_limits.window_started_at<=? THEN excluded.window_started_at ELSE api_rate_limits.window_started_at END`)
+    .bind(identity, current, current - policy.windowSeconds, current - policy.windowSeconds).run();
+  const row: any = await env.DB.prepare("SELECT window_started_at,request_count FROM api_rate_limits WHERE identity=?").bind(identity).first();
+  if (row && Number(row.request_count) > policy.limit) {
+    const retryAfter = Math.max(1, policy.windowSeconds - (current - Number(row.window_started_at)));
+    return json({ error: "Too many requests. Please try again later.", retryAfter }, {
+      status: 429,
+      headers: { "Retry-After": String(retryAfter) },
+    });
+  }
+  return null;
 }
 
 function normalizeEmail(value: unknown) {
@@ -895,40 +947,36 @@ contact@taallab.work`;
 
 const BOOKING_COOLDOWN_SECONDS = 15 * 60;
 
-async function bookingRateLimit(env: Env, email: string, ip: string) {
+async function reserveBookingRateLimit(env: Env, email: string, ip: string) {
   const identities = [`email:${email}`, `ip:${ip}`];
+  const current = now();
+  const cutoff = current - BOOKING_COOLDOWN_SECONDS;
+  const results: any = await env.DB.batch([
+    env.DB.prepare(`INSERT INTO booking_rate_limits(identity,last_sent_at)
+      VALUES(?,?)
+      ON CONFLICT(identity) DO UPDATE SET last_sent_at=excluded.last_sent_at
+      WHERE booking_rate_limits.last_sent_at<=?`)
+      .bind(identities[0], current, cutoff),
+    env.DB.prepare(`INSERT INTO booking_rate_limits(identity,last_sent_at)
+      VALUES(?,?)
+      ON CONFLICT(identity) DO UPDATE SET last_sent_at=excluded.last_sent_at
+      WHERE booking_rate_limits.last_sent_at<=?`)
+      .bind(identities[1], current, cutoff),
+  ]);
   const rows: any = await env.DB.prepare(
     "SELECT identity,last_sent_at FROM booking_rate_limits WHERE identity IN (?,?)"
   ).bind(...identities).all();
-
-  const current = now();
-  const latest = Math.max(
-    ...((rows.results || []).map((row: any) => Number(row.last_sent_at) || 0)),
-    0,
-  );
-  const remaining = BOOKING_COOLDOWN_SECONDS - (current - latest);
-
-  if (remaining > 0) {
-    return {
-      allowed: false,
-      retryAfter: remaining,
-    };
-  }
-
-  return { allowed: true, retryAfter: 0 };
+  const latest = Math.max(...((rows.results || []).map((row: any) => Number(row.last_sent_at) || 0)), 0);
+  const remaining = Math.max(1, BOOKING_COOLDOWN_SECONDS - (current - latest));
+  const bothReserved = Array.isArray(results) && results.length === 2 &&
+    results.every((result: any) => Number(result?.meta?.changes || 0) === 1);
+  return { allowed: bothReserved, retryAfter: bothReserved ? 0 : remaining };
 }
 
-async function markBookingSent(env: Env, email: string, ip: string) {
-  const sentAt = now();
+async function releaseBookingRateLimit(env: Env, email: string, ip: string, reservedAt: number) {
   await env.DB.batch([
-    env.DB.prepare(`INSERT INTO booking_rate_limits(identity,last_sent_at)
-      VALUES(?,?)
-      ON CONFLICT(identity) DO UPDATE SET last_sent_at=excluded.last_sent_at`)
-      .bind(`email:${email}`, sentAt),
-    env.DB.prepare(`INSERT INTO booking_rate_limits(identity,last_sent_at)
-      VALUES(?,?)
-      ON CONFLICT(identity) DO UPDATE SET last_sent_at=excluded.last_sent_at`)
-      .bind(`ip:${ip}`, sentAt),
+    env.DB.prepare("DELETE FROM booking_rate_limits WHERE identity=? AND last_sent_at=?").bind(`email:${email}`, reservedAt),
+    env.DB.prepare("DELETE FROM booking_rate_limits WHERE identity=? AND last_sent_at=?").bind(`ip:${ip}`, reservedAt),
   ]);
 }
 
@@ -1299,12 +1347,15 @@ export default {
     try {
       await ensureSupportSchema(env);
 
+      const authLimitResponse = req.method === "POST" ? await enforceRateLimit(env, req, url.pathname) : null;
+      if (authLimitResponse) return authLimitResponse;
+
       if (url.pathname === "/api/booking" && req.method === "POST") {
         const body = await req.json().catch(() => ({}));
         const email = normalizeEmail(body.email);
         const ip = req.headers.get("CF-Connecting-IP") || req.headers.get("X-Forwarded-For")?.split(",")[0].trim() || "unknown";
 
-        const limit = await bookingRateLimit(env, email, ip);
+        const limit = await reserveBookingRateLimit(env, email, ip);
         if (!limit.allowed) {
           const minutes = Math.ceil(limit.retryAfter / 60);
           return json(
@@ -1319,6 +1370,7 @@ export default {
           );
         }
 
+        const reservedAt = now();
         const result = await sendBookingEmail(env, {
           name: String(body.name || ""),
           email,
@@ -1327,9 +1379,10 @@ export default {
           date: String(body.date || ""),
           message: String(body.message || ""),
         });
-        if (!result.sent) return json({ error: result.error || "Could not send booking enquiry." }, { status: 502 });
-
-        await markBookingSent(env, email, ip);
+        if (!result.sent) {
+          await releaseBookingRateLimit(env, email, ip, reservedAt);
+          return json({ error: "Could not send booking enquiry. Please try again later." }, { status: 502 });
+        }
         return json({ ok: true });
       }
 
@@ -1644,9 +1697,10 @@ export default {
 
       return new Response("Not found", { status: 404 });
     } catch (error) {
-      console.error(error);
       if (error instanceof Response) return error;
-      return json({ error: error instanceof Error ? error.message : "Server error" }, { status: 500 });
+      const incidentId = randomToken(8);
+      console.error("Unhandled Worker error", { incidentId, name: error instanceof Error ? error.name : "UnknownError" });
+      return json({ error: "An unexpected server error occurred.", incidentId }, { status: 500 });
     }
   },
 
@@ -1655,6 +1709,8 @@ export default {
       cleanup(env),
       env.DB.prepare("DELETE FROM email_verification_tokens WHERE expires_at<=?").bind(now()).run(),
       env.DB.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").bind(now()).run(),
+      env.DB.prepare("DELETE FROM booking_rate_limits WHERE last_sent_at<=?").bind(now() - 86400).run(),
+      env.DB.prepare("DELETE FROM api_rate_limits WHERE window_started_at<=?").bind(now() - 86400).run(),
     ]));
   },
 } satisfies ExportedHandler<Env>;
