@@ -34,6 +34,19 @@ const json = (data: any, init: ResponseInit = {}) => {
   return new Response(JSON.stringify(data), { ...init, headers });
 };
 
+function addSecurityHeaders(response: Response) {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    if (!headers.has(key)) headers.set(key, value);
+  }
+  headers.set("Strict-Transport-Security", "max-age=31536000");
+  const contentType = headers.get("content-type") || "";
+  if (contentType.includes("text/html")) {
+    headers.set("Content-Security-Policy", "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; upgrade-insecure-requests");
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 function randomToken(bytes = 24) {
   const a = crypto.getRandomValues(new Uint8Array(bytes));
   return [...a].map((x) => x.toString(16).padStart(2, "0")).join("");
@@ -1265,6 +1278,7 @@ async function cleanup(env: Env) {
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
+    const response = await (async (): Promise<Response> => {
     const url = new URL(req.url);
     try {
       const mutating = !["GET", "HEAD", "OPTIONS"].includes(req.method.toUpperCase());
@@ -1633,6 +1647,8 @@ export default {
       console.error("Unhandled Worker error", { incidentId, name: error instanceof Error ? error.name : "UnknownError" });
       return json({ error: "An unexpected server error occurred.", incidentId }, { status: 500 });
     }
+    })();
+    return addSecurityHeaders(response);
   },
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
