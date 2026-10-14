@@ -115,105 +115,27 @@ async function hashPassword(password: string) {
   return `pbkdf2$${PASSWORD_ITERATIONS}$${base64Url(salt)}$${base64Url(bits)}`;
 }
 
-async function ensureSupportSchema(env: Env) {
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`).run();
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS api_rate_limits (
-    identity TEXT PRIMARY KEY,
-    window_started_at INTEGER NOT NULL,
-    request_count INTEGER NOT NULL
-  )`).run();
-  const columns: any = await env.DB.prepare("PRAGMA table_info(files)").all();
-  const hasLastDownloaded = (columns.results || []).some((col: any) => col.name === "last_downloaded_at");
-  if (!hasLastDownloaded) {
-    await env.DB.prepare("ALTER TABLE files ADD COLUMN last_downloaded_at INTEGER").run();
-  }
-
-  const transferColumns: any = await env.DB.prepare("PRAGMA table_info(transfers)").all();
-  const hasTransferUser = (transferColumns.results || []).some((col: any) => col.name === "user_id");
-  if (!hasTransferUser) {
-    try {
-      await env.DB.prepare("ALTER TABLE transfers ADD COLUMN user_id TEXT").run();
-    } catch (e) {
-      const check: any = await env.DB.prepare("PRAGMA table_info(transfers)").all();
-      const exists = (check.results || []).some((col: any) => col.name === "user_id");
-      if (!exists) throw e;
+async function verifyRequiredSchema(env: Env) {
+  const required: Record<string, string[]> = {
+    files: ["last_downloaded_at"],
+    transfers: ["user_id"],
+    users: ["email_verified_at", "two_factor_enabled"],
+  };
+  for (const [table, expectedColumns] of Object.entries(required)) {
+    const result: any = await env.DB.prepare(`PRAGMA table_info(${table})`).all();
+    const available = new Set((result.results || []).map((column: any) => String(column.name)));
+    const missing = expectedColumns.filter((column) => !available.has(column));
+    if (missing.length) {
+      throw new Error(`Database schema is missing required columns for ${table}; apply the documented D1 migrations.`);
     }
   }
-  const userColumns: any = await env.DB.prepare("PRAGMA table_info(users)").all();
-  const hasEmailVerified = (userColumns.results || []).some((col: any) => col.name === "email_verified_at");
-  if (!hasEmailVerified) {
-    await env.DB.prepare("ALTER TABLE users ADD COLUMN email_verified_at INTEGER").run();
-    await env.DB.prepare("UPDATE users SET email_verified_at=created_at WHERE email_verified_at IS NULL").run();
+  const tables: any = await env.DB.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('app_settings','email_verification_tokens','google_identities','two_factor_challenges','booking_rate_limits','api_rate_limits')"
+  ).all();
+  const availableTables = new Set((tables.results || []).map((row: any) => String(row.name)));
+  for (const name of ["app_settings","email_verification_tokens","google_identities","two_factor_challenges","booking_rate_limits","api_rate_limits"]) {
+    if (!availableTables.has(name)) throw new Error("Database migration is required before serving requests.");
   }
-  const hasTwoFactor = (userColumns.results || []).some((col: any) => col.name === "two_factor_enabled");
-  if (!hasTwoFactor) {
-    await env.DB.prepare("ALTER TABLE users ADD COLUMN two_factor_enabled INTEGER NOT NULL DEFAULT 1").run();
-  }
-
-  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_transfers_user_id ON transfers(user_id)").run();
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS email_verification_tokens (
-    token_hash TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL
-  )`).run();
-  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_email_verification_user ON email_verification_tokens(user_id)").run();
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS google_identities (
-    google_sub TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL UNIQUE,
-    email TEXT NOT NULL,
-    created_at INTEGER NOT NULL
-  )`).run();
-
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS two_factor_challenges (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    code_hash TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL,
-    attempts INTEGER NOT NULL DEFAULT 0
-  )`).run();
-  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_2fa_challenges_user ON two_factor_challenges(user_id)").run();
-
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS booking_rate_limits (
-    identity TEXT PRIMARY KEY,
-    last_sent_at INTEGER NOT NULL
-  )`).run();
-}
-
-const AUTH_RATE_LIMITS: Record<string, { limit: number; windowSeconds: number }> = {
-  "/api/auth/login": { limit: 10, windowSeconds: 60 },
-  "/api/admin/login": { limit: 10, windowSeconds: 60 },
-  "/api/auth/signup": { limit: 5, windowSeconds: 900 },
-  "/api/auth/setup": { limit: 5, windowSeconds: 900 },
-  "/api/auth/2fa/verify": { limit: 5, windowSeconds: 300 },
-  "/api/auth/2fa/resend": { limit: 3, windowSeconds: 900 },
-  "/api/auth/resend-verification": { limit: 3, windowSeconds: 900 },
-  "/api/account/password": { limit: 5, windowSeconds: 900 },
-  "/api/account/security": { limit: 5, windowSeconds: 900 },
-};
-
-async function enforceRateLimit(env: Env, req: Request, route: string) {
-  const policy = AUTH_RATE_LIMITS[route];
-  if (!policy) return null;
-  const ip = req.headers.get("CF-Connecting-IP") || "unknown";
-  const identity = await hashText(`rate:${route}:${ip}`);
-  const current = now();
-  await env.DB.prepare(`INSERT INTO api_rate_limits(identity,window_started_at,request_count)
-    VALUES(?,?,1)
-    ON CONFLICT(identity) DO UPDATE SET
-      request_count=CASE WHEN api_rate_limits.window_started_at<=? THEN 1 ELSE api_rate_limits.request_count+1 END,
-      window_started_at=CASE WHEN api_rate_limits.window_started_at<=? THEN excluded.window_started_at ELSE api_rate_limits.window_started_at END`)
-    .bind(identity, current, current - policy.windowSeconds, current - policy.windowSeconds).run();
-  const row: any = await env.DB.prepare("SELECT window_started_at,request_count FROM api_rate_limits WHERE identity=?").bind(identity).first();
-  if (row && Number(row.request_count) > policy.limit) {
-    const retryAfter = Math.max(1, policy.windowSeconds - (current - Number(row.window_started_at)));
-    return json({ error: "Too many requests. Please try again later.", retryAfter }, {
-      status: 429,
-      headers: { "Retry-After": String(retryAfter) },
-    });
-  }
-  return null;
 }
 
 function normalizeEmail(value: unknown) {
@@ -1354,7 +1276,7 @@ export default {
         }
       }
 
-      await ensureSupportSchema(env);
+      await verifyRequiredSchema(env);
 
       const authLimitResponse = req.method === "POST" ? await enforceRateLimit(env, req, url.pathname) : null;
       if (authLimitResponse) return authLimitResponse;
