@@ -970,7 +970,7 @@ async function reserveBookingRateLimit(env: Env, email: string, ip: string) {
   const remaining = Math.max(1, BOOKING_COOLDOWN_SECONDS - (current - latest));
   const bothReserved = Array.isArray(results) && results.length === 2 &&
     results.every((result: any) => Number(result?.meta?.changes || 0) === 1);
-  return { allowed: bothReserved, retryAfter: bothReserved ? 0 : remaining };
+  return { allowed: bothReserved, retryAfter: bothReserved ? 0 : remaining, reservedAt: current };
 }
 
 async function releaseBookingRateLimit(env: Env, email: string, ip: string, reservedAt: number) {
@@ -1345,6 +1345,15 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     try {
+      const mutating = !["GET", "HEAD", "OPTIONS"].includes(req.method.toUpperCase());
+      const hasSessionCookie = !!parseCookie(req, "taallab_session");
+      if (mutating && hasSessionCookie) {
+        const requestOrigin = req.headers.get("Origin");
+        if (!requestOrigin || requestOrigin !== origin(env)) {
+          return json({ error: "Request origin could not be verified." }, { status: 403 });
+        }
+      }
+
       await ensureSupportSchema(env);
 
       const authLimitResponse = req.method === "POST" ? await enforceRateLimit(env, req, url.pathname) : null;
@@ -1370,7 +1379,7 @@ export default {
           );
         }
 
-        const reservedAt = now();
+        const reservedAt = limit.reservedAt;
         const result = await sendBookingEmail(env, {
           name: String(body.name || ""),
           email,
