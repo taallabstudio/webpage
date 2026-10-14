@@ -42,7 +42,7 @@ function addSecurityHeaders(response: Response) {
   headers.set("Strict-Transport-Security", "max-age=31536000");
   const contentType = headers.get("content-type") || "";
   if (contentType.includes("text/html")) {
-    headers.set("Content-Security-Policy", "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; upgrade-insecure-requests");
+    headers.set("Content-Security-Policy", "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; upgrade-insecure-requests");
   }
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
