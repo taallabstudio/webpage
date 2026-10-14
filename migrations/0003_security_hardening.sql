@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS email_verification_tokens (
   expires_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_email_verification_user ON email_verification_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_transfers_user_id ON transfers(user_id);
 
 CREATE TABLE IF NOT EXISTS google_identities (
   google_sub TEXT PRIMARY KEY,
