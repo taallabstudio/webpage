@@ -18,7 +18,7 @@ Do not put secrets in this repository or in `wrangler.toml`. The Razorpay key ID
 
 ## Wrangler configuration
 
-`wrangler.toml` must declare `DBStore` for production. A preview binding is also declared so the branch preview can exercise store APIs; it currently uses the same separate store database, not the transfer database. Create a dedicated preview D1 database and change the preview ID before testing real customer data.
+`wrangler.toml` declares `DBStore` for the production Worker only. No preview D1 database or preview `DBStore` binding is configured. Store changes should be tested and deployed through the main branch workflow as requested. Keep the existing `DB` transfer binding unchanged.
 
 ## Store files and product catalogue
 
