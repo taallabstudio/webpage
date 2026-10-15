@@ -256,7 +256,7 @@ async function streamProduct(req: Request, env: StoreEnv, token: string) {
     headers: { Authorization: `Basic ${btoa(`${env.B2_KEY_ID}:${env.B2_APPLICATION_KEY}`)}` },
   });
   const authData: any = await authResponse.json().catch(() => ({}));
-  if (!authResponse.ok || !authData.authorizationToken || !authData.downloadUrl) {
+  if (!authResponse.ok || !authData.authorizationToken || !authData.apiInfo?.storageApi?.downloadUrl) {
     console.error("Backblaze authorization failed", authResponse.status);
     return json({ error: "Could not authorize private download storage." }, 502);
   }
@@ -264,7 +264,7 @@ async function streamProduct(req: Request, env: StoreEnv, token: string) {
   const range = req.headers.get("Range");
   const headers = new Headers({ Authorization: authData.authorizationToken });
   if (range) headers.set("Range", range);
-  const response = await fetch(`${authData.downloadUrl.replace(/\/$/, "")}/file/${encodeURIComponent(env.B2_BUCKET_NAME)}/${objectPath}`, { headers });
+  const response = await fetch(`${authData.apiInfo.storageApi.downloadUrl.replace(/\/$/, "")}/file/${encodeURIComponent(env.B2_BUCKET_NAME)}/${objectPath}`, { headers });
   if (!response.ok || !response.body) {
     console.error("Backblaze object download failed", response.status, product.id);
     return json({ error: response.status === 404 ? "The product file has not been uploaded yet." : "Could not retrieve the product file." }, response.status === 404 ? 404 : 502);
