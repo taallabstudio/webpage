@@ -4,16 +4,62 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Shop Audio — TAAL LAB</title>
 <meta name="description" content="Audio tools, sample packs and sound libraries from TAAL LAB.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{color-scheme:dark;--bg:#090d14;--panel:#111a28;--line:#263448;--text:#edf4ff;--muted:#9aabc2;--blue:#63b8ff}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% -20%,#15314a 0,transparent 50%),var(--bg);color:var(--text);font:16px/1.6 Inter,system-ui,sans-serif}a{color:inherit;text-decoration:none}.wrap{max-width:1100px;margin:auto;padding:28px 22px 70px}.nav{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:20px}.brand{font-weight:800;letter-spacing:.16em}.brand span{color:var(--blue)}.nav a:last-child{color:var(--blue)}.eyebrow{color:var(--blue);font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;margin-top:62px}.hero h1{font-size:clamp(2.5rem,7vw,5.2rem);line-height:1.03;letter-spacing:-.055em;max-width:760px;margin:14px 0}.hero p{color:var(--muted);max-width:620px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:16px;margin-top:38px}.card{background:linear-gradient(145deg,#172335,#0d131d);border:1px solid var(--line);border-radius:20px;padding:24px;min-height:260px;display:flex;flex-direction:column}.symbol{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;color:var(--blue);background:#16304a;font-size:1.4rem}.tag{color:var(--blue);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;margin-top:20px}.card h2{margin:6px 0 4px}.card p{color:var(--muted);margin:0 0 22px}.foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:10px}.price{font-weight:700}.btn{display:inline-flex;justify-content:center;align-items:center;padding:11px 16px;border-radius:11px;background:var(--blue);color:#07111d;font-weight:750;border:0;cursor:pointer}.btn[disabled]{background:#273345;color:#8291a5;cursor:not-allowed}.notice{color:var(--muted);margin-top:24px;font-size:.9rem}.error{color:#ffb3b3}.loading{color:var(--muted)}footer{margin-top:70px;color:var(--muted);font-size:.82rem;border-top:1px solid var(--line);padding-top:20px}
-</style></head>
-<body><main class="wrap">
-<nav class="nav"><a class="brand" href="/">TAAL<span> LAB</span></a><a href="/">Back to studio ↗</a></nav>
-<section class="hero"><div class="eyebrow">TAAL LAB · DIGITAL STORE</div><h1>Tools for the sound in your head.</h1><p>Plugins, sample packs and sound libraries made for music creators. Digital downloads are delivered through secure, private links after payment.</p></section>
+:root{color-scheme:light;--bg:#f5f7f8;--panel:rgba(255,255,255,.82);--line:#e1e6eb;--text:#1d2229;--muted:#707985;--blue:#0878e8;--blue-soft:#eaf4ff}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 Inter,system-ui,sans-serif;min-height:100vh}
+a{color:inherit;text-decoration:none}
+button,a{ -webkit-tap-highlight-color:transparent}
+.page-glow{position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at 78% 8%,rgba(93,174,235,.17),transparent 30%),radial-gradient(circle at 12% 52%,rgba(207,218,228,.3),transparent 36%);z-index:-1}
+.wrap{width:min(1240px,100%);margin:auto;padding:0 5vw 44px}
+.nav{height:82px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(29,34,41,.1);gap:20px}
+.brand{font-family:"Space Grotesk",sans-serif;font-weight:700;letter-spacing:-.045em;font-size:18px;display:flex;align-items:center;gap:10px}
+.brand-mark{width:30px;height:30px;border:1px solid rgba(8,120,232,.28);border-radius:10px;display:grid;place-items:center;color:var(--blue);font-size:13px;background:rgba(255,255,255,.72)}
+.brand span{color:var(--blue)}
+.nav a:last-child{font-size:12px;font-weight:700;color:#4f5863;transition:color .2s}
+.nav a:last-child:hover{color:var(--blue)}
+.hero{padding:112px 0 20px;max-width:850px}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;color:var(--blue);font-size:10px;font-weight:700;letter-spacing:.17em;text-transform:uppercase}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 4px rgba(8,120,232,.1)}
+.hero h1{font-family:"Space Grotesk",sans-serif;font-size:clamp(48px,7.8vw,100px);line-height:.96;letter-spacing:-.075em;max-width:850px;margin:22px 0 20px;font-weight:700}
+.hero h1 em{font-style:normal;color:var(--blue)}
+.hero p{font-size:16px;color:var(--muted);max-width:590px;margin:0;line-height:1.75}
+.section-line{display:flex;align-items:center;gap:14px;margin:45px 0 18px;color:#858e98;font-size:10px;letter-spacing:.15em;font-weight:700;text-transform:uppercase}
+.section-line:after{content:"";height:1px;background:var(--line);flex:1}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.card{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(255,255,255,.95),rgba(250,252,253,.82));border:1px solid rgba(218,225,232,.95);border-radius:22px;padding:25px;min-height:300px;display:flex;flex-direction:column;box-shadow:0 14px 38px rgba(35,49,63,.045);transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease}
+.card:before{content:"";position:absolute;top:-90px;right:-90px;width:190px;height:190px;background:radial-gradient(circle,rgba(8,120,232,.10),transparent 70%);pointer-events:none}
+.card:hover{transform:translateY(-4px);border-color:#c5ddf4;box-shadow:0 22px 50px rgba(35,49,63,.09)}
+.symbol{position:relative;width:46px;height:46px;border-radius:15px;display:grid;place-items:center;color:var(--blue);background:var(--blue-soft);font-size:20px;border:1px solid rgba(8,120,232,.07)}
+.tag{color:var(--blue);font-size:9px;letter-spacing:.15em;text-transform:uppercase;font-weight:700;margin-top:25px}
+.card h2{font-family:"Space Grotesk",sans-serif;font-size:22px;line-height:1.2;letter-spacing:-.045em;margin:8px 0 8px}
+.card p{color:var(--muted);font-size:13px;line-height:1.7;margin:0 0 28px;max-width:310px}
+.foot{margin-top:auto;padding-top:18px;border-top:1px solid #e9edf1;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.price{font-weight:700;font-size:12px}
+.btn{display:inline-flex;justify-content:center;align-items:center;gap:8px;padding:11px 15px;border-radius:999px;background:var(--blue);color:white;font-size:11px;font-weight:700;border:1px solid var(--blue);cursor:pointer;transition:transform .2s,background .2s;white-space:nowrap}
+.btn:hover{background:#066bd0;transform:translateY(-1px)}
+.btn[aria-disabled=true]{background:#f0f2f4;color:#89929d;border-color:#e5e8eb;cursor:not-allowed;transform:none}
+.notice{display:flex;align-items:flex-start;gap:10px;color:#7a838d;margin-top:24px;font-size:11px;line-height:1.6}
+.notice-mark{flex:none;width:18px;height:18px;display:grid;place-items:center;border:1px solid #d8e4ef;border-radius:50%;color:var(--blue);font-size:11px}
+.error{color:#b7443a}.loading{color:var(--muted);grid-column:1/-1;padding:24px 0}
+footer{margin-top:86px;color:#818a95;font-size:11px;border-top:1px solid rgba(29,34,41,.1);padding-top:22px;display:flex;justify-content:space-between;gap:15px}
+footer a{color:#4f5863;font-weight:600}footer a:hover{color:var(--blue)}
+@media(max-width:850px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hero{padding-top:86px}.card{min-height:285px}}
+@media(max-width:560px){.wrap{padding:0 20px 30px}.nav{height:70px}.brand{font-size:16px}.brand-mark{width:28px;height:28px}.hero{padding:75px 0 12px}.hero h1{font-size:clamp(46px,13vw,68px)}.hero p{font-size:14px}.grid{grid-template-columns:1fr;gap:12px}.card{min-height:255px;padding:22px}.section-line{margin-top:34px}footer{margin-top:58px;flex-direction:column}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.card,.btn{transition:none}}
+</style>
+</head>
+<body><div class="page-glow" aria-hidden="true"></div><main class="wrap">
+<nav class="nav"><a class="brand" href="/" aria-label="TAAL LAB home"><span class="brand-mark" aria-hidden="true">T.</span>TAAL <span>LAB</span></a><a href="/">← Back to studio</a></nav>
+<section class="hero"><div class="eyebrow"><span class="dot"></span> TAAL LAB · DIGITAL STORE</div><h1>Tools for the sound<br><em>in your head.</em></h1><p>Plugins, sample packs and sound libraries made for music creators. Digital downloads are delivered through secure, private links after payment.</p></section>
+<div class="section-line">Made for your next idea</div>
 <div id="products" class="grid"><p class="loading">Loading products…</p></div>
-<p class="notice">Products marked “Coming soon” are not available to purchase yet. Never send payment outside the checkout on this site.</p>
-<footer>© TAAL LAB · <a href="mailto:contact@taallab.work">Contact support</a></footer>
+<p class="notice"><span class="notice-mark">i</span><span>Products marked “Coming soon” are not available to purchase yet. Never send payment outside the checkout on this site.</span></p>
+<footer><span>© TAAL LAB</span><a href="mailto:contact@taallab.work">Contact support ↗</a></footer>
 </main>
 <script>
 const root=document.querySelector("#products");
@@ -29,7 +75,7 @@ fetch("/api/store/products").then(async r=>{if(!r.ok)throw new Error("Could not 
   const desc=document.createElement("p");desc.textContent=p.description;
   const foot=document.createElement("div");foot.className="foot";
   const price=document.createElement("span");price.className="price";price.textContent=p.active?money(p.price):"Coming soon";
-  const btn=document.createElement("a");btn.className="btn";btn.textContent=p.active?"Get it":"Unavailable";if(p.active){btn.href="/checkout.html?product="+encodeURIComponent(p.id)}else{btn.setAttribute("aria-disabled","true");btn.style.opacity=".65";btn.style.pointerEvents="none"}
+  const btn=document.createElement("a");btn.className="btn";btn.textContent=p.active?"Get it ↗":"Unavailable";if(p.active){btn.href="/checkout.html?product="+encodeURIComponent(p.id)}else{btn.setAttribute("aria-disabled","true");btn.tabIndex=-1}
   foot.append(price,btn);card.append(symbol,tag,h,desc,foot);root.append(card);
  }
 }).catch(e=>{root.innerHTML='<p class="error">The store is temporarily unavailable. Please try again later.</p>';console.error(e)});
