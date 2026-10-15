@@ -205,7 +205,7 @@ async function verifyPayment(req: Request, env: StoreEnv) {
       headers: { Authorization: `Basic ${auth}` },
     });
     const payment: any = await paymentResponse.json().catch(() => ({}));
-    if (!paymentResponse.ok || payment.order_id !== orderId || Number(payment.amount) !== Number(order.amount) || payment.currency !== order.currency || !["authorized", "captured"].includes(payment.status)) {
+    if (!paymentResponse.ok || payment.order_id !== orderId || Number(payment.amount) !== Number(order.amount) || payment.currency !== order.currency || payment.status !== "captured") {
       return json({ error: "Razorpay could not confirm this payment." }, 400);
     }
     await env.DBStore.prepare("UPDATE store_orders SET status='paid', razorpay_payment_id=?, paid_at=?, updated_at=? WHERE id=?")
