@@ -1,5 +1,15 @@
+import { handleStoreRequest } from "./store";
+
 export interface Env {
   DB: D1Database;
+  DBStore: D1Database;
+  ASSETS: Fetcher;
+  B2_KEY_ID?: string;
+  B2_APPLICATION_KEY?: string;
+  B2_BUCKET_NAME?: string;
+  DOWNLOAD_SIGNING_SECRET?: string;
+  RAZORPAY_KEY_ID?: string;
+  RAZORPAY_KEY_SECRET?: string;
   APP_ORIGIN: string;
   DEFAULT_EXPIRY_DAYS: string;
   ADMIN_SETUP_SECRET?: string;
@@ -1297,6 +1307,10 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     try {
+      if (url.pathname.startsWith("/api/store/")) {
+        const storeResponse = await handleStoreRequest(req, env);
+        if (storeResponse) return storeResponse;
+      }
       await ensureSupportSchema(env);
 
       if (url.pathname === "/api/booking" && req.method === "POST") {
