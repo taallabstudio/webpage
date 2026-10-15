@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Shop Audio — TAAL LAB</title>
+<title>Downloads — TAAL LAB</title>
 <meta name="description" content="Audio tools, sample packs and sound libraries from TAAL LAB.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -51,10 +51,38 @@ footer a{color:#4f5863;font-weight:600}footer a:hover{color:var(--blue)}
 @media(max-width:850px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hero{padding-top:86px}.card{min-height:285px}}
 @media(max-width:560px){.wrap{padding:0 20px 30px}.nav{height:70px}.brand{font-size:16px}.brand-mark{width:28px;height:28px}.hero{padding:75px 0 12px}.hero h1{font-size:clamp(46px,13vw,68px)}.hero p{font-size:14px}.grid{grid-template-columns:1fr;gap:12px}.card{min-height:255px;padding:22px}.section-line{margin-top:34px}footer{margin-top:58px;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.card,.btn{transition:none}}
+
+/* Shared TAAL LAB homepage navigation */
+.landing-nav{position:relative;top:auto;left:auto;right:auto;height:82px;padding:0 0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;z-index:20;border-bottom:1px solid rgba(20,30,40,.08);gap:18px}
+.studio-brand{display:flex;align-items:center;gap:10px;justify-self:start;min-width:0}
+.site-logo{width:32px;height:32px;display:grid;place-items:center;flex:none}.site-logo img{width:100%;height:100%;object-fit:contain;display:block}
+.site-brand-text{font-family:"Space Grotesk",sans-serif;font-size:19px;font-weight:700;letter-spacing:-.04em}
+.studio-nav{display:flex;align-items:center;justify-content:center;gap:clamp(12px,1.8vw,28px);font-size:12px;font-weight:600;white-space:nowrap}
+.studio-nav>a,.nav-dropdown>a{color:#4f5863;transition:color .2s ease;display:inline-flex;align-items:center;gap:4px;padding:18px 0}
+.studio-nav>a:hover,.nav-dropdown:hover>a{color:#147be8}
+.nav-dropdown{position:relative}.nav-caret{font-size:13px;line-height:1}
+.nav-menu{position:absolute;top:52px;left:50%;transform:translate(-50%,8px);width:205px;padding:8px;background:rgba(255,255,255,.97);border:1px solid rgba(20,30,40,.08);border-radius:14px;box-shadow:0 18px 45px rgba(35,49,63,.13);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s ease,transform .18s ease,visibility .18s ease;backdrop-filter:blur(18px);z-index:30}
+.nav-dropdown:hover .nav-menu,.nav-dropdown:focus-within .nav-menu{opacity:1;visibility:visible;pointer-events:auto;transform:translate(-50%,0)}
+.nav-menu a{display:block;padding:10px 12px;border-radius:9px;color:#515b66;font-size:11px;font-weight:600}.nav-menu a:hover{background:#edf5fd;color:#147be8}
+.nav-menu-right{left:auto;right:0;transform:translateY(8px)}.nav-dropdown:hover .nav-menu-right,.nav-dropdown:focus-within .nav-menu-right{transform:translateY(0)}
+.landing-auth{display:flex;align-items:center;gap:8px;justify-self:end}
+.login-nav-btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border:1px solid #dfe4e9;background:rgba(255,255,255,.82);backdrop-filter:blur(12px);border-radius:999px;font-size:12px;font-weight:700;color:#1d2229;box-shadow:0 6px 18px rgba(35,49,63,.08)}
+.login-nav-btn.secondary{background:transparent;box-shadow:none}.login-nav-btn:hover{background:#fff;border-color:#cfd6dd}
+@media(max-width:1050px){.studio-nav{gap:11px;font-size:11px}.login-nav-btn{padding:9px 11px}.site-brand-text{font-size:17px}}
+@media(max-width:760px){.landing-nav{height:70px;display:flex;justify-content:space-between;padding:0;gap:8px}.studio-nav{display:none}.landing-auth{gap:6px}.login-nav-btn{padding:9px 12px}.site-logo{width:29px;height:29px}.site-brand-text{font-size:17px}}
+
 </style>
 </head>
 <body><div class="page-glow" aria-hidden="true"></div><main class="wrap">
-<nav class="nav"><a class="brand" href="/" aria-label="TAAL LAB home"><span class="brand-mark" aria-hidden="true">T.</span>TAAL <span>LAB</span></a><a href="/">← Back to studio</a></nav>
+<header class="landing-nav">
+<a class="studio-brand" href="/#home" aria-label="TaalLab home"><span class="site-logo"><img src="/logo.png" alt=""></span><span class="site-brand-text">TaalLab</span></a>
+<nav class="studio-nav" aria-label="Main navigation">
+<a href="/#home">Home</a><a href="/shop.html">Downloads</a>
+<div class="nav-dropdown"><a href="/#services">Services <span class="nav-caret">⌄</span></a><div class="nav-menu"><a href="/#music-production">Music Production</a><a href="/#recording">Recording</a><a href="/#mixing">Mixing</a><a href="/#mastering">Mastering</a><a href="/#dubbing">Dubbing / Voice Over</a></div></div>
+<div class="nav-dropdown"><a href="/#studio">Studio <span class="nav-caret">⌄</span></a><div class="nav-menu"><a href="/#studio">The Studio</a><a href="/#equipment">Equipment &amp; Setup</a></div></div>
+<a href="/#book-session">Book a Session</a>
+<div class="nav-dropdown"><a href="/#contact">Contact <span class="nav-caret">⌄</span></a><div class="nav-menu nav-menu-right"><a href="/#contact-email">Email</a><a href="https://www.instagram.com/taallabstudio" target="_blank" rel="noopener noreferrer">Instagram</a><a href="/#contact-whatsapp">WhatsApp</a><a href="/#contact-location">Location</a></div></div>
+</nav><div class="landing-auth"><a class="login-nav-btn secondary" href="/login">Sign up</a><a class="login-nav-btn" href="/login">Login</a></div></header>
 <section class="hero"><div class="eyebrow"><span class="dot"></span> TAAL LAB · DIGITAL STORE</div><h1>Tools for the sound<br><em>in your head.</em></h1><p>Plugins, sample packs and sound libraries made for music creators. Digital downloads are delivered through secure, private links after payment.</p></section>
 <div class="section-line">Made for your next idea</div>
 <div id="products" class="grid"><p class="loading">Loading products…</p></div>
