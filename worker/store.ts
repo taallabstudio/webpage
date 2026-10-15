@@ -62,6 +62,15 @@ const json = (data: unknown, status = 200) =>
 
 const unixNow = () => Math.floor(Date.now() / 1000);
 const cleanOrigin = (env: StoreEnv) => env.APP_ORIGIN.replace(/\/$/, "");
+function downloadOrigin(req: Request, env: StoreEnv) {
+  const requestUrl = new URL(req.url);
+  const productionOrigin = cleanOrigin(env);
+  if (requestUrl.origin !== productionOrigin &&
+      (requestUrl.hostname.endsWith(".workers.dev") || requestUrl.hostname.endsWith(".pages.dev"))) {
+    return requestUrl.origin;
+  }
+  return productionOrigin;
+}
 
 function hex(bytes: ArrayBuffer) {
   return [...new Uint8Array(bytes)].map((v) => v.toString(16).padStart(2, "0")).join("");
@@ -214,7 +223,7 @@ async function verifyPayment(req: Request, env: StoreEnv) {
   const product = PRODUCTS.find((p) => p.id === order.product_id);
   if (!product) return json({ error: "Product configuration was not found." }, 500);
   const token = await makeDownloadToken(env, String(order.id), product.id);
-  return json({ ok: true, downloadUrl: `${cleanOrigin(env)}/download.html?token=${encodeURIComponent(token)}` });
+  return json({ ok: true, downloadUrl: `${downloadOrigin(req, env)}/download.html?token=${encodeURIComponent(token)}` });
 }
 
 async function streamProduct(req: Request, env: StoreEnv, token: string) {
