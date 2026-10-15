@@ -28,10 +28,6 @@ binding = "DB"
 database_name = "taallab-transfers-preview"
 database_id = "3d879502-b07a-46ba-9927-d844d15cb748"
 
-[[previews.d1_databases]]
-binding = "DBStore"
-database_name = "taallab-store"
-database_id = "acb0d230-3a92-4682-b847-da7e018f7f18"
 
 [triggers]
 crons = ["0 * * * *"]
