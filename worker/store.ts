@@ -263,6 +263,7 @@ async function streamProduct(req: Request, env: StoreEnv, token: string) {
 export async function handleStoreRequest(req: Request, env: StoreEnv): Promise<Response | null> {
   const url = new URL(req.url);
   if (url.pathname === "/api/store/products" && req.method === "GET") {
+    await ensureStoreSchema(env);
     return json({ products: PRODUCTS.map(publicProduct) });
   }
   if (url.pathname === "/api/store/create-order" && req.method === "POST") {
