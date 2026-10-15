@@ -28,7 +28,7 @@ const PRODUCTS: Product[] = [
     description: "A Max for Live device that calculates tempo-synced reverb decay times and pre-delay values for your productions.",
     category: "Max for Live Device",
     price: 199,
-    active: false,
+    active: true,
     fileKey: "products/ReverbTimeCalculator.zip",
     fileName: "ReverbTimeCalculator.zip",
   },
@@ -170,6 +170,11 @@ function publicProduct(product: Product) {
 
 async function createOrder(req: Request, env: StoreEnv) {
   if (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) return json({ error: "Payments are not configured." }, 503);
+  // Safety lock: this store checkout is deliberately test-only until the owner explicitly approves a live launch.
+  // Razorpay Test Mode key IDs use the rzp_test_ prefix. Never create orders with live credentials here.
+  if (!env.RAZORPAY_KEY_ID.startsWith("rzp_test_")) {
+    return json({ error: "Checkout is locked to protect you from real charges. Configure Razorpay Test Mode keys (rzp_test_...) to test checkout." }, 503);
+  }
   const body: any = await req.json().catch(() => ({}));
   const product = PRODUCTS.find((p) => p.id === String(body.productId || ""));
   if (!product || !product.active || product.price <= 0) return json({ error: "This product is not available for purchase yet." }, 400);
