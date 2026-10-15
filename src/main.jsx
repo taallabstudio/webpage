@@ -229,6 +229,7 @@ function Landing() {
 
       <nav className="studio-nav" aria-label="Main navigation">
         <a href="#home">Home</a>
+        <a href="/shop.html">Shop Audio</a>
 
         <div className="nav-dropdown">
           <a href="#services">Services <ChevronDown className="nav-caret" size={13} strokeWidth={1.8} aria-hidden="true" /></a>
