@@ -71,6 +71,8 @@ footer a{color:#4f5863;font-weight:600}footer a:hover{color:var(--blue)}
 @media(max-width:1050px){.studio-nav{gap:11px;font-size:11px}.login-nav-btn{padding:9px 11px}.site-brand-text{font-size:17px}}
 @media(max-width:760px){.landing-nav{height:70px;display:flex;justify-content:space-between;padding:0;gap:8px}.studio-nav{display:none}.landing-auth{gap:6px}.login-nav-btn{padding:9px 12px}.site-logo{width:29px;height:29px}.site-brand-text{font-size:17px}}
 
+
+.catalog-tools{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:45px 0 18px}.catalog-tools .section-line{margin:0;flex:1}.sort-control{display:flex;align-items:center;gap:10px;font-size:11px;font-weight:700;color:#707985;white-space:nowrap}.sort-control select{font:inherit;color:#1d2229;background:rgba(255,255,255,.9);border:1px solid #dfe5eb;border-radius:999px;padding:10px 14px;outline:none;cursor:pointer}.category-section{margin:0 0 34px}.category-heading{font-family:"Space Grotesk",sans-serif;font-size:21px;letter-spacing:-.04em;margin:0 0 14px;display:flex;align-items:center;gap:12px}.category-heading:after{content:"";height:1px;background:var(--line);flex:1}.category-section .grid{grid-template-columns:repeat(3,minmax(0,1fr))}.btn[aria-disabled=true]{pointer-events:none;opacity:.85}@media(max-width:850px){.category-section .grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.catalog-tools{align-items:flex-start;flex-direction:column;margin-top:34px}.sort-control{width:100%;justify-content:space-between}.sort-control select{max-width:65%}.category-section .grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body><div class="page-glow" aria-hidden="true"></div><main class="wrap">
@@ -84,27 +86,50 @@ footer a{color:#4f5863;font-weight:600}footer a:hover{color:var(--blue)}
 <div class="nav-dropdown"><a href="/#contact">Contact <span class="nav-caret">⌄</span></a><div class="nav-menu nav-menu-right"><a href="/#contact-email">Email</a><a href="https://www.instagram.com/taallabstudio" target="_blank" rel="noopener noreferrer">Instagram</a><a href="/#contact-whatsapp">WhatsApp</a><a href="/#contact-location">Location</a></div></div>
 </nav><div class="landing-auth"><a class="login-nav-btn secondary" href="/login">Sign up</a><a class="login-nav-btn" href="/login">Login</a></div></header>
 <section class="hero"><div class="eyebrow"><span class="dot"></span> TAAL LAB · DIGITAL STORE</div><h1>Tools for the sound<br><em>in your head.</em></h1><p>Plugins, sample packs and sound libraries made for music creators. Digital downloads are delivered through secure, private links after payment.</p></section>
-<div class="section-line">Made for your next idea</div>
-<div id="products" class="grid"><p class="loading">Loading products…</p></div>
+<div class="catalog-tools"><div class="section-line">Made for your next idea</div><label class="sort-control" for="sort-products">Sort products <select id="sort-products"><option value="featured">Featured</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="name-asc">Name: A to Z</option><option value="name-desc">Name: Z to A</option></select></label></div>
+<div id="products"><p class="loading">Loading products…</p></div>
 <p class="notice"><span class="notice-mark">i</span><span>Products marked “Coming soon” are not available to purchase yet. Never send payment outside the checkout on this site.</span></p>
 <footer><span>© TAAL LAB</span><a href="mailto:contact@taallab.work">Contact support ↗</a></footer>
 </main>
 <script>
 const root=document.querySelector("#products");
+const sortSelect=document.querySelector("#sort-products");
 const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(n);
-fetch("/api/store/products").then(async r=>{if(!r.ok)throw new Error("Could not load products");return r.json()}).then(({products})=>{
+let allProducts=[];
+const categoryOrder=["Max for Live Device","Audio Plugin","Sample Pack","Sound Library"];
+function renderProducts(){
+ const mode=sortSelect.value;
+ const products=[...allProducts].sort((a,b)=>{
+  if(mode==="price-asc") return Number(a.price)-Number(b.price)||a.name.localeCompare(b.name);
+  if(mode==="price-desc") return Number(b.price)-Number(a.price)||a.name.localeCompare(b.name);
+  if(mode==="name-asc") return a.name.localeCompare(b.name);
+  if(mode==="name-desc") return b.name.localeCompare(a.name);
+  return (categoryOrder.indexOf(a.category)-categoryOrder.indexOf(b.category))||a.name.localeCompare(b.name);
+ });
  root.innerHTML="";
- if(!products?.length){root.innerHTML="<p>No products are listed right now.</p>";return}
- for(const p of products){
-  const card=document.createElement("article");card.className="card";
-  const symbol=document.createElement("div");symbol.className="symbol";symbol.textContent=p.category==="Audio Plugin"?"◉":p.category==="Sample Pack"?"▦":"✦";
-  const tag=document.createElement("div");tag.className="tag";tag.textContent=p.category;
-  const h=document.createElement("h2");h.textContent=p.name;
-  const desc=document.createElement("p");desc.textContent=p.description;
-  const foot=document.createElement("div");foot.className="foot";
-  const price=document.createElement("span");price.className="price";price.textContent=p.active?money(p.price):"Coming soon";
-  const btn=document.createElement("a");btn.className="btn";btn.textContent=p.active?"Get it ↗":"Unavailable";if(p.active){btn.href="/checkout.html?product="+encodeURIComponent(p.id)}else{btn.setAttribute("aria-disabled","true");btn.tabIndex=-1}
-  foot.append(price,btn);card.append(symbol,tag,h,desc,foot);root.append(card);
+ if(!products.length){root.innerHTML="<p>No products are listed right now.</p>";return}
+ const categories=mode==="featured"?categoryOrder:[...new Set(products.map(p=>p.category))].sort((a,b)=>a.localeCompare(b));
+ for(const category of categories){
+  const group=products.filter(p=>p.category===category);
+  if(!group.length) continue;
+  const section=document.createElement("section");section.className="category-section";
+  const heading=document.createElement("h2");heading.className="category-heading";heading.textContent=category;
+  const grid=document.createElement("div");grid.className="grid";
+  for(const p of group){
+   const card=document.createElement("article");card.className="card";
+   const symbol=document.createElement("div");symbol.className="symbol";symbol.textContent=p.category==="Audio Plugin"?"◉":p.category==="Sample Pack"?"▦":p.category==="Max for Live Device"?"✦":"✧";
+   const tag=document.createElement("div");tag.className="tag";tag.textContent=p.category;
+   const h=document.createElement("h2");h.textContent=p.name;
+   const desc=document.createElement("p");desc.textContent=p.description;
+   const foot=document.createElement("div");foot.className="foot";
+   const price=document.createElement("span");price.className="price";price.textContent=p.active?money(p.price):"Coming soon";
+   const btn=document.createElement("a");btn.className="btn";btn.textContent=p.active?"Get it ↗":"Unavailable";
+   if(p.active){btn.href="/checkout.html?product="+encodeURIComponent(p.id)}else{btn.setAttribute("aria-disabled","true");btn.setAttribute("aria-label",p.name+" is coming soon");btn.tabIndex=-1;btn.href="#"}
+   foot.append(price,btn);card.append(symbol,tag,h,desc,foot);grid.append(card);
+  }
+  section.append(heading,grid);root.append(section);
  }
-}).catch(e=>{root.innerHTML='<p class="error">The store is temporarily unavailable. Please try again later.</p>';console.error(e)});
+}
+sortSelect.addEventListener("change",renderProducts);
+fetch("/api/store/products").then(async r=>{if(!r.ok)throw new Error("Could not load products");return r.json()}).then(({products})=>{allProducts=Array.isArray(products)?products:[];renderProducts()}).catch(e=>{root.innerHTML='<p class="error">The store is temporarily unavailable. Please try again later.</p>';console.error(e)});
 </script></body></html>
