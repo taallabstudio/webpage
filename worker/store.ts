@@ -23,6 +23,16 @@ type Product = {
 
 const PRODUCTS: Product[] = [
   {
+    id: "reverb-time-calculator",
+    name: "Reverb Time Calculator",
+    description: "A Max for Live device that calculates tempo-synced reverb decay times and pre-delay values for your productions.",
+    category: "Max for Live Device",
+    price: 199,
+    active: false,
+    fileKey: "products/ReverbTimeCalculator.zip",
+    fileName: "ReverbTimeCalculator.zip",
+  },
+  {
     id: "lab-2a",
     name: "LAB-2A",
     description: "A vintage-inspired optical compressor plugin for your mix bus and vocals.",
