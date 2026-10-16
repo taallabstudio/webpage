@@ -217,7 +217,7 @@ async function uploadProductFile(req: Request, env: StoreEnv) {
     if(!listed.ok||!bucketId) return json({error:"Backblaze authorized the key but could not resolve the configured bucket. Ensure the key has writeFiles permission for the private taallab-product-files bucket; if the key is unrestricted, it also needs listBuckets permission."},502);
   }
   const u=await fetch(apiUrl.replace(/\/$/,"")+"/b2api/v3/b2_get_upload_url",{method:"POST",headers:{Authorization:ad.authorizationToken,"Content-Type":"application/json"},body:JSON.stringify({bucketId})});
-  const ud:any=await u.json().catch(()=>({})); if(!u.ok||!ud.uploadUrl||!ud.authorizationToken) return json({error:"Could not prepare private upload. Check that the B2 key can write to this bucket."},502);
+  const ud:any=await u.json().catch(()=>({})); if(!u.ok||!ud.uploadUrl||!ud.authorizationToken){ const detail=[ud.code,ud.message].filter(Boolean).join(": "); console.error("Backblaze upload URL request failed",u.status,ud.code||"unknown"); return json({error:"Could not prepare private upload (HTTP "+u.status+(detail?": "+detail:"")+"). Check the B2 key capabilities and access to the configured bucket."},502); }
   const key="products/"+(kind==="cover"?"covers/":"")+crypto.randomUUID()+"-"+filename;
   const uploaded=await fetch(ud.uploadUrl,{method:"POST",headers:{"Authorization":ud.authorizationToken,"X-Bz-File-Name":encodeURIComponent(key),"Content-Type":req.headers.get("Content-Type")||"application/octet-stream","X-Bz-Content-Sha1":"do_not_verify"},body:bytes});
   const up:any=await uploaded.json().catch(()=>({})); if(!uploaded.ok||!up.fileId) return json({error:"Backblaze could not store this file."},502);
