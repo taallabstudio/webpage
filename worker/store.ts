@@ -410,6 +410,15 @@ async function createOrder(req: Request, env: StoreEnv) {
   });
 }
 
+async function sendPurchaseEmail(env: StoreEnv, order: any, product: Product) {
+  if (!env.RESEND_API_KEY || !order.customer_email) return;
+  const orderNumber = String(order.order_number || order.id);
+  const amount = (Number(order.amount) / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+  const purchaseUrl = cleanOrigin(env) + '/account/settings?tab=purchased';
+  const html = '<h1>Thank you for your purchase!</h1><p>Your TaalLab payment has been verified.</p><p><b>Product:</b> ' + product.name + '</p><p><b>Order ID:</b> ' + orderNumber + '</p><p><b>Amount paid:</b> ' + amount + '</p><p><b>Purchase date:</b> ' + new Date(Number(order.paid_at || unixNow()) * 1000).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + '</p><p><a href="' + purchaseUrl + '">View my purchases and download your product</a></p>';
+  const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'TaalLab <contact@taallab.work>', to: [String(order.customer_email)], subject: 'TaalLab purchase confirmed — ' + orderNumber, html }) });
+  if (!response.ok) console.error('Purchase confirmation email failed', response.status);
+}
 async function verifyPayment(req: Request, env: StoreEnv) {
   if (!env.RAZORPAY_KEY_SECRET) return json({ error: "Payments are not configured." }, 503);
   const body: any = await req.json().catch(() => ({}));
@@ -423,6 +432,7 @@ async function verifyPayment(req: Request, env: StoreEnv) {
   await ensureStoreSchema(env);
   const order: any = await env.DBStore.prepare("SELECT * FROM store_orders WHERE razorpay_order_id=? LIMIT 1").bind(orderId).first();
   if (!order) return json({ error: "Order was not found." }, 404);
+  let newlyPaid = false;
   if (order.status !== "paid") {
     const auth = btoa(`${env.RAZORPAY_KEY_ID || ""}:${env.RAZORPAY_KEY_SECRET}`);
     const paymentResponse = await fetch(`https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}`, {
@@ -434,11 +444,13 @@ async function verifyPayment(req: Request, env: StoreEnv) {
     }
     await env.DBStore.prepare("UPDATE store_orders SET status='paid', razorpay_payment_id=?, paid_at=?, updated_at=? WHERE id=?")
       .bind(paymentId, unixNow(), unixNow(), order.id).run();
+    order.status = 'paid'; order.razorpay_payment_id = paymentId; order.paid_at = unixNow(); newlyPaid = true;
   }
   const product = (await allProducts(env,true)).find((p) => p.id === order.product_id);
   if (!product) return json({ error: "Product configuration was not found." }, 500);
+  if (newlyPaid) { try { await sendPurchaseEmail(env, order, product); } catch (error) { console.error("Purchase email error", error); } }
   const token = await makeDownloadToken(env, String(order.id), product.id);
-  return json({ ok: true, downloadUrl: `${downloadOrigin(req, env)}/download.html?token=${encodeURIComponent(token)}` });
+  return json({ ok: true, orderId: order.order_number || order.id, downloadUrl: `${downloadOrigin(req, env)}/download.html?token=${encodeURIComponent(token)}` });
 }
 
 async function streamProductCover(req: Request, env: StoreEnv, productId: string) {
