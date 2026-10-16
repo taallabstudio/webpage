@@ -496,12 +496,12 @@ async function currentUser(env: Env, req: Request) {
 async function updateAccountProfile(req: Request, env: Env) {
   const user = await requireUser(req, env);
   const body = await req.json().catch(() => ({}));
-  const displayName = String(body.display_name ?? "").trim().replace(/\\s+/g, " ").slice(0, 40);
+  const displayName = String(body.display_name ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
   if (displayName.length < 2) return json({ error: "Display name must be at least 2 characters." }, { status: 400 });
 
   const hasAvatar = Object.prototype.hasOwnProperty.call(body, "avatar_data");
   const avatarData = hasAvatar ? String(body.avatar_data || "") : String(user.avatar_data || "");
-  if (avatarData && (avatarData.length > 350000 || !/^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(avatarData))) {
+  if (avatarData && (avatarData.length > 350000 || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(avatarData))) {
     return json({ error: "Profile pictures must be PNG, JPEG or WebP and under 250 KB after processing." }, { status: 400 });
   }
 
