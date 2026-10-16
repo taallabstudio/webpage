@@ -38,6 +38,25 @@ const api = async (path, options={}) => {
   return data;
 };
 
+function ProfileAvatar({user,size=38}) {
+  const label = String(user?.display_name || user?.email || "TaalLab").trim();
+  return <span className="profile-avatar" style={{width:size,height:size,minWidth:size}} aria-label={label} title={label}>
+    {user?.avatar_data ? <img src={user.avatar_data} alt="" /> : <UserRound size={Math.round(size*.55)} strokeWidth={1.8}/>}
+  </span>;
+}
+
+function SiteAccountMenu({user,onLogout}) {
+  const name = user?.display_name || user?.email?.split("@")[0] || "Account";
+  return <details className="site-account-menu">
+    <summary><ProfileAvatar user={user} size={34}/><span className="site-account-name">{name}</span><ChevronDown size={14}/></summary>
+    <div className="site-account-dropdown">
+      <div className="site-account-identity"><strong>{name}</strong><small>{user?.email}</small></div>
+      <a href="/account/settings">Account settings</a>
+      {user?.role === "admin" && <a href="/login">Studio dashboard</a>}
+      <button type="button" onClick={onLogout}>Sign out</button>
+    </div>
+  </details>;
+}
 function Logo({studioOnly=false}) {
   return <div className="brand" aria-label={studioOnly ? "TaalLab" : "TrackDeliver by TaalLab"}>
     <span className="brand-logo" aria-hidden="true"><img src="/logo.png" alt="" /></span>
@@ -58,6 +77,10 @@ function Landing() {
   const [bookingSending, setBookingSending] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [bookingCooldown, setBookingCooldown] = useState(0);
+  const [currentAccount, setCurrentAccount] = useState(null);
+
+  useEffect(() => { api("/auth/me").then(result => setCurrentAccount(result.authenticated ? result.user : null)).catch(() => setCurrentAccount(null)); }, []);
+  async function signOutFromSite() { try { await api("/auth/logout", { method: "POST" }); } catch {} setCurrentAccount(null); }
 
   useEffect(() => {
     // Scroll reveal based on the supplied Coding2GO tutorial.
@@ -264,8 +287,7 @@ function Landing() {
       </nav>
 
       <div className="landing-auth">
-        <a className="login-nav-btn secondary" href="/login">Sign up</a>
-        <a className="login-nav-btn" href="/login">Login</a>
+        {currentAccount ? <SiteAccountMenu user={currentAccount} onLogout={signOutFromSite}/> : <><a className="login-nav-btn secondary" href="/login">Sign up</a><a className="login-nav-btn" href="/login">Login</a></>}
       </div>
     </header>
 
