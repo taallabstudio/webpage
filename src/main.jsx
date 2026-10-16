@@ -754,6 +754,7 @@ function Admin({initialUpload=false}) {
     <aside className="sidebar"><Logo/><div className="side-links">
       <button className={page==="dashboard"?"active":""} onClick={()=>setPage("dashboard")}><Gauge/> Dashboard</button>
       <button className={page==="transfers"?"active":""} onClick={()=>setPage("transfers")}><FolderOpen/> Transfers</button>
+      <button className={page==="products"?"active":""} onClick={()=>setPage("products")}><HardDrive/> Store Products</button>
       <button className={page==="upload"?"active":""} onClick={()=>setPage("upload")}><UploadCloud/> New Transfer</button>
       <button className={page==="users"?"active":""} onClick={()=>setPage("users")}><UserRound/> Users</button>
       <button className={page==="settings"?"active":""} onClick={()=>setPage("settings")}><Settings/> Account</button>
@@ -762,12 +763,40 @@ function Admin({initialUpload=false}) {
       <div className="admin-mobile-head"><Logo/><button><Menu/></button></div>
       {page==="dashboard"&&<Dashboard stats={stats} transfers={transfers} onOpen={setSelected}/>}
       {page==="transfers"&&<Transfers transfers={transfers} onOpen={setSelected}/>}
+      {page==="products"&&<StoreProductManager/>}
       {page==="upload"&&<Upload onDone={()=>{setPage("dashboard");refresh()}}/>}
       {page==="users"&&<UserManagement currentUser={user}/>}
       {page==="settings"&&<AccountSettings user={user} onPasswordChanged={refresh} showGoogleDrive/>}
       {selected&&<TransferDetail transfer={selected} onClose={()=>setSelected(null)} onChanged={refresh}/>}
     </main>
   </div>;
+}
+
+
+function StoreProductManager(){
+  const blank={id:"",name:"",category:"Max for Live Device",description:"",features:"",price:"199",version:"1.0",status:"draft",fileKey:"",fileName:"",coverKey:"",coverName:""};
+  const [form,setForm]=useState(blank),[products,setProducts]=useState([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+  async function load(){try{const d=await api("/store/admin/products");setProducts(d.products||[])}catch(e){setError(e.message)}finally{setLoading(false)}}
+  useEffect(()=>{load()},[]);
+  async function upload(file,kind){if(!file)return;setBusy(true);setError("");setNotice("Uploading "+file.name+"…");try{const r=await fetch("/api/store/admin/upload?kind="+kind+"&filename="+encodeURIComponent(file.name),{method:"POST",credentials:"include",headers:{"Content-Type":file.type||"application/octet-stream"},body:file});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Upload failed");setForm(f=>kind==="cover"?{...f,coverKey:d.key,coverName:file.name}:{...f,fileKey:d.key,fileName:d.fileName});setNotice(file.name+" uploaded to private storage.")}catch(e){setError(e.message);setNotice("")}finally{setBusy(false)}}
+  async function save(e){e.preventDefault();setError("");setNotice("");setBusy(true);try{await api("/store/admin/products",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,price:Number(form.price)})});setNotice(form.status==="published"?"Product published to the shop.":"Draft saved successfully.");setForm(blank);await load()}catch(e){setError(e.message)}finally{setBusy(false)}}
+  function edit(p){setForm({...blank,...p,price:String(p.price),status:p.status||"draft",fileKey:p.fileKey||"",fileName:p.fileName||"",coverKey:p.coverKey||"",coverName:p.coverKey?"Cover image uploaded":""});window.scrollTo({top:0,behavior:"smooth"})}
+  return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">TAALLAB STORE</span><h1>Products</h1><p>Add digital products, upload secure downloads and manage what appears in your shop.</p></div></div>
+  <section className="panel" style={{padding:24,marginBottom:24}}><div className="panel-head"><div><h2>{form.id?"Edit product":"Add a product"}</h2><p>Product details, pricing, files and publishing</p></div><button type="button" className="ghost-btn" onClick={()=>setForm(blank)}>New product</button></div>
+  <form onSubmit={save} style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:16}}>
+    <label>Product type<select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}><option>Max for Live Device</option><option>Sample Pack</option><option>Audio Plugin</option><option>Preset Pack</option><option>Sound Library</option><option>MIDI Pack</option><option>Ableton Device</option><option>Other</option></select></label>
+    <label>Product name<input required maxLength="160" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="e.g. TaalLab Drum Essentials"/></label>
+    <label>Price (INR ₹)<input required type="number" min="0" max="10000000" step="0.01" value={form.price} onChange={e=>setForm({...form,price:e.target.value})}/></label>
+    <label>Version<input value={form.version} maxLength="40" onChange={e=>setForm({...form,version:e.target.value})}/></label>
+    <label style={{gridColumn:"1/-1"}}>Description<textarea rows="3" maxLength="5000" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Describe what customers get and how it helps them."/></label>
+    <label style={{gridColumn:"1/-1"}}>Features / included contents<textarea rows="3" maxLength="5000" value={form.features} onChange={e=>setForm({...form,features:e.target.value})} placeholder="List features or included files, one per line."/></label>
+    <div style={{border:"1px solid var(--border,#333)",borderRadius:12,padding:16}}><strong>Product download file *</strong><p className="muted">Private file stored in Backblaze B2. Maximum 100 MB per upload.</p><input type="file" onChange={e=>upload(e.target.files?.[0],"product")} disabled={busy}/>{form.fileName&&<p className="muted">Uploaded: {form.fileName}</p>}</div>
+    <div style={{border:"1px solid var(--border,#333)",borderRadius:12,padding:16}}><strong>Cover image (optional)</strong><p className="muted">Upload artwork for this product.</p><input type="file" accept="image/*" onChange={e=>upload(e.target.files?.[0],"cover")} disabled={busy}/>{form.coverName&&<p className="muted">{form.coverName}</p>}</div>
+    <label>Publishing status<select value={form.status} onChange={e=>setForm({...form,status:e.target.value})}><option value="draft">Draft — hidden from shop</option><option value="published">Published — visible in shop</option></select></label>
+    {error&&<div className="error-box" style={{gridColumn:"1/-1"}}>{error}</div>}{notice&&<div className="success-box" style={{gridColumn:"1/-1"}}>{notice}</div>}
+    <div style={{gridColumn:"1/-1",display:"flex",gap:12,flexWrap:"wrap"}}><button className="primary-btn" disabled={busy}>{busy?"Please wait…":form.status==="published"?"Save & publish":"Save draft"}</button>{form.id&&<button type="button" className="ghost-btn" onClick={()=>setForm(blank)}>Cancel edit</button>}</div>
+  </form></section>
+  <section className="panel"><div className="panel-head"><div><h2>Product catalogue</h2><p>{products.length} product{products.length===1?"":"s"}</p></div><button className="ghost-btn" onClick={load}>Refresh</button></div>{loading?<div className="loading">Loading products…</div>:products.length===0?<p className="muted">No products yet.</p>:<div className="table-wrap"><table><thead><tr><th>Product</th><th>Type</th><th>Price</th><th>Status</th><th>File</th><th></th></tr></thead><tbody>{products.map(p=><tr key={p.id}><td><strong>{p.name}</strong><div className="muted">{p.version}</div></td><td>{p.category}</td><td>₹{Number(p.price).toLocaleString("en-IN")}</td><td>{p.status==="published"?"Published":"Draft"}</td><td>{p.fileName||"Not uploaded"}</td><td><button className="ghost-btn" onClick={()=>edit(p)}>Edit</button></td></tr>)}</tbody></table></div>}</section></div>
 }
 
 function UserManagement({currentUser}) {
