@@ -1211,7 +1211,7 @@ function AccountPage() {
   if(!user)return <Login onLogin={refreshUser}/>;
   return <div className="account-page-shell">
     <header className="account-page-header"><a href="/" className="account-home-link"><Logo studioOnly/></a><SiteAccountMenu user={user} onLogout={async()=>{try{await api("/auth/logout",{method:"POST"})}catch{}setUser(null);location.href="/login"}}/></header>
-    <AccountSettings user={user} onPasswordChanged={refreshUser}/><PurchasedProducts/>
+    <div className="account-content-column"><AccountSettings user={user} onPasswordChanged={refreshUser}/><PurchasedProducts/></div>
   </div>;
 }
 
