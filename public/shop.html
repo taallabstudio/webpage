@@ -109,9 +109,9 @@ function renderProducts(){
  });
  root.innerHTML="";
  if(!products.length){root.innerHTML="<p>No products are listed right now.</p>";return}
- const categories=mode==="featured"?categoryOrder:[...new Set(products.map(p=>p.category))].sort((a,b)=>a.localeCompare(b));
+ const categories=mode==="latest"?["Latest releases"]:mode==="featured"?categoryOrder:[...new Set(products.map(p=>p.category))].sort((a,b)=>a.localeCompare(b));
  for(const category of categories){
-  const group=products.filter(p=>p.category===category);
+  const group=category==="Latest releases"?products:products.filter(p=>p.category===category);
   if(!group.length) continue;
   const section=document.createElement("section");section.className="category-section";
   const heading=document.createElement("h2");heading.className="category-heading";heading.textContent=category;
