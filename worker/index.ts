@@ -1308,7 +1308,7 @@ export default {
     const url = new URL(req.url);
     try {
       if (url.pathname.startsWith("/api/store/")) {
-        const storeResponse = await handleStoreRequest(req, env);
+        const storeResponse = await handleStoreRequest(req, { ...env, authorizeAdmin: async (request: Request) => { try { await requireAdmin(request, env); return true; } catch { return false; } } });
         if (storeResponse) return storeResponse;
       }
       await ensureSupportSchema(env);
