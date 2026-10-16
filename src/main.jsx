@@ -1182,6 +1182,22 @@ function getPath(){
   return location.pathname.replace(/\/+$/, "") || "/";
 }
 
+function PurchasedProducts() {
+  const [purchases, setPurchases] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [downloading, setDownloading] = useState("");
+  useEffect(() => { api("/api/store/purchases").then(d => setPurchases(d.purchases || [])).catch(e => setError(e.message || "Could not load purchases.")).finally(() => setLoading(false)); }, []);
+  async function download(orderId) {
+    setDownloading(orderId); setError("");
+    try { const d = await api("/api/store/purchases/download", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId }) }); location.href = d.downloadUrl; }
+    catch (e) { setError(e.message || "Could not prepare download."); setDownloading(""); }
+  }
+  return <section className="panel purchased-panel" id="purchased"><div className="panel-head"><div><h2>Purchased</h2><p>Your products, sorted by purchase date. Download them again whenever you need.</p></div></div>
+    {loading ? <p className="muted">Loading your purchases…</p> : error && !purchases.length ? <p className="muted">{error}</p> : !purchases.length ? <div className="purchases-empty"><h3>No purchases yet</h3><p>Products you buy from TaalLab will appear here.</p><a className="primary-btn" href="/shop.html">Browse downloads</a></div> : <div className="purchases-list">{purchases.map(p => <article className="purchase-item" key={p.orderId}><div className="purchase-main"><strong>{p.productName}</strong><small>Order ID: {p.orderId}</small><small>Purchased {new Date(p.purchasedAt * 1000).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</small></div><div className="purchase-side"><strong>{(p.amount / 100).toLocaleString("en-IN", { style: "currency", currency: p.currency || "INR" })}</strong><button className="primary-btn" disabled={!p.canDownload || downloading === p.orderId} onClick={() => download(p.orderId)}>{downloading === p.orderId ? "Preparing…" : "Download"}</button></div></article>)}</div>}
+    {error && purchases.length > 0 && <p className="error-text">{error}</p>}
+  </section>;
+}
 function AccountPage() {
   const [user,setUser]=useState(null);
   const [checking,setChecking]=useState(true);
@@ -1195,7 +1211,7 @@ function AccountPage() {
   if(!user)return <Login onLogin={refreshUser}/>;
   return <div className="account-page-shell">
     <header className="account-page-header"><a href="/" className="account-home-link"><Logo studioOnly/></a><SiteAccountMenu user={user} onLogout={async()=>{try{await api("/auth/logout",{method:"POST"})}catch{}setUser(null);location.href="/login"}}/></header>
-    <AccountSettings user={user} onPasswordChanged={refreshUser}/>
+    <AccountSettings user={user} onPasswordChanged={refreshUser}/><PurchasedProducts/>
   </div>;
 }
 
