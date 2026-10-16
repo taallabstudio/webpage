@@ -284,7 +284,7 @@ function couponDiscount(code: string, subtotalPaise: number) {
 }
 
 function cleanCustomer(body: any) {
-  const value = (key: string, max: number) => String(body[key] || "").trim().replace(/\\s+/g, " ").slice(0, max);
+  const value = (key: string, max: number) => String(body[key] || "").trim().replace(/\s+/g, " ").slice(0, max);
   const customer = {
     fullName: value("fullName", 100),
     phone: value("phone", 20).replace(/[\\s()-]/g, ""),
@@ -292,7 +292,7 @@ function cleanCustomer(body: any) {
     addressLine2: value("addressLine2", 160),
     city: value("city", 80),
     state: value("state", 80),
-    pincode: value("pincode", 12).replace(/\\s/g, ""),
+    pincode: value("pincode", 12).replace(/\s/g, ""),
     country: value("country", 80) || "India",
   };
   if (customer.fullName.length < 2 || !/^\\+?[0-9]{10,15}$/.test(customer.phone) ||
