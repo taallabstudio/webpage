@@ -895,7 +895,57 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
     api("/google/status").then(d=>setDriveConnected(!!d.connected)).catch(e=>{setDriveConnected(false);setDriveError(e.message)});
   },[showGoogleDrive]);
 
-  return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">ACCOUNT</span><h1>Account</h1><p>{user?.email} • {user?.role}</p></div></div>
+  const [displayName,setDisplayName]=useState(user?.display_name || user?.email?.split("@")[0] || "");
+  const [avatarData,setAvatarData]=useState(user?.avatar_data || "");
+  const [profileSaving,setProfileSaving]=useState(false);
+  const [profileError,setProfileError]=useState("");
+  const [profileMessage,setProfileMessage]=useState("");
+  useEffect(()=>{setDisplayName(user?.display_name || user?.email?.split("@")[0] || "");setAvatarData(user?.avatar_data || "")},[user?.id,user?.display_name,user?.avatar_data]);
+
+  async function chooseAvatar(file) {
+    setProfileError("");setProfileMessage("");
+    if(!file)return;
+    if(!file.type.startsWith("image/")){setProfileError("Choose an image file.");return}
+    let objectUrl="";
+    try {
+      const image = new Image(); objectUrl = URL.createObjectURL(file);
+      await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=objectUrl});
+      const canvas=document.createElement("canvas");canvas.width=256;canvas.height=256;
+      const ctx=canvas.getContext("2d");if(!ctx)throw new Error("Could not process this image.");
+      const scale=Math.max(256/image.width,256/image.height),width=image.width*scale,height=image.height*scale;
+      ctx.drawImage(image,(256-width)/2,(256-height)/2,width,height);
+      const encoded=canvas.toDataURL("image/webp",0.82);
+      if(encoded.length>350000)throw new Error("That image is too large. Please choose a smaller image.");
+      setAvatarData(encoded);
+    } catch(e) { setProfileError(e.message || "Could not read this image."); }
+    finally { if(objectUrl)URL.revokeObjectURL(objectUrl); }
+  }
+
+  async function saveProfile(e) {
+    e.preventDefault();setProfileSaving(true);setProfileError("");setProfileMessage("");
+    try {
+      const result=await api("/account/profile",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({display_name:displayName,avatar_data:avatarData})});
+      setDisplayName(result.user?.display_name || displayName);setAvatarData(result.user?.avatar_data || "");
+      setProfileMessage("Your profile has been updated.");onPasswordChanged();
+    } catch(e) { setProfileError(e.message); }
+    finally { setProfileSaving(false); }
+  }
+
+  return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">ACCOUNT SETTINGS</span><h1>Account settings</h1><p>Manage your profile, sign-in security and password.</p></div></div>
+    <section className="panel" style={{maxWidth:720,padding:24,marginBottom:18}}>
+      <h2>Public profile</h2><p className="muted" style={{marginTop:6}}>This name and picture appear in the TaalLab website navigation when you are signed in.</p>
+      <form onSubmit={saveProfile}>
+        <div className="profile-editor"><ProfileAvatar user={{display_name:displayName,email:user?.email,avatar_data:avatarData}} size={88}/><div className="profile-editor-actions">
+          <label className="ghost-btn profile-upload-btn">Change picture<input type="file" accept="image/png,image/jpeg,image/webp,image/*" onChange={e=>{chooseAvatar(e.target.files?.[0]);e.target.value=""}} hidden/></label>
+          {avatarData && <button type="button" className="ghost-btn" onClick={()=>setAvatarData("")}>Use default picture</button>}
+          <small className="muted">Square crop · saved as a small WebP image · max 250 KB</small>
+        </div></div>
+        <label>Username / display name<input value={displayName} onChange={e=>setDisplayName(e.target.value)} minLength={2} maxLength={40} placeholder="How should we show your name?" required/></label>
+        <label>Email address<input value={user?.email || ""} readOnly disabled/></label>
+        {profileError&&<div className="error-box">{profileError}</div>}{profileMessage&&<div className="success-pill">{profileMessage}</div>}
+        <button className="primary-btn" disabled={profileSaving}>{profileSaving?"Saving profile…":"Save profile"}</button>
+      </form>
+    </section>
     <section className="panel" style={{maxWidth:620,padding:24}}>
       <h2>Security</h2>
       <p className="muted" style={{marginTop:6}}>Email verification is required for every account. Two-step verification adds a one-time code sent to your email after your password.</p>
