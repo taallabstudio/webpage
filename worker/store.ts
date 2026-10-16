@@ -9,6 +9,7 @@ export interface StoreEnv {
   APP_ORIGIN: string;
   ASSETS: Fetcher;
   authorizeAdmin?: (req: Request) => Promise<boolean>;
+  getCustomer?: (req: Request) => Promise<{ id: string; email: string; displayName?: string } | null>;
 }
 
 type Product = {
@@ -154,12 +155,43 @@ async function ensureStoreSchema(env: StoreEnv) {
     razorpay_order_id TEXT UNIQUE,
     razorpay_payment_id TEXT,
     customer_email TEXT,
+    user_id TEXT,
+    customer_name TEXT,
+    customer_phone TEXT,
+    address_line1 TEXT,
+    address_line2 TEXT,
+    city TEXT,
+    state TEXT,
+    pincode TEXT,
+    country TEXT,
+    coupon_code TEXT,
+    discount_amount INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     paid_at INTEGER,
     download_count INTEGER NOT NULL DEFAULT 0,
     last_downloaded_at INTEGER
   )`).run();
+  await env.DBStore.prepare(`CREATE TABLE IF NOT EXISTS store_customer_profiles (
+    user_id TEXT PRIMARY KEY,
+    full_name TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
+    address_line1 TEXT NOT NULL DEFAULT '',
+    address_line2 TEXT NOT NULL DEFAULT '',
+    city TEXT NOT NULL DEFAULT '',
+    state TEXT NOT NULL DEFAULT '',
+    pincode TEXT NOT NULL DEFAULT '',
+    country TEXT NOT NULL DEFAULT 'India',
+    updated_at INTEGER NOT NULL
+  )`).run();
+  for (const [column, declaration] of [
+    ["user_id", "TEXT"], ["customer_name", "TEXT"], ["customer_phone", "TEXT"],
+    ["address_line1", "TEXT"], ["address_line2", "TEXT"], ["city", "TEXT"],
+    ["state", "TEXT"], ["pincode", "TEXT"], ["country", "TEXT"], ["coupon_code", "TEXT"],
+    ["discount_amount", "INTEGER NOT NULL DEFAULT 0"]
+  ] as const) {
+    try { await env.DBStore.prepare(`ALTER TABLE store_orders ADD COLUMN ${column} ${declaration}`).run(); } catch {}
+  }
   await env.DBStore.prepare("CREATE INDEX IF NOT EXISTS idx_store_orders_status ON store_orders(status, created_at)").run();
   const existing = await env.DBStore.prepare("SELECT COUNT(*) AS n FROM store_products").first<{n:number}>();
   if (!existing?.n) {
@@ -238,18 +270,103 @@ function publicProduct(product: Product) {
   };
 }
 
-async function createOrder(req: Request, env: StoreEnv) {
-  if (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) return json({ error: "Payments are not configured." }, 503);
-  // Safety lock: this store checkout is deliberately test-only until the owner explicitly approves a live launch.
-  // Razorpay Test Mode key IDs use the rzp_test_ prefix. Never create orders with live credentials here.
-  if (!env.RAZORPAY_KEY_ID.startsWith("rzp_test_")) {
-    return json({ error: "Checkout is locked to protect you from real charges. Configure Razorpay Test Mode keys (rzp_test_...) to test checkout." }, 503);
+const TEMP_COUPON = { code: "TAAL10", percent: 10, maxDiscountPaise: 10000, minimumPaise: 100, expiresAt: "2026-10-24T00:00:00+05:30" };
+
+function couponDiscount(code: string, subtotalPaise: number) {
+  if (!code) return { code: "", discountPaise: 0 };
+  const normalized = code.trim().toUpperCase();
+  if (normalized !== TEMP_COUPON.code || Date.now() >= new Date(TEMP_COUPON.expiresAt).getTime()) {
+    throw new Error("That coupon code is invalid or has expired.");
   }
+  if (subtotalPaise < TEMP_COUPON.minimumPaise) throw new Error("This coupon requires a minimum order of ₹1.");
+  const discountPaise = Math.min(Math.round(subtotalPaise * TEMP_COUPON.percent / 100), TEMP_COUPON.maxDiscountPaise);
+  return { code: TEMP_COUPON.code, discountPaise };
+}
+
+function cleanCustomer(body: any) {
+  const value = (key: string, max: number) => String(body[key] || "").trim().replace(/\s+/g, " ").slice(0, max);
+  const customer = {
+    fullName: value("fullName", 100),
+    phone: value("phone", 20).replace(/[\s()-]/g, ""),
+    addressLine1: value("addressLine1", 160),
+    addressLine2: value("addressLine2", 160),
+    city: value("city", 80),
+    state: value("state", 80),
+    pincode: value("pincode", 12).replace(/\s/g, ""),
+    country: value("country", 80) || "India",
+  };
+  if (customer.fullName.length < 2 || !/^\+?[0-9]{10,15}$/.test(customer.phone) ||
+      customer.addressLine1.length < 4 || !customer.city || !customer.state ||
+      !/^[A-Za-z0-9 -]{4,10}$/.test(customer.pincode) || !customer.country) {
+    throw new Error("Enter your name, valid phone number, full address, city, state and PIN/postal code.");
+  }
+  return customer;
+}
+
+async function customerProfile(req: Request, env: StoreEnv, save = false) {
+  const user = await env.getCustomer?.(req);
+  if (!user) return json({ error: "Please log in to continue checkout." }, 401);
+  await ensureStoreSchema(env);
+  if (save) {
+    const body: any = await req.json().catch(() => ({}));
+    let customer;
+    try { customer = cleanCustomer(body); } catch (error) {
+      return json({ error: error instanceof Error ? error.message : "Check your details." }, 400);
+    }
+    await env.DBStore.prepare(`INSERT INTO store_customer_profiles
+      (user_id,full_name,phone,address_line1,address_line2,city,state,pincode,country,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(user_id) DO UPDATE SET full_name=excluded.full_name,phone=excluded.phone,
+      address_line1=excluded.address_line1,address_line2=excluded.address_line2,city=excluded.city,
+      state=excluded.state,pincode=excluded.pincode,country=excluded.country,updated_at=excluded.updated_at`)
+      .bind(user.id, customer.fullName, customer.phone, customer.addressLine1, customer.addressLine2, customer.city, customer.state, customer.pincode, customer.country, unixNow()).run();
+    return json({ ok: true, profile: customer });
+  }
+  const row: any = await env.DBStore.prepare("SELECT * FROM store_customer_profiles WHERE user_id=? LIMIT 1").bind(user.id).first();
+  return json({ authenticated: true, email: user.email, displayName: user.displayName || "", profile: row ? {
+    fullName: row.full_name || "", phone: row.phone || "", addressLine1: row.address_line1 || "",
+    addressLine2: row.address_line2 || "", city: row.city || "", state: row.state || "",
+    pincode: row.pincode || "", country: row.country || "India"
+  } : null });
+}
+
+async function validateCoupon(req: Request, env: StoreEnv) {
+  const user = await env.getCustomer?.(req);
+  if (!user) return json({ error: "Please log in to continue checkout." }, 401);
   const body: any = await req.json().catch(() => ({}));
   const product = (await allProducts(env)).find((p) => p.id === String(body.productId || ""));
   if (!product || !product.active || product.price <= 0) return json({ error: "This product is not available for purchase yet." }, 400);
-  const amount = Math.round(product.price * 100);
-  if (!Number.isSafeInteger(amount) || amount < 100) return json({ error: "Invalid product price." }, 400);
+  try {
+    const subtotalPaise = Math.round(product.price * 100);
+    const discount = couponDiscount(String(body.code || ""), subtotalPaise);
+    return json({ code: discount.code, subtotal: subtotalPaise, discount: discount.discountPaise, total: subtotalPaise - discount.discountPaise, currency: "INR", percent: TEMP_COUPON.percent, maxDiscount: TEMP_COUPON.maxDiscountPaise });
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : "Invalid coupon." }, 400);
+  }
+}
+
+async function createOrder(req: Request, env: StoreEnv) {
+  if (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) return json({ error: "Payments are not configured." }, 503);
+  if (!env.RAZORPAY_KEY_ID.startsWith("rzp_test_")) {
+    return json({ error: "Checkout is locked to protect you from real charges. Configure Razorpay Test Mode keys (rzp_test_...) to test checkout." }, 503);
+  }
+  const user = await env.getCustomer?.(req);
+  if (!user) return json({ error: "Please log in to continue checkout." }, 401);
+  const body: any = await req.json().catch(() => ({}));
+  const product = (await allProducts(env)).find((p) => p.id === String(body.productId || ""));
+  if (!product || !product.active || product.price <= 0) return json({ error: "This product is not available for purchase yet." }, 400);
+  const amountPaise = Math.round(product.price * 100);
+  if (!Number.isSafeInteger(amountPaise) || amountPaise < 100) return json({ error: "Invalid product price." }, 400);
+  let customer;
+  try { customer = cleanCustomer(body); } catch (error) {
+    return json({ error: error instanceof Error ? error.message : "Check your details." }, 400);
+  }
+  let discount;
+  try { discount = couponDiscount(String(body.couponCode || ""), amountPaise); } catch (error) {
+    return json({ error: error instanceof Error ? error.message : "Invalid coupon." }, 400);
+  }
+  const amount = amountPaise - discount.discountPaise;
+  if (!Number.isSafeInteger(amount) || amount < 100) return json({ error: "The final amount must be at least ₹1." }, 400);
 
   await ensureStoreSchema(env);
   const localId = crypto.randomUUID();
@@ -258,7 +375,7 @@ async function createOrder(req: Request, env: StoreEnv) {
   const response = await fetch("https://api.razorpay.com/v1/orders", {
     method: "POST",
     headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ amount, currency: "INR", receipt: localId.slice(0, 40), notes: { product_id: product.id, store_order_id: localId } }),
+    body: JSON.stringify({ amount, currency: "INR", receipt: localId.slice(0, 40), notes: { product_id: product.id, store_order_id: localId, customer_user_id: user.id, coupon_code: discount.code } }),
   });
   const razorOrder: any = await response.json().catch(() => ({}));
   if (!response.ok || !razorOrder.id) {
@@ -266,17 +383,27 @@ async function createOrder(req: Request, env: StoreEnv) {
     return json({ error: "Could not start checkout. Please try again." }, 502);
   }
   await env.DBStore.prepare(`INSERT INTO store_orders
-    (id, product_id, amount, currency, status, razorpay_order_id, customer_email, created_at, updated_at)
-    VALUES (?, ?, ?, 'INR', 'created', ?, ?, ?, ?)`)
-    .bind(localId, product.id, amount, razorOrder.id, String(body.email || "").trim().slice(0, 254) || null, created, created).run();
+    (id,product_id,amount,currency,status,razorpay_order_id,customer_email,user_id,customer_name,customer_phone,
+     address_line1,address_line2,city,state,pincode,country,coupon_code,discount_amount,created_at,updated_at)
+    VALUES(?,?,?,'INR','created',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(localId, product.id, amount, razorOrder.id, user.email, user.id, customer.fullName, customer.phone,
+      customer.addressLine1, customer.addressLine2, customer.city, customer.state, customer.pincode, customer.country,
+      discount.code || null, discount.discountPaise, created, created).run();
+
+  if (body.saveDetails === true) {
+    await env.DBStore.prepare(`INSERT INTO store_customer_profiles
+      (user_id,full_name,phone,address_line1,address_line2,city,state,pincode,country,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(user_id) DO UPDATE SET full_name=excluded.full_name,phone=excluded.phone,
+      address_line1=excluded.address_line1,address_line2=excluded.address_line2,city=excluded.city,
+      state=excluded.state,pincode=excluded.pincode,country=excluded.country,updated_at=excluded.updated_at`)
+      .bind(user.id, customer.fullName, customer.phone, customer.addressLine1, customer.addressLine2, customer.city, customer.state, customer.pincode, customer.country, created).run();
+  }
 
   return json({
-    keyId: env.RAZORPAY_KEY_ID,
-    orderId: razorOrder.id,
-    amount,
-    currency: "INR",
-    product: publicProduct(product),
-    storeOrderId: localId,
+    keyId: env.RAZORPAY_KEY_ID, orderId: razorOrder.id, amount, currency: "INR",
+    product: publicProduct(product), storeOrderId: localId, subtotal: amountPaise,
+    discount: discount.discountPaise, couponCode: discount.code,
   });
 }
 
@@ -394,6 +521,9 @@ export async function handleStoreRequest(req: Request, env: StoreEnv): Promise<R
     await ensureStoreSchema(env);
     return json({ products: (await allProducts(env)).map(publicProduct) });
   }
+  if (url.pathname === "/api/store/customer-profile" && req.method === "GET") return customerProfile(req, env);
+  if (url.pathname === "/api/store/customer-profile" && req.method === "PUT") return customerProfile(req, env, true);
+  if (url.pathname === "/api/store/validate-coupon" && req.method === "POST") return validateCoupon(req, env);
   if (url.pathname === "/api/store/create-order" && req.method === "POST") {
     return createOrder(req, env);
   }

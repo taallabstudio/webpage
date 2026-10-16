@@ -1334,7 +1334,14 @@ export default {
     try {
       await ensureSupportSchema(env);
       if (url.pathname.startsWith("/api/store/")) {
-        const storeResponse = await handleStoreRequest(req, { ...env, authorizeAdmin: async (request: Request) => { try { await requireAdmin(request, env); return true; } catch { return false; } } });
+        const storeResponse = await handleStoreRequest(req, {
+          ...env,
+          authorizeAdmin: async (request: Request) => { try { await requireAdmin(request, env); return true; } catch { return false; } },
+          getCustomer: async (request: Request) => {
+            const customer = await getSessionUser(request, env);
+            return customer ? { id: String(customer.id), email: String(customer.email), displayName: String(customer.display_name || "") } : null;
+          },
+        });
         if (storeResponse) return storeResponse;
       }
 
