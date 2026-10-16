@@ -169,7 +169,7 @@ async function ensureStoreSchema(env: StoreEnv) {
   }
 }
 
-function rowProduct(row: any): Product & {features:string;version:string;status:string;coverKey:string} {
+function rowProduct(row: any): Product & {features:string;version:string;status:string;coverKey:string;updatedAt:number} {
   return {id:String(row.id),name:String(row.name),description:String(row.description||""),category:String(row.category),price:Number(row.price),active:Number(row.active)===1 && row.status==="published",fileKey:String(row.file_key||""),fileName:String(row.file_name||""),features:String(row.features||""),version:String(row.version||"1.0"),status:String(row.status||"draft"),coverKey:String(row.cover_key||""),updatedAt:Number(row.updated_at||0)};
 }
 async function allProducts(env: StoreEnv, includeDrafts=false) {
