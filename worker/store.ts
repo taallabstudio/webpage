@@ -8,6 +8,7 @@ export interface StoreEnv {
   RAZORPAY_KEY_SECRET?: string;
   APP_ORIGIN: string;
   ASSETS: Fetcher;
+  authorizeAdmin?: (req: Request) => Promise<boolean>;
 }
 
 type Product = {
