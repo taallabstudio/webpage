@@ -1169,6 +1169,23 @@ function getPath(){
   return location.pathname.replace(/\/+$/, "") || "/";
 }
 
+function AccountPage() {
+  const [user,setUser]=useState(null);
+  const [checking,setChecking]=useState(true);
+  async function refreshUser() {
+    try { const result=await api("/auth/me");setUser(result.authenticated?result.user:null); }
+    catch { setUser(null); }
+    finally { setChecking(false); }
+  }
+  useEffect(()=>{refreshUser()},[]);
+  if(checking)return <div className="loading"><RefreshCw className="spin"/> Checking your account…</div>;
+  if(!user)return <Login onLogin={refreshUser}/>;
+  return <div className="account-page-shell">
+    <header className="account-page-header"><a href="/" className="account-home-link"><Logo studioOnly/></a><SiteAccountMenu user={user} onLogout={async()=>{try{await api("/auth/logout",{method:"POST"})}catch{}setUser(null);location.href="/login"}}/></header>
+    <AccountSettings user={user} onPasswordChanged={refreshUser}/>
+  </div>;
+}
+
 function App(){
   const path = getPath();
 
@@ -1181,6 +1198,8 @@ function App(){
   if(path === "/admin" || path === "/login") {
     return <Admin/>;
   }
+
+  if(path === "/account/settings") return <AccountPage/>;
 
   if(path === "/admin/upload") {
     return <Admin initialUpload/>;
