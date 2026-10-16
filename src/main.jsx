@@ -508,6 +508,7 @@ function Preview({file,onClose}) {
 function Login({onLogin}) {
   const loginParams = new URLSearchParams(location.search);
   const codeInputs = useRef([]);
+  const codeForm = useRef(null);
   const [email,setEmail]=useState(loginParams.get("email")||"");
   const [password,setPassword]=useState("");
   const [code,setCode]=useState("");
@@ -525,6 +526,12 @@ function Login({onLogin}) {
     return ()=>window.clearInterval(timer);
   },[resendCooldown]);
 
+  useEffect(()=>{
+    if (twoFactor && /^\d{6}$/.test(code)) {
+      codeForm.current?.requestSubmit();
+    }
+  },[code,twoFactor]);
+
   async function submit(e) {
     e.preventDefault(); setError(""); setNotice("");
     try {
@@ -534,7 +541,7 @@ function Login({onLogin}) {
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({challenge_id:challengeId,code})
         });
-        onLogin();
+        window.location.assign("/");
         return;
       }
 
@@ -553,7 +560,7 @@ function Login({onLogin}) {
         setVerificationRequired(true);
         setNotice("Account created. Check your email and verify your address before signing in.");
       } else {
-        onLogin();
+        window.location.assign("/");
       }
     } catch(e) {
       setError(e.message);
@@ -599,7 +606,7 @@ function Login({onLogin}) {
     <Logo/><div className="login-icon"><ShieldCheck/></div>
     <h1>Check your email</h1>
     <p>Enter the 6-digit code we sent to <strong>{email}</strong>.</p>
-    <form onSubmit={submit}>
+    <form ref={codeForm} onSubmit={submit}>
       <label className="otp-label">Verification code</label>
       <div className="otp-inputs" role="group" aria-label="Six-digit verification code" onPaste={e=>{
         const pasted=e.clipboardData.getData("text").replace(/\D/g,"").slice(0,6);
