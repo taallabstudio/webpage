@@ -1187,10 +1187,10 @@ function PurchasedProducts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [downloading, setDownloading] = useState("");
-  useEffect(() => { api("/api/store/purchases").then(d => setPurchases(d.purchases || [])).catch(e => setError(e.message || "Could not load purchases.")).finally(() => setLoading(false)); }, []);
+  useEffect(() => { api("/store/purchases").then(d => setPurchases(d.purchases || [])).catch(e => setError(e.message || "Could not load purchases.")).finally(() => setLoading(false)); }, []);
   async function download(orderId) {
     setDownloading(orderId); setError("");
-    try { const d = await api("/api/store/purchases/download", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId }) }); location.href = d.downloadUrl; }
+    try { const d = await api("/store/purchases/download", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId }) }); location.href = d.downloadUrl; }
     catch (e) { setError(e.message || "Could not prepare download."); setDownloading(""); }
   }
   return <section className="panel purchased-panel" id="purchased"><div className="panel-head"><div><h2>Purchased</h2><p>Your products, sorted by purchase date. Download them again whenever you need.</p></div></div>
