@@ -501,8 +501,9 @@ async function updateAccountProfile(req: Request, env: Env) {
 
   const hasAvatar = Object.prototype.hasOwnProperty.call(body, "avatar_data");
   const avatarData = hasAvatar ? String(body.avatar_data || "") : String(user.avatar_data || "");
-  if (avatarData && (avatarData.length > 350000 || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(avatarData))) {
-    return json({ error: "Profile pictures must be PNG, JPEG or WebP and under 250 KB after processing." }, { status: 400 });
+  const avatarPrefix = ["data:image/png;base64,", "data:image/jpeg;base64,", "data:image/webp;base64,"].find(prefix => avatarData.startsWith(prefix));
+  const avatarPayload = avatarPrefix ? avatarData.slice(avatarPrefix.length) : "";
+  if (avatarData && (avatarData.length > 350000 || !avatarPrefix || !/^[A-Za-z0-9+/]+={0,2}$/.test(avatarPayload))) {
   }
 
   await env.DB.prepare("UPDATE users SET display_name=?,avatar_data=?,updated_at=? WHERE id=?")
