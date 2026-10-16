@@ -1330,11 +1330,11 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     try {
+      await ensureSupportSchema(env);
       if (url.pathname.startsWith("/api/store/")) {
         const storeResponse = await handleStoreRequest(req, { ...env, authorizeAdmin: async (request: Request) => { try { await requireAdmin(request, env); return true; } catch { return false; } } });
         if (storeResponse) return storeResponse;
       }
-      await ensureSupportSchema(env);
 
       if (url.pathname === "/api/booking" && req.method === "POST") {
         const body = await req.json().catch(() => ({}));
