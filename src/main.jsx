@@ -520,6 +520,12 @@ function Login({onLogin}) {
   const [resendCooldown,setResendCooldown]=useState(0);
   const [verificationRequired,setVerificationRequired]=useState(false);
 
+  function afterLogin(){
+    const next=new URLSearchParams(location.search).get("next")||"";
+    if(next.startsWith("/checkout.html")&&!next.startsWith("//")) location.assign(next);
+    else location.assign("/");
+  }
+
   useEffect(()=>{
     if (!resendCooldown) return;
     const timer=window.setInterval(()=>setResendCooldown(v=>Math.max(0,v-1)),1000);
@@ -541,7 +547,7 @@ function Login({onLogin}) {
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({challenge_id:challengeId,code})
         });
-        window.location.assign("/");
+        afterLogin();
         return;
       }
 
@@ -560,7 +566,7 @@ function Login({onLogin}) {
         setVerificationRequired(true);
         setNotice("Account created. Check your email and verify your address before signing in.");
       } else {
-        window.location.assign("/");
+        afterLogin();
       }
     } catch(e) {
       setError(e.message);
