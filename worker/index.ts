@@ -63,7 +63,7 @@ function expiresLabel(ts: number) {
 }
 
 function parseCookie(req: Request, name: string) {
-  return (req.headers.get("Cookie") || "").match(new RegExp(`(?:^|;\s*)${name}=([^;]+)`))?.[1] || "";
+  return (req.headers.get("Cookie") || "").match(new RegExp(\`(?:^|;\\s*)\${name}=([^;]+)\`))?.[1] || "";
 }
 
 function base64Url(bytes: Uint8Array) {
