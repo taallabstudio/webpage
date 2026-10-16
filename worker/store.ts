@@ -6,6 +6,7 @@ export interface StoreEnv {
   DOWNLOAD_SIGNING_SECRET?: string;
   RAZORPAY_KEY_ID?: string;
   RAZORPAY_KEY_SECRET?: string;
+  RESEND_API_KEY?: string;
   APP_ORIGIN: string;
   ASSETS: Fetcher;
   authorizeAdmin?: (req: Request) => Promise<boolean>;
@@ -148,6 +149,7 @@ async function ensureStoreSchema(env: StoreEnv) {
   )`).run();
   await env.DBStore.prepare(`CREATE TABLE IF NOT EXISTS store_orders (
     id TEXT PRIMARY KEY,
+    order_number TEXT UNIQUE,
     product_id TEXT NOT NULL,
     amount INTEGER NOT NULL,
     currency TEXT NOT NULL DEFAULT 'INR',
@@ -185,7 +187,7 @@ async function ensureStoreSchema(env: StoreEnv) {
     updated_at INTEGER NOT NULL
   )`).run();
   for (const [column, declaration] of [
-    ["user_id", "TEXT"], ["customer_name", "TEXT"], ["customer_phone", "TEXT"],
+    ["order_number", "TEXT"], ["user_id", "TEXT"], ["customer_name", "TEXT"], ["customer_phone", "TEXT"],
     ["address_line1", "TEXT"], ["address_line2", "TEXT"], ["city", "TEXT"],
     ["state", "TEXT"], ["pincode", "TEXT"], ["country", "TEXT"], ["coupon_code", "TEXT"],
     ["discount_amount", "INTEGER NOT NULL DEFAULT 0"]
@@ -370,6 +372,7 @@ async function createOrder(req: Request, env: StoreEnv) {
 
   await ensureStoreSchema(env);
   const localId = crypto.randomUUID();
+  const orderNumber = "TL-" + new Date().getFullYear() + "-" + crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase();
   const created = unixNow();
   const auth = btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`);
   const response = await fetch("https://api.razorpay.com/v1/orders", {
@@ -383,10 +386,10 @@ async function createOrder(req: Request, env: StoreEnv) {
     return json({ error: "Could not start checkout. Please try again." }, 502);
   }
   await env.DBStore.prepare(`INSERT INTO store_orders
-    (id,product_id,amount,currency,status,razorpay_order_id,customer_email,user_id,customer_name,customer_phone,
+    (id,order_number,product_id,amount,currency,status,razorpay_order_id,customer_email,user_id,customer_name,customer_phone,
      address_line1,address_line2,city,state,pincode,country,coupon_code,discount_amount,created_at,updated_at)
-    VALUES(?,?,?,'INR','created',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .bind(localId, product.id, amount, razorOrder.id, user.email, user.id, customer.fullName, customer.phone,
+    VALUES(?,?,?,?,'INR','created',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(localId, orderNumber, product.id, amount, razorOrder.id, user.email, user.id, customer.fullName, customer.phone,
       customer.addressLine1, customer.addressLine2, customer.city, customer.state, customer.pincode, customer.country,
       discount.code || null, discount.discountPaise, created, created).run();
 
@@ -407,6 +410,15 @@ async function createOrder(req: Request, env: StoreEnv) {
   });
 }
 
+async function sendPurchaseEmail(env: StoreEnv, order: any, product: Product) {
+  if (!env.RESEND_API_KEY || !order.customer_email) return;
+  const orderNumber = String(order.order_number || order.id);
+  const amount = (Number(order.amount) / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+  const purchaseUrl = cleanOrigin(env) + '/account/settings?tab=purchased';
+  const html = '<h1>Thank you for your purchase!</h1><p>Your TaalLab payment has been verified.</p><p><b>Product:</b> ' + product.name + '</p><p><b>Order ID:</b> ' + orderNumber + '</p><p><b>Amount paid:</b> ' + amount + '</p><p><b>Purchase date:</b> ' + new Date(Number(order.paid_at || unixNow()) * 1000).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + '</p><p><a href="' + purchaseUrl + '">View my purchases and download your product</a></p>';
+  const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'TaalLab <contact@taallab.work>', to: [String(order.customer_email)], subject: 'TaalLab purchase confirmed — ' + orderNumber, html }) });
+  if (!response.ok) console.error('Purchase confirmation email failed', response.status);
+}
 async function verifyPayment(req: Request, env: StoreEnv) {
   if (!env.RAZORPAY_KEY_SECRET) return json({ error: "Payments are not configured." }, 503);
   const body: any = await req.json().catch(() => ({}));
@@ -420,6 +432,7 @@ async function verifyPayment(req: Request, env: StoreEnv) {
   await ensureStoreSchema(env);
   const order: any = await env.DBStore.prepare("SELECT * FROM store_orders WHERE razorpay_order_id=? LIMIT 1").bind(orderId).first();
   if (!order) return json({ error: "Order was not found." }, 404);
+  let newlyPaid = false;
   if (order.status !== "paid") {
     const auth = btoa(`${env.RAZORPAY_KEY_ID || ""}:${env.RAZORPAY_KEY_SECRET}`);
     const paymentResponse = await fetch(`https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}`, {
@@ -431,11 +444,13 @@ async function verifyPayment(req: Request, env: StoreEnv) {
     }
     await env.DBStore.prepare("UPDATE store_orders SET status='paid', razorpay_payment_id=?, paid_at=?, updated_at=? WHERE id=?")
       .bind(paymentId, unixNow(), unixNow(), order.id).run();
+    order.status = 'paid'; order.razorpay_payment_id = paymentId; order.paid_at = unixNow(); newlyPaid = true;
   }
   const product = (await allProducts(env,true)).find((p) => p.id === order.product_id);
   if (!product) return json({ error: "Product configuration was not found." }, 500);
+  if (newlyPaid) { try { await sendPurchaseEmail(env, order, product); } catch (error) { console.error("Purchase email error", error); } }
   const token = await makeDownloadToken(env, String(order.id), product.id);
-  return json({ ok: true, downloadUrl: `${downloadOrigin(req, env)}/download.html?token=${encodeURIComponent(token)}` });
+  return json({ ok: true, orderId: order.order_number || order.id, downloadUrl: `${downloadOrigin(req, env)}/download.html?token=${encodeURIComponent(token)}` });
 }
 
 async function streamProductCover(req: Request, env: StoreEnv, productId: string) {
@@ -508,6 +523,31 @@ async function streamProduct(req: Request, env: StoreEnv, token: string) {
   return new Response(response.body, { status: response.status === 206 ? 206 : 200, headers: out });
 }
 
+async function listPurchases(req: Request, env: StoreEnv) {
+  const user = await env.getCustomer?.(req);
+  if (!user) return json({ error: "Please log in to view purchases." }, 401);
+  await ensureStoreSchema(env);
+  const rows = await env.DBStore.prepare("SELECT * FROM store_orders WHERE user_id=? AND status='paid' ORDER BY COALESCE(paid_at,created_at) DESC, created_at DESC").bind(user.id).all();
+  const products = await allProducts(env, true);
+  const purchases = (rows.results || []).map((o: any) => {
+    const p = products.find((item) => item.id === o.product_id);
+    return { orderId: o.order_number || o.id, productId: o.product_id, productName: p?.name || "TaalLab product", amount: Number(o.amount), currency: o.currency || "INR", purchasedAt: Number(o.paid_at || o.created_at), downloadCount: Number(o.download_count || 0), canDownload: Boolean(p?.fileKey) };
+  });
+  return json({ purchases });
+}
+
+async function purchaseDownload(req: Request, env: StoreEnv) {
+  const user = await env.getCustomer?.(req);
+  if (!user) return json({ error: "Please log in to download purchases." }, 401);
+  const body: any = await req.json().catch(() => ({}));
+  await ensureStoreSchema(env);
+  const order: any = await env.DBStore.prepare("SELECT * FROM store_orders WHERE (order_number=? OR id=?) AND user_id=? AND status='paid' LIMIT 1").bind(String(body.orderId || ""), String(body.orderId || ""), user.id).first();
+  if (!order) return json({ error: "Paid purchase not found in your account." }, 404);
+  const product = (await allProducts(env, true)).find((p) => p.id === order.product_id);
+  if (!product || !product.fileKey) return json({ error: "The product file is not available." }, 503);
+  const token = await makeDownloadToken(env, String(order.id), product.id);
+  return json({ downloadUrl: downloadOrigin(req, env) + "/download.html?token=" + encodeURIComponent(token) });
+}
 export async function handleStoreRequest(req: Request, env: StoreEnv): Promise<Response | null> {
   const url = new URL(req.url);
   if (url.pathname === "/api/store/admin/products" && req.method === "GET") {
@@ -521,6 +561,8 @@ export async function handleStoreRequest(req: Request, env: StoreEnv): Promise<R
     await ensureStoreSchema(env);
     return json({ products: (await allProducts(env)).map(publicProduct) });
   }
+  if (url.pathname === "/api/store/purchases" && req.method === "GET") return listPurchases(req, env);
+  if (url.pathname === "/api/store/purchases/download" && req.method === "POST") return purchaseDownload(req, env);
   if (url.pathname === "/api/store/customer-profile" && req.method === "GET") return customerProfile(req, env);
   if (url.pathname === "/api/store/customer-profile" && req.method === "PUT") return customerProfile(req, env, true);
   if (url.pathname === "/api/store/validate-coupon" && req.method === "POST") return validateCoupon(req, env);
