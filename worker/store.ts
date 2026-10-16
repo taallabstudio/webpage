@@ -220,7 +220,7 @@ async function uploadProductFile(req: Request, env: StoreEnv) {
   const ud:any=await u.json().catch(()=>({})); if(!u.ok||!ud.uploadUrl||!ud.authorizationToken){ const detail=[ud.code,ud.message].filter(Boolean).join(": "); console.error("Backblaze upload URL request failed",u.status,ud.code||"unknown"); return json({error:"Could not prepare private upload (HTTP "+u.status+(detail?": "+detail:"")+"). Check the B2 key capabilities and access to the configured bucket."},502); }
   const key="products/"+(kind==="cover"?"covers/":"")+crypto.randomUUID()+"-"+filename;
   const uploaded=await fetch(ud.uploadUrl,{method:"POST",headers:{"Authorization":ud.authorizationToken,"X-Bz-File-Name":encodeURIComponent(key),"Content-Type":req.headers.get("Content-Type")||"application/octet-stream","X-Bz-Content-Sha1":"do_not_verify"},body:bytes});
-  const up:any=await uploaded.json().catch(()=>({})); if(!uploaded.ok||!up.fileId) return json({error:"Backblaze could not store this file."},502);
+  const up:any=await uploaded.json().catch(()=>({})); if(!uploaded.ok||!up.fileId){ const detail=[up.code,up.message].filter(Boolean).join(": "); console.error("Backblaze file upload failed",uploaded.status,up.code||"unknown"); return json({error:"Backblaze could not store this file (HTTP "+uploaded.status+(detail?": "+detail:"")+"). Check the B2 upload key and bucket permissions."},502); }
   return json({ok:true,key,fileName:filename,bytes:bytes.byteLength,kind});
 }
 
