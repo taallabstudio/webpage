@@ -170,7 +170,7 @@ async function ensureStoreSchema(env: StoreEnv) {
 }
 
 function rowProduct(row: any): Product & {features:string;version:string;status:string;coverKey:string} {
-  return {id:String(row.id),name:String(row.name),description:String(row.description||""),category:String(row.category),price:Number(row.price),active:Number(row.active)===1 && row.status==="published",fileKey:String(row.file_key||""),fileName:String(row.file_name||""),features:String(row.features||""),version:String(row.version||"1.0"),status:String(row.status||"draft"),coverKey:String(row.cover_key||"")};
+  return {id:String(row.id),name:String(row.name),description:String(row.description||""),category:String(row.category),price:Number(row.price),active:Number(row.active)===1 && row.status==="published",fileKey:String(row.file_key||""),fileName:String(row.file_name||""),features:String(row.features||""),version:String(row.version||"1.0"),status:String(row.status||"draft"),coverKey:String(row.cover_key||""),updatedAt:Number(row.updated_at||0)};
 }
 async function allProducts(env: StoreEnv, includeDrafts=false) {
   await ensureStoreSchema(env);
@@ -233,6 +233,8 @@ function publicProduct(product: Product) {
     price: product.price,
     currency: "INR",
     active: product.active && product.price > 0,
+    updatedAt: Number((product as any).updatedAt || 0),
+    coverUrl: (product as any).coverKey ? `/api/store/cover?id=${encodeURIComponent(product.id)}` : "",
   };
 }
 
@@ -309,6 +311,33 @@ async function verifyPayment(req: Request, env: StoreEnv) {
   return json({ ok: true, downloadUrl: `${downloadOrigin(req, env)}/download.html?token=${encodeURIComponent(token)}` });
 }
 
+async function streamProductCover(req: Request, env: StoreEnv, productId: string) {
+  const product = (await allProducts(env)).find((p) => p.id === productId);
+  if (!product || !product.coverKey || !product.coverKey.startsWith("products/covers/")) {
+    return new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });
+  }
+  if (!env.B2_KEY_ID || !env.B2_APPLICATION_KEY || !env.B2_BUCKET_NAME) return json({ error: "Cover image storage is not configured." }, 503);
+  const authResponse = await fetch("https://api.backblazeb2.com/b2api/v3/b2_authorize_account", {
+    headers: { Authorization: "Basic " + btoa(env.B2_KEY_ID + ":" + env.B2_APPLICATION_KEY) },
+  });
+  const authData: any = await authResponse.json().catch(() => ({}));
+  if (!authResponse.ok || !authData.authorizationToken || !authData.apiInfo?.storageApi?.downloadUrl) {
+    return json({ error: "Could not authorize cover image storage." }, 502);
+  }
+  const objectPath = product.coverKey.split("/").map((part) => encodeURIComponent(part)).join("/");
+  const response = await fetch(`${authData.apiInfo.storageApi.downloadUrl.replace(/\/$/, "")}/file/${encodeURIComponent(env.B2_BUCKET_NAME)}/${objectPath}`, {
+    headers: { Authorization: authData.authorizationToken },
+  });
+  if (!response.ok || !response.body) return new Response(null, { status: response.status === 404 ? 404 : 502 });
+  const contentType = response.headers.get("Content-Type") || "application/octet-stream";
+  if (!contentType.startsWith("image/")) return new Response(null, { status: 415 });
+  return new Response(response.body, { headers: {
+    "Content-Type": contentType,
+    "Cache-Control": "public, max-age=300, s-maxage=3600",
+    "X-Content-Type-Options": "nosniff",
+  }});
+}
+
 async function streamProduct(req: Request, env: StoreEnv, token: string) {
   const claims = await readDownloadToken(env, token);
   if (!claims) return json({ error: "This download link is invalid or expired. Contact TaalLab if you need a new link." }, 403);
@@ -360,6 +389,7 @@ export async function handleStoreRequest(req: Request, env: StoreEnv): Promise<R
   }
   if (url.pathname === "/api/store/admin/products" && req.method === "POST") return saveProduct(req,env);
   if (url.pathname === "/api/store/admin/upload" && req.method === "POST") return uploadProductFile(req,env);
+  if (url.pathname === "/api/store/cover" && req.method === "GET") return streamProductCover(req,env,url.searchParams.get("id") || "");
   if (url.pathname === "/api/store/products" && req.method === "GET") {
     await ensureStoreSchema(env);
     return json({ products: (await allProducts(env)).map(publicProduct) });
