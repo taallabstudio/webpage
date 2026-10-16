@@ -63,7 +63,7 @@ function expiresLabel(ts: number) {
 }
 
 function parseCookie(req: Request, name: string) {
-  return (req.headers.get("Cookie") || "").match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`))?.[1] || "";
+  return (req.headers.get("Cookie") || "").match(new RegExp(`(?:^|;\s*)${name}=([^;]+)`))?.[1] || "";
 }
 
 function base64Url(bytes: Uint8Array) {
@@ -1354,12 +1354,12 @@ async function transferSharePage(req: Request, env: Env, transferId: string) {
   const safeDescription = escapeHtml(description);
   const safeUrl = escapeHtml(pageUrl);
   html = html
-    .replace(/<title>[^<]*<\\/title>/i, "<title>" + safeTitle + "</title>")
-    .replace(/<meta property="og:title" content="[^"]*"\\s*\\/>/i, '<meta property="og:title" content="' + safeTitle + '" />')
-    .replace(/<meta property="og:description" content="[^"]*"\\s*\\/>/i, '<meta property="og:description" content="' + safeDescription + '" />')
-    .replace(/<meta name="twitter:title" content="[^"]*"\\s*\\/>/i, '<meta name="twitter:title" content="' + safeTitle + '" />')
-    .replace(/<meta name="twitter:description" content="[^"]*"\\s*\\/>/i, '<meta name="twitter:description" content="' + safeDescription + '" />')
-    .replace("</head>", '<meta property="og:url" content="' + safeUrl + '" />\\n    <meta name="twitter:url" content="' + safeUrl + '" />\\n  </head>');
+    .replace(/<title>[^<]*<\/title>/i, "<title>" + safeTitle + "</title>")
+    .replace(/<meta property="og:title" content="[^"]*"\s*\/>/i, '<meta property="og:title" content="' + safeTitle + '" />')
+    .replace(/<meta property="og:description" content="[^"]*"\s*\/>/i, '<meta property="og:description" content="' + safeDescription + '" />')
+    .replace(/<meta name="twitter:title" content="[^"]*"\s*\/>/i, '<meta name="twitter:title" content="' + safeTitle + '" />')
+    .replace(/<meta name="twitter:description" content="[^"]*"\s*\/>/i, '<meta name="twitter:description" content="' + safeDescription + '" />')
+    .replace("</head>", '<meta property="og:url" content="' + safeUrl + '" />\n    <meta name="twitter:url" content="' + safeUrl + '" />\n  </head>');
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store" } });
 }
 
@@ -1367,7 +1367,7 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     try {
-      const sharedTransfer = url.pathname.match(/^\\/d\\/([a-f0-9]+)$/i);
+      const sharedTransfer = url.pathname.match(/^\/d\/([a-f0-9]+)$/i);
       if (sharedTransfer && req.method === "GET") {
         const sharePage = await transferSharePage(req, env, sharedTransfer[1]);
         if (sharePage) return sharePage;
