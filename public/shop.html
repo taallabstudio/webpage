@@ -34,7 +34,7 @@ button,a{ -webkit-tap-highlight-color:transparent}
 .card{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(255,255,255,.95),rgba(250,252,253,.82));border:1px solid rgba(218,225,232,.95);border-radius:22px;padding:25px;min-height:300px;display:flex;flex-direction:column;box-shadow:0 14px 38px rgba(35,49,63,.045);transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease}
 .card:before{content:"";position:absolute;top:-90px;right:-90px;width:190px;height:190px;background:radial-gradient(circle,rgba(8,120,232,.10),transparent 70%);pointer-events:none}
 .card:hover{transform:translateY(-4px);border-color:#c5ddf4;box-shadow:0 22px 50px rgba(35,49,63,.09)}
-.symbol{position:relative;width:46px;height:46px;border-radius:15px;display:grid;place-items:center;color:var(--blue);background:var(--blue-soft);font-size:20px;border:1px solid rgba(8,120,232,.07)}
+.product-cover{position:relative;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:14px;border:1px solid rgba(218,225,232,.95);margin-bottom:2px;background:#edf1f5}.symbol{position:relative;width:46px;height:46px;border-radius:15px;display:grid;place-items:center;color:var(--blue);background:var(--blue-soft);font-size:20px;border:1px solid rgba(8,120,232,.07)}
 .tag{color:var(--blue);font-size:9px;letter-spacing:.15em;text-transform:uppercase;font-weight:700;margin-top:25px}
 .card h2{font-family:"Space Grotesk",sans-serif;font-size:22px;line-height:1.2;letter-spacing:-.045em;margin:8px 0 8px}
 .card p{color:var(--muted);font-size:13px;line-height:1.7;margin:0 0 28px;max-width:310px}
@@ -86,7 +86,7 @@ footer a{color:#4f5863;font-weight:600}footer a:hover{color:var(--blue)}
 <div class="nav-dropdown"><a href="/#contact">Contact <span class="nav-caret">⌄</span></a><div class="nav-menu nav-menu-right"><a href="/#contact-email">Email</a><a href="https://www.instagram.com/taallabstudio" target="_blank" rel="noopener noreferrer">Instagram</a><a href="/#contact-whatsapp">WhatsApp</a><a href="/#contact-location">Location</a></div></div>
 </nav><div class="landing-auth"><a class="login-nav-btn secondary" href="/login">Sign up</a><a class="login-nav-btn" href="/login">Login</a></div></header>
 <section class="hero"><div class="eyebrow"><span class="dot"></span> TAAL LAB · DIGITAL STORE</div><h1>Tools for the sound<br><em>in your head.</em></h1><p>Plugins, sample packs and sound libraries made for music creators. Digital downloads are delivered through secure, private links after payment.</p></section>
-<div class="catalog-tools"><div class="section-line">Made for your next idea</div><label class="sort-control" for="sort-products">Sort products <select id="sort-products"><option value="featured">Featured</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="name-asc">Name: A to Z</option><option value="name-desc">Name: Z to A</option></select></label></div>
+<div class="catalog-tools"><div class="section-line">Made for your next idea</div><label class="sort-control" for="sort-products">Sort products <select id="sort-products"><option value="latest">Latest first</option><option value="featured">Featured</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="name-asc">Name: A to Z</option><option value="name-desc">Name: Z to A</option></select></label></div>
 <div id="products"><p class="loading">Loading products…</p></div>
 <p class="notice"><span class="notice-mark">i</span><span>Products marked “Coming soon” are not available to purchase yet. Never send payment outside the checkout on this site.</span></p>
 <footer><span>© TAAL LAB</span><a href="mailto:contact@taallab.work">Contact support ↗</a></footer>
@@ -104,6 +104,7 @@ function renderProducts(){
   if(mode==="price-desc") return Number(b.price)-Number(a.price)||a.name.localeCompare(b.name);
   if(mode==="name-asc") return a.name.localeCompare(b.name);
   if(mode==="name-desc") return b.name.localeCompare(a.name);
+  if(mode==="latest") return Number(b.updatedAt||0)-Number(a.updatedAt||0)||a.name.localeCompare(b.name);
   return (categoryOrder.indexOf(a.category)-categoryOrder.indexOf(b.category))||a.name.localeCompare(b.name);
  });
  root.innerHTML="";
@@ -117,6 +118,7 @@ function renderProducts(){
   const grid=document.createElement("div");grid.className="grid";
   for(const p of group){
    const card=document.createElement("article");card.className="card";
+   if(p.coverUrl){const cover=document.createElement("img");cover.className="product-cover";cover.src=p.coverUrl;cover.alt=p.name+" cover artwork";cover.loading="lazy";cover.onerror=()=>cover.remove();card.append(cover)}
    const symbol=document.createElement("div");symbol.className="symbol";symbol.textContent=p.category==="Audio Plugin"?"◉":p.category==="Sample Pack"?"▦":p.category==="Max for Live Device"?"✦":"✧";
    const tag=document.createElement("div");tag.className="tag";tag.textContent=p.category;
    const h=document.createElement("h2");h.textContent=p.name;
