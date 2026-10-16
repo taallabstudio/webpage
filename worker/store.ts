@@ -511,6 +511,31 @@ async function streamProduct(req: Request, env: StoreEnv, token: string) {
   return new Response(response.body, { status: response.status === 206 ? 206 : 200, headers: out });
 }
 
+async function listPurchases(req: Request, env: StoreEnv) {
+  const user = await env.getCustomer?.(req);
+  if (!user) return json({ error: "Please log in to view purchases." }, 401);
+  await ensureStoreSchema(env);
+  const rows = await env.DBStore.prepare("SELECT * FROM store_orders WHERE user_id=? AND status='paid' ORDER BY COALESCE(paid_at,created_at) DESC, created_at DESC").bind(user.id).all();
+  const products = await allProducts(env, true);
+  const purchases = (rows.results || []).map((o: any) => {
+    const p = products.find((item) => item.id === o.product_id);
+    return { orderId: o.order_number || o.id, productId: o.product_id, productName: p?.name || "TaalLab product", amount: Number(o.amount), currency: o.currency || "INR", purchasedAt: Number(o.paid_at || o.created_at), downloadCount: Number(o.download_count || 0), canDownload: Boolean(p?.fileKey) };
+  });
+  return json({ purchases });
+}
+
+async function purchaseDownload(req: Request, env: StoreEnv) {
+  const user = await env.getCustomer?.(req);
+  if (!user) return json({ error: "Please log in to download purchases." }, 401);
+  const body: any = await req.json().catch(() => ({}));
+  await ensureStoreSchema(env);
+  const order: any = await env.DBStore.prepare("SELECT * FROM store_orders WHERE order_number=? AND user_id=? AND status='paid' LIMIT 1").bind(String(body.orderId || ""), user.id).first();
+  if (!order) return json({ error: "Paid purchase not found in your account." }, 404);
+  const product = (await allProducts(env, true)).find((p) => p.id === order.product_id);
+  if (!product || !product.fileKey) return json({ error: "The product file is not available." }, 503);
+  const token = await makeDownloadToken(env, String(order.id), product.id);
+  return json({ downloadUrl: downloadOrigin(req, env) + "/download.html?token=" + encodeURIComponent(token) });
+}
 export async function handleStoreRequest(req: Request, env: StoreEnv): Promise<Response | null> {
   const url = new URL(req.url);
   if (url.pathname === "/api/store/admin/products" && req.method === "GET") {
@@ -524,6 +549,8 @@ export async function handleStoreRequest(req: Request, env: StoreEnv): Promise<R
     await ensureStoreSchema(env);
     return json({ products: (await allProducts(env)).map(publicProduct) });
   }
+  if (url.pathname === "/api/store/purchases" && req.method === "GET") return listPurchases(req, env);
+  if (url.pathname === "/api/store/purchases/download" && req.method === "POST") return purchaseDownload(req, env);
   if (url.pathname === "/api/store/customer-profile" && req.method === "GET") return customerProfile(req, env);
   if (url.pathname === "/api/store/customer-profile" && req.method === "PUT") return customerProfile(req, env, true);
   if (url.pathname === "/api/store/validate-coupon" && req.method === "POST") return validateCoupon(req, env);
