@@ -1294,13 +1294,14 @@ html{scroll-behavior:smooth}
 
 /* Account settings: align every section to one centered content column. */
 .account-content-column{
-  width:min(720px,100%);
+  width:min(620px,100%);
   margin:0 auto;
 }
 .account-content-column>.admin-content{
   width:100%;
   max-width:none;
   margin:0;
+  padding:0;
 }
 .account-content-column>.admin-content .panel{
   box-sizing:border-box;
@@ -1316,6 +1317,9 @@ html{scroll-behavior:smooth}
 .account-content-column .purchased-panel .panel-head{
   margin-left:0;
   margin-right:0;
+}
+.account-content-column .purchase-item{
+  padding:20px 22px;
 }
 @media(max-width:760px){
   .account-content-column{width:100%}
