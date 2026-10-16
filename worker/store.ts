@@ -205,9 +205,17 @@ async function uploadProductFile(req: Request, env: StoreEnv) {
   const declared=Number(req.headers.get("Content-Length")||0); if(declared>100*1024*1024) return json({error:"Uploads are limited to 100 MB per file."},413);
   const bytes=await req.arrayBuffer(); if(!bytes.byteLength) return json({error:"Choose a non-empty file to upload."},400); if(bytes.byteLength>100*1024*1024) return json({error:"Uploads are limited to 100 MB per file."},413);
   const auth=await fetch("https://api.backblazeb2.com/b2api/v3/b2_authorize_account",{headers:{Authorization:"Basic "+btoa(env.B2_KEY_ID+":"+env.B2_APPLICATION_KEY)}});
-  const ad:any=await auth.json().catch(()=>({})); if(!auth.ok||!ad.authorizationToken) return json({error:"Could not authorize Backblaze upload."},502);
-  const apiUrl=ad.apiInfo?.storageApi?.apiUrl, bucketId=ad.allowed?.bucketId;
-  if(!apiUrl||!bucketId) return json({error:"Backblaze did not return the bucket upload details."},502);
+  const ad:any=await auth.json().catch(()=>({})); if(!auth.ok||!ad.authorizationToken) return json({error:"Could not authorize Backblaze upload. Check the B2 key ID and application key."},502);
+  const apiUrl=ad.apiInfo?.storageApi?.apiUrl;
+  let bucketId=ad.apiInfo?.storageApi?.bucketId||ad.allowed?.bucketId||ad.allowed?.buckets?.find((b:any)=>b.name===env.B2_BUCKET_NAME||b.bucketName===env.B2_BUCKET_NAME)?.id||ad.allowed?.buckets?.find((b:any)=>b.name===env.B2_BUCKET_NAME||b.bucketName===env.B2_BUCKET_NAME)?.bucketId;
+  if(!apiUrl) return json({error:"Backblaze authorization succeeded but did not return its storage API URL."},502);
+  // Unrestricted keys may not return a bucket ID during authorization; resolve the configured private bucket by name.
+  if(!bucketId){
+    const listed=await fetch(apiUrl.replace(/\/$/,"")+"/b2api/v3/b2_list_buckets",{method:"POST",headers:{Authorization:ad.authorizationToken,"Content-Type":"application/json"},body:JSON.stringify({accountId:ad.accountId,bucketName:env.B2_BUCKET_NAME})});
+    const ld:any=await listed.json().catch(()=>({}));
+    bucketId=ld.buckets?.find((b:any)=>b.bucketName===env.B2_BUCKET_NAME)?.bucketId;
+    if(!listed.ok||!bucketId) return json({error:"Backblaze authorized the key but could not resolve the configured bucket. Ensure the key has writeFiles permission for the private taallab-product-files bucket; if the key is unrestricted, it also needs listBuckets permission."},502);
+  }
   const u=await fetch(apiUrl.replace(/\/$/,"")+"/b2api/v3/b2_get_upload_url",{method:"POST",headers:{Authorization:ad.authorizationToken,"Content-Type":"application/json"},body:JSON.stringify({bucketId})});
   const ud:any=await u.json().catch(()=>({})); if(!u.ok||!ud.uploadUrl||!ud.authorizationToken) return json({error:"Could not prepare private upload. Check that the B2 key can write to this bucket."},502);
   const key="products/"+(kind==="cover"?"covers/":"")+crypto.randomUUID()+"-"+filename;
