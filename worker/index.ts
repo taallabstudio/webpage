@@ -133,6 +133,11 @@ async function ensureSupportSchema(env: Env) {
     }
   }
   const userColumns: any = await env.DB.prepare("PRAGMA table_info(users)").all();
+  const hasDisplayName = (userColumns.results || []).some((col: any) => col.name === "display_name");
+  if (!hasDisplayName) await env.DB.prepare("ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''").run();
+  const hasAvatarData = (userColumns.results || []).some((col: any) => col.name === "avatar_data");
+  if (!hasAvatarData) await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_data TEXT NOT NULL DEFAULT ''").run();
+
   const hasEmailVerified = (userColumns.results || []).some((col: any) => col.name === "email_verified_at");
   if (!hasEmailVerified) {
     await env.DB.prepare("ALTER TABLE users ADD COLUMN email_verified_at INTEGER").run();
@@ -269,7 +274,7 @@ If you did not try to sign in, change your password and contact TaalLab.`;
 async function getSessionUser(req: Request, env: Env) {
   const sid = parseCookie(req, "taallab_session");
   if (!sid) return null;
-  const row: any = await env.DB.prepare(`SELECT u.id,u.email,u.role,u.status,u.created_at,u.updated_at,u.email_verified_at,u.two_factor_enabled
+  const row: any = await env.DB.prepare(`SELECT u.id,u.email,u.role,u.status,u.created_at,u.updated_at,u.email_verified_at,u.two_factor_enabled,u.display_name,u.avatar_data
     FROM sessions s JOIN users u ON u.id=s.user_id
     WHERE s.id=? AND s.expires_at>? AND u.status='active' LIMIT 1`)
     .bind(sid, now()).first();
@@ -486,6 +491,24 @@ async function authSetup(req: Request, env: Env) {
 async function currentUser(env: Env, req: Request) {
   const user = await getSessionUser(req, env);
   return user ? json({ authenticated: true, user }) : json({ authenticated: false });
+}
+
+async function updateAccountProfile(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  const body = await req.json().catch(() => ({}));
+  const displayName = String(body.display_name ?? "").trim().replace(/\\s+/g, " ").slice(0, 40);
+  if (displayName.length < 2) return json({ error: "Display name must be at least 2 characters." }, { status: 400 });
+
+  const hasAvatar = Object.prototype.hasOwnProperty.call(body, "avatar_data");
+  const avatarData = hasAvatar ? String(body.avatar_data || "") : String(user.avatar_data || "");
+  if (avatarData && (avatarData.length > 350000 || !/^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(avatarData))) {
+    return json({ error: "Profile pictures must be PNG, JPEG or WebP and under 250 KB after processing." }, { status: 400 });
+  }
+
+  await env.DB.prepare("UPDATE users SET display_name=?,avatar_data=?,updated_at=? WHERE id=?")
+    .bind(displayName, avatarData, now(), user.id).run();
+  const updated = await getSessionUser(req, env);
+  return json({ ok: true, user: updated });
 }
 
 async function updateSecuritySettings(req: Request, env: Env) {
@@ -1356,6 +1379,7 @@ export default {
       if ((url.pathname === "/api/auth/login" || url.pathname === "/api/admin/login") && req.method === "POST") return authLogin(req, env);
       if ((url.pathname === "/api/auth/logout" || url.pathname === "/api/admin/logout") && req.method === "POST") return authLogout(req, env);
       if (url.pathname === "/api/auth/me" && req.method === "GET") return currentUser(env, req);
+      if (url.pathname === "/api/account/profile" && req.method === "PATCH") return updateAccountProfile(req, env);
       if (url.pathname === "/api/account/password" && req.method === "POST") return changeOwnPassword(req, env);
       if (url.pathname === "/api/account/security" && req.method === "POST") return updateSecuritySettings(req, env);
 
