@@ -1290,3 +1290,33 @@ html{scroll-behavior:smooth}
 @media(max-width:760px){.site-account-name{display:none}.site-account-menu summary{gap:4px}.account-page-shell{padding:0 14px 32px}.account-page-header{min-height:68px}.profile-editor{align-items:flex-start}.profile-editor-actions{flex-direction:column}}
 
 .purchased-panel{width:min(620px,100%);margin:20px auto 0}.purchases-list{display:flex;flex-direction:column}.purchase-item{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 0;border-top:1px solid #e5e9ee}.purchase-main{display:flex;flex-direction:column;gap:6px;min-width:0}.purchase-main small{font-size:12px;color:#78818c}.purchase-side{display:flex;align-items:flex-end;flex-direction:column;gap:10px;white-space:nowrap}.purchases-empty{padding:24px 0}.purchases-empty p{color:#78818c}.purchase-side .primary-btn{cursor:pointer;border:0}@media(max-width:640px){.purchase-item{align-items:flex-start;flex-direction:column}.purchase-side{width:100%;align-items:flex-start;flex-direction:row;justify-content:space-between}.purchased-panel{padding:20px}}
+
+
+/* Account settings: align every section to one centered content column. */
+.account-content-column{
+  width:min(720px,100%);
+  margin:0 auto;
+}
+.account-content-column>.admin-content{
+  width:100%;
+  max-width:none;
+  margin:0;
+}
+.account-content-column>.admin-content .panel{
+  box-sizing:border-box;
+  width:100%;
+  max-width:none !important;
+}
+.account-content-column .purchased-panel{
+  box-sizing:border-box;
+  width:100%;
+  max-width:none;
+  margin:20px 0 0;
+}
+.account-content-column .purchased-panel .panel-head{
+  margin-left:0;
+  margin-right:0;
+}
+@media(max-width:760px){
+  .account-content-column{width:100%}
+}
