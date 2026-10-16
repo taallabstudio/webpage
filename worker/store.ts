@@ -541,7 +541,7 @@ async function purchaseDownload(req: Request, env: StoreEnv) {
   if (!user) return json({ error: "Please log in to download purchases." }, 401);
   const body: any = await req.json().catch(() => ({}));
   await ensureStoreSchema(env);
-  const order: any = await env.DBStore.prepare("SELECT * FROM store_orders WHERE order_number=? AND user_id=? AND status='paid' LIMIT 1").bind(String(body.orderId || ""), user.id).first();
+  const order: any = await env.DBStore.prepare("SELECT * FROM store_orders WHERE (order_number=? OR id=?) AND user_id=? AND status='paid' LIMIT 1").bind(String(body.orderId || ""), String(body.orderId || ""), user.id).first();
   if (!order) return json({ error: "Paid purchase not found in your account." }, 404);
   const product = (await allProducts(env, true)).find((p) => p.id === order.product_id);
   if (!product || !product.fileKey) return json({ error: "The product file is not available." }, 503);
