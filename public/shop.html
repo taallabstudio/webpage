@@ -189,9 +189,9 @@ function renderProducts(){
    const desc=document.createElement("p");desc.textContent=p.description;
    const foot=document.createElement("div");foot.className="foot";
    const price=document.createElement("span");price.className="price";price.textContent=p.active?money(p.price):"Coming soon";
-   const btn=document.createElement("a");btn.className="btn";btn.textContent=p.active?"Get it ↗":"Unavailable";
-   if(p.active){btn.href="/checkout.html?product="+encodeURIComponent(p.id)}else{btn.setAttribute("aria-disabled","true");btn.setAttribute("aria-label",p.name+" is coming soon");btn.tabIndex=-1;btn.href="#"}
-   foot.append(price,btn);card.append(symbol,tag,h,desc,foot);grid.append(card);
+    const btn=document.createElement("button");btn.type="button";btn.className="btn";btn.textContent=p.active?(cartRead().some(item=>item.id===p.id)?"Added ✓":"Add to cart"):"Unavailable";
+    if(p.active){btn.addEventListener("click",()=>{const items=cartRead();if(!items.some(item=>item.id===p.id)){items.push({id:p.id,name:p.name,price:Number(p.price),category:p.category});cartWrite(items)}btn.textContent="Added ✓";btn.classList.add("cart-added")})}else{btn.setAttribute("aria-disabled","true");btn.setAttribute("aria-label",p.name+" is coming soon");btn.disabled=true}
+    foot.append(price,btn);card.append(symbol,tag,h,desc,foot);grid.append(card);
   }
   section.append(heading,grid);root.append(section);
  }
