@@ -1028,8 +1028,15 @@ html{scroll-behavior:smooth}
 }
 
 .landing > .landing-nav{
-  position:absolute;
-  z-index:20;
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  z-index:70;
+  background:rgba(248,250,252,.88);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+  border-bottom:1px solid rgba(20,30,40,.08);
 }
 
 /* Section backgrounds stay in the normal page layer.
