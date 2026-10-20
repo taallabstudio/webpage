@@ -407,7 +407,7 @@ async function createOrder(req: Request, env: StoreEnv) {
     await env.DBStore.prepare(`INSERT INTO store_orders
       (id,order_number,product_id,amount,currency,status,razorpay_order_id,customer_email,user_id,customer_name,customer_phone,
        address_line1,address_line2,city,state,pincode,country,coupon_code,discount_amount,created_at,updated_at,checkout_group_id,group_total)
-      VALUES(?,?,?,?,'INR','created',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      VALUES(?,?,?,?,'INR','created',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .bind(localId, itemOrderNumber, product.id, amount, index === 0 ? razorOrder.id : null, user.email, user.id, customer.fullName, customer.phone,
         customer.addressLine1, customer.addressLine2, customer.city, customer.state, customer.pincode, customer.country,
         discount.code || null, proportional, created, created, localGroupId, totalAmount).run();
