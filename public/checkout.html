@@ -90,17 +90,17 @@ function showPurchaseSuccess(downloads){
 async function start(){
  try{
   if(!productIds.length)throw new Error("Your cart is empty. Return to the shop and add products.");
-  const authResponse=await fetch("/api/store/customer-profile",{credentials:"same-origin",cache:"no-store"});
+  const [authResponse,catalog,historyResponse]=await Promise.all([
+   fetch("/api/store/customer-profile",{credentials:"same-origin",cache:"no-store"}),
+   fetch("/api/store/products",{cache:"default"}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Could not load products");return d}),
+   fetch("/api/store/purchases",{credentials:"same-origin",cache:"no-store"}).then(async r=>r.ok?r.json():{purchases:[]}).catch(()=>({purchases:[]}))
+  ]);
   if(authResponse.status===401){const next=location.pathname+location.search;location.href="/login?next="+encodeURIComponent(next);return;}
   const auth=await authResponse.json().catch(()=>({}));
   if(!authResponse.ok)throw new Error(auth.error||"Could not check your account.");
   account=auth;document.querySelector("#email").value=auth.email||"";
   accountStrip.textContent="Signed in as "+(auth.email||"your TaalLab account")+". Your purchase will be linked to this account.";
   fillProfile(auth.profile);
-  const [catalog,historyResponse]=await Promise.all([
-   fetch("/api/store/products",{cache:"no-store"}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Could not load products");return d}),
-   fetch("/api/store/purchases",{credentials:"same-origin",cache:"no-store"}).then(async r=>r.ok?r.json():{purchases:[]}).catch(()=>({purchases:[]}))
-  ]);
   products=productIds.map(id=>(catalog.products||[]).find(p=>p.id===id));
   if(products.some(p=>!p))throw new Error("One or more products could not be found. Return to the shop and try again.");
   if(products.some(p=>!p.active))throw new Error("One or more products are no longer available.");
