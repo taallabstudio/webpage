@@ -250,7 +250,8 @@ function Landing() {
     <header className="landing-nav">
       <a className="studio-brand" href="#home" aria-label="TaalLab home"><Logo studioOnly /></a>
 
-      <button className="mobile-nav-toggle" type="button" aria-label={mobileMenuOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(v => !v)}><Menu size={21}/></button>\n      <nav className={`studio-nav${mobileMenuOpen ? " mobile-open" : ""}`} aria-label="Main navigation">
+      <button className="mobile-nav-toggle" type="button" aria-label={mobileMenuOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(v => !v)}><Menu size={21}/></button>
+      <nav className={`studio-nav${mobileMenuOpen ? " mobile-open" : ""}`} aria-label="Main navigation" onClick={() => setMobileMenuOpen(false)}>
         <a href="#home">Home</a>
         <a href="/shop.html">Downloads</a>
 
