@@ -522,8 +522,8 @@ function Login({onLogin}) {
 
   function afterLogin(){
     const next=new URLSearchParams(location.search).get("next")||"";
-    if(next.startsWith("/checkout.html")&&!next.startsWith("//")) location.assign(next);
-    else location.assign("/");
+    if(next.startsWith("/checkout.html")&&!next.startsWith("//")) { location.assign(next); return; }
+    api("/auth/me").then(result => location.assign(result.user?.role === "admin" ? "/admin" : "/account")).catch(() => location.assign("/account"));
   }
 
   useEffect(()=>{
@@ -1233,9 +1233,11 @@ function App(){
     return <TransferPage id={path.split("/")[2]}/>;
   }
 
-  if(path === "/admin" || path === "/login") {
-    return <Admin/>;
-  }
+  if(path === "/login") return <Login/>;
+
+  if(path === "/admin") return <Admin/>;
+
+  if(path === "/account") return <UserDashboard/>;
 
   if(path === "/account/settings") return <AccountPage/>;
 
