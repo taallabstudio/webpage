@@ -158,7 +158,6 @@ function renderCart(){
 renderCart();
 if(location.hash==="#cart")openCart();
 
-const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(n);
 let allProducts=[];
 const categoryOrder=["Max for Live Device","Audio Plugin","Sample Pack","Sound Library"];
 function renderProducts(){
