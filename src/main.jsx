@@ -288,6 +288,7 @@ function Landing() {
       </nav>
 
       <div className="landing-auth">
+        <a className="cart-nav-btn" href="/shop.html#cart" aria-label={`Shopping cart, ${cartCount} items`} title="Cart"><ShoppingCart size={18}/>{cartCount > 0 && <span className="cart-count">{cartCount}</span>}</a>
         {currentAccount ? <SiteAccountMenu user={currentAccount} onLogout={signOutFromSite}/> : <><a className="login-nav-btn secondary" href="/login">Sign up</a><a className="login-nav-btn" href="/login">Login</a></>}
       </div>
     </header>
