@@ -1215,7 +1215,16 @@ function AccountPage() {
   </div>;
 }
 
-function UserDashboard(){\n  const [user,setUser]=useState(null);\n  const [checking,setChecking]=useState(true);\n  useEffect(()=>{api("/auth/me").then(d=>{if(!d.authenticated){setUser(null);return}if(d.user?.role==="admin"){location.replace("/admin");return}setUser(d.user)}).catch(()=>setUser(null)).finally(()=>setChecking(false))},[]);\n  if(checking)return <div className="loading"><RefreshCw className="spin"/> Checking your account…</div>;\n  if(!user)return <Login/>;\n  return <UserPortal user={user}/>;\n}\n\nfunction App(){
+function UserDashboard(){
+  const [user,setUser]=useState(null);
+  const [checking,setChecking]=useState(true);
+  useEffect(()=>{api("/auth/me").then(d=>{if(!d.authenticated){setUser(null);return}if(d.user?.role==="admin"){location.replace("/admin");return}setUser(d.user)}).catch(()=>setUser(null)).finally(()=>setChecking(false))},[]);
+  if(checking)return <div className="loading"><RefreshCw className="spin"/> Checking your account…</div>;
+  if(!user)return <Login/>;
+  return <UserPortal user={user}/>;
+}
+
+function App(){
   const path = getPath();
 
   if(path === "/") return <Landing/>;
