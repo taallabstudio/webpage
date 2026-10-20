@@ -77,9 +77,12 @@ function Landing() {
   const [bookingSending, setBookingSending] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [bookingCooldown, setBookingCooldown] = useState(0);
-  const [currentAccount, setCurrentAccount] = useState(null);\n  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);\n  const [cartCount, setCartCount] = useState(0);
+  const [currentAccount, setCurrentAccount] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
 
-  useEffect(() => { api("/auth/me").then(result => setCurrentAccount(result.authenticated ? result.user : null)).catch(() => setCurrentAccount(null)); }, []);\n  useEffect(() => { const sync=()=>{try{setCartCount(JSON.parse(localStorage.getItem("taallab.store.cart.v1")||"[]").length)}catch{setCartCount(0)}}; sync(); window.addEventListener("storage",sync); window.addEventListener("focus",sync); return ()=>{window.removeEventListener("storage",sync);window.removeEventListener("focus",sync)}; }, []);
+  useEffect(() => { api("/auth/me").then(result => setCurrentAccount(result.authenticated ? result.user : null)).catch(() => setCurrentAccount(null)); }, []);
+  useEffect(() => { const sync=()=>{try{setCartCount(JSON.parse(localStorage.getItem("taallab.store.cart.v1")||"[]").length)}catch{setCartCount(0)}}; sync(); window.addEventListener("storage",sync); window.addEventListener("focus",sync); return ()=>{window.removeEventListener("storage",sync);window.removeEventListener("focus",sync)}; }, []);
   async function signOutFromSite() { try { await api("/auth/logout", { method: "POST" }); } catch {} setCurrentAccount(null); }
 
   useEffect(() => {
