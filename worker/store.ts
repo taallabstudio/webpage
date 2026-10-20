@@ -592,7 +592,8 @@ export async function handleStoreRequest(req: Request, env: StoreEnv): Promise<R
   if (url.pathname === "/api/store/cover" && req.method === "GET") return streamProductCover(req,env,url.searchParams.get("id") || "");
   if (url.pathname === "/api/store/products" && req.method === "GET") {
     await ensureStoreSchema(env);
-    return json({ products: (await allProducts(env)).map(publicProduct) });
+    const products = (await allProducts(env)).map(publicProduct);
+    return new Response(JSON.stringify({ products }), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=20, s-maxage=60, stale-while-revalidate=120" } });
   }
   if (url.pathname === "/api/store/purchases" && req.method === "GET") return listPurchases(req, env);
   if (url.pathname === "/api/store/purchases/download" && req.method === "POST") return purchaseDownload(req, env);

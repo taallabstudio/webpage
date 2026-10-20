@@ -140,6 +140,7 @@ const sortSelect=document.querySelector("#sort-products");
 const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(n);
 const cartRead=()=>{try{const v=JSON.parse(localStorage.getItem(CART_KEY)||"[]");return Array.isArray(v)?v:[]}catch{return []}};
 const cartWrite=items=>{localStorage.setItem(CART_KEY,JSON.stringify(items));renderCart();if(typeof renderProducts==="function")renderProducts()};
+window.addEventListener("storage",event=>{if(event.key===CART_KEY){renderCart();renderProducts()}});
 const openCart=()=>{cartBackdrop.classList.add("open");cartBackdrop.setAttribute("aria-hidden","false");document.body.style.overflow="hidden"};
 const closeCart=()=>{cartBackdrop.classList.remove("open");cartBackdrop.setAttribute("aria-hidden","true");document.body.style.overflow=""};
 document.querySelector("#open-cart").addEventListener("click",openCart);
@@ -187,8 +188,7 @@ function renderProducts(){
   const grid=document.createElement("div");grid.className="grid";
   for(const p of group){
    const card=document.createElement("article");card.className="card";
-   if(p.coverUrl){const cover=document.createElement("img");cover.className="product-cover";cover.src=p.coverUrl;cover.alt=p.name+" cover artwork";cover.loading="lazy";cover.onerror=()=>cover.remove();card.append(cover)}
-   const symbol=document.createElement("div");symbol.className="symbol";symbol.textContent=p.category==="Audio Plugin"?"◉":p.category==="Sample Pack"?"▦":p.category==="Max for Live Device"?"✦":"✧";
+    if(p.coverUrl){const cover=document.createElement("img");cover.className="product-cover";cover.src=p.coverUrl;cover.alt=p.name+" cover artwork";cover.loading=group.indexOf(p)<2?"eager":"lazy";cover.decoding="async";if(group.indexOf(p)<2)cover.fetchPriority="high";cover.onerror=()=>cover.remove();card.append(cover)}
    const tag=document.createElement("div");tag.className="tag";tag.textContent=p.category;
    const h=document.createElement("h2");h.textContent=p.name;
    const desc=document.createElement("p");desc.textContent=p.description;
@@ -196,9 +196,9 @@ function renderProducts(){
    const price=document.createElement("span");price.className="price";price.textContent=p.active?money(p.price):"Coming soon";
     const btn=document.createElement("button");btn.type="button";btn.className="btn";
     if(ownedProductIds.has(p.id)){btn.textContent="Purchased";btn.disabled=true;btn.setAttribute("aria-disabled","true");btn.classList.add("purchased-btn")}
-    else if(p.active){btn.textContent=cartRead().some(item=>item.id===p.id)?"Added ✓":"Add to cart";btn.addEventListener("click",()=>{const items=cartRead();if(!items.some(item=>item.id===p.id)){items.push({id:p.id,name:p.name,price:Number(p.price),category:p.category});cartWrite(items)}btn.textContent="Added ✓";btn.classList.add("cart-added")})}
+     else if(p.active){const inCart=cartRead().some(item=>item.id===p.id);btn.textContent=inCart?"Added ✓":"Add to cart";if(inCart)btn.classList.add("cart-added");btn.addEventListener("click",()=>{const items=cartRead();if(!items.some(item=>item.id===p.id)){items.push({id:p.id,name:p.name,price:Number(p.price),category:p.category});cartWrite(items)}})}
     else{btn.textContent="Unavailable";btn.setAttribute("aria-disabled","true");btn.setAttribute("aria-label",p.name+" is coming soon");btn.disabled=true}
-    foot.append(price,btn);card.append(symbol,tag,h,desc,foot);grid.append(card);
+    foot.append(price,btn);card.append(tag,h,desc,foot);grid.append(card);
   }
   section.append(heading,grid);root.append(section);
  }
