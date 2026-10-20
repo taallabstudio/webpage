@@ -1324,3 +1324,22 @@ html{scroll-behavior:smooth}
 @media(max-width:760px){
   .account-content-column{width:100%}
 }
+
+
+/* Store cart shortcut and accessible mobile site navigation */
+.mobile-nav-toggle{display:none;align-items:center;justify-content:center;width:38px;height:38px;flex:none;border:1px solid #dfe5eb;background:rgba(255,255,255,.9);border-radius:12px;color:#26313d}
+.cart-nav-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;flex:none;border:1px solid #dfe5eb;background:rgba(255,255,255,.9);border-radius:999px;color:#26313d}
+.cart-count{position:absolute;right:-4px;top:-5px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:var(--blue);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center}
+@media(max-width:760px){
+  .landing-nav{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;gap:8px;padding:0 14px;background:rgba(255,255,255,.9);backdrop-filter:blur(18px);border-bottom:1px solid rgba(20,30,40,.08)}
+  .mobile-nav-toggle{display:inline-flex;order:2}
+  .studio-brand{order:1}
+  .landing-auth{order:3;gap:6px}
+  .landing-auth .login-nav-btn.secondary{display:none}
+  .landing-auth .login-nav-btn{padding:8px 10px}
+  .studio-nav{display:none}
+  .studio-nav.mobile-open{display:flex;position:absolute;top:calc(100% + 8px);left:12px;right:12px;align-items:stretch;flex-direction:column;gap:0;padding:10px;background:rgba(255,255,255,.98);border:1px solid #e0e6ec;border-radius:16px;box-shadow:0 20px 45px rgba(35,49,63,.16);white-space:normal;max-height:calc(100vh - 90px);overflow:auto}
+  .studio-nav.mobile-open>a,.studio-nav.mobile-open .nav-dropdown>a{display:flex;width:100%;padding:12px;border-radius:9px}
+  .studio-nav.mobile-open .nav-dropdown{width:100%}
+  .studio-nav.mobile-open .nav-menu{display:block;position:static;opacity:1;visibility:visible;pointer-events:auto;transform:none;width:100%;box-shadow:none;border:0;padding:0 8px 8px;background:transparent}
+}
