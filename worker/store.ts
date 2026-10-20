@@ -140,7 +140,7 @@ async function readDownloadToken(env: StoreEnv, token: string) {
   }
 }
 
-async function ensureStoreSchema(env: StoreEnv) {
+async function initializeStoreSchema(env: StoreEnv) {
   await env.DBStore.prepare(`CREATE TABLE IF NOT EXISTS store_products (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', category TEXT NOT NULL,
     features TEXT NOT NULL DEFAULT '', price REAL NOT NULL, version TEXT NOT NULL DEFAULT '1.0',
@@ -202,6 +202,17 @@ async function ensureStoreSchema(env: StoreEnv) {
       (id,name,description,category,features,price,version,active,status,file_key,file_name,cover_key,created_at,updated_at)
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(p.id,p.name,p.description,p.category,"",p.price,"1.0",p.active?1:0,p.active?"published":"draft",p.fileKey,p.fileName,"",unixNow(),unixNow()).run();
   }
+}
+
+let storeSchemaPromise: Promise<void> | null = null;
+function ensureStoreSchema(env: StoreEnv): Promise<void> {
+  if (!storeSchemaPromise) {
+    storeSchemaPromise = initializeStoreSchema(env).catch((error) => {
+      storeSchemaPromise = null;
+      throw error;
+    });
+  }
+  return storeSchemaPromise;
 }
 
 function rowProduct(row: any): Product & {features:string;version:string;status:string;coverKey:string;updatedAt:number} {
