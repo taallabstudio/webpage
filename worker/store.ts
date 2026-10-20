@@ -194,7 +194,8 @@ async function ensureStoreSchema(env: StoreEnv) {
   ] as const) {
     try { await env.DBStore.prepare(`ALTER TABLE store_orders ADD COLUMN ${column} ${declaration}`).run(); } catch {}
   }
-  await env.DBStore.prepare("CREATE INDEX IF NOT EXISTS idx_store_orders_status ON store_orders(status, created_at)").run();\n  await env.DBStore.prepare("CREATE INDEX IF NOT EXISTS idx_store_orders_group ON store_orders(checkout_group_id)").run();
+  await env.DBStore.prepare("CREATE INDEX IF NOT EXISTS idx_store_orders_status ON store_orders(status, created_at)").run();
+  await env.DBStore.prepare("CREATE INDEX IF NOT EXISTS idx_store_orders_group ON store_orders(checkout_group_id)").run();
   const existing = await env.DBStore.prepare("SELECT COUNT(*) AS n FROM store_products").first<{n:number}>();
   if (!existing?.n) {
     for (const p of PRODUCTS) await env.DBStore.prepare(`INSERT OR IGNORE INTO store_products
