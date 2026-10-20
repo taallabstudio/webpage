@@ -105,7 +105,7 @@ footer a{color:#4f5863;font-weight:600}footer a:hover{color:var(--blue)}
   const response=await fetch("/api/auth/me",{credentials:"include",cache:"no-store"});
   const data=await response.json();if(!response.ok||!data.authenticated||!data.user)return;
   const user=data.user,name=user.display_name||String(user.email||"").split("@")[0]||"Account";
-  host.replaceChildren();
+  const cartButton=host.querySelector("#open-cart");host.replaceChildren(...(cartButton?[cartButton]:[]));
   const menu=document.createElement("details");menu.className="site-account-menu";
   const summary=document.createElement("summary");
   const avatar=document.createElement("span");avatar.className="profile-avatar";
@@ -121,7 +121,7 @@ footer a{color:#4f5863;font-weight:600}footer a:hover{color:var(--blue)}
   identity.append(strong,email);
   const settings=document.createElement("a");settings.href="/account/settings";settings.textContent="Account settings";
   dropdown.append(identity,settings);
-  if(user.role==="admin"){const dashboard=document.createElement("a");dashboard.href="/login";dashboard.textContent="Studio dashboard";dropdown.append(dashboard)}
+  if(user.role==="admin"){const dashboard=document.createElement("a");dashboard.href="/admin";dashboard.textContent="Studio dashboard";dropdown.append(dashboard)}
   const logout=document.createElement("button");logout.type="button";logout.textContent="Sign out";
   logout.addEventListener("click",async()=>{try{await fetch("/api/auth/logout",{method:"POST",credentials:"include"})}finally{location.reload()}});
   dropdown.append(logout);menu.append(summary,dropdown);host.append(menu);
