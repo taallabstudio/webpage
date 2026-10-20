@@ -437,7 +437,7 @@ function Header({admin=false, onLogout}) {
   return <header className="topbar">
     <Logo />
     {admin ? <nav className="topnav">
-      <a href="/login">Dashboard</a><a href="/login">New Transfer</a>
+      <a href="/admin">Dashboard</a><a href="/admin/upload">New Transfer</a>
       <button className="ghost-btn" onClick={onLogout}><LogOut size={16}/> Logout</button>
     </nav> : <nav className="topnav">
       <span className="status-pill"><span className="dot"/> Secure transfer</span>
@@ -524,7 +524,7 @@ function Login({onLogin}) {
   function afterLogin(){
     const next=new URLSearchParams(location.search).get("next")||"";
     if(next.startsWith("/checkout.html")&&!next.startsWith("//")) { location.assign(next); return; }
-    api("/auth/me").then(result => location.assign(result.user?.role === "admin" ? "/admin" : "/account")).catch(() => location.assign("/account"));
+    api("/auth/me").then(result => location.assign(result.user?.role === "admin" ? "/admin" : location.pathname === "/account/settings" ? "/account/settings" : "/account")).catch(() => location.assign("/account"));
   }
 
   useEffect(()=>{
