@@ -58,53 +58,80 @@
 <p id="message" role="status" class="small"></p><p class="small">Your download link is time-limited and only works after a verified payment. Do not share it.</p></section></main>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
-const params=new URLSearchParams(location.search),id=params.get("product"),title=document.querySelector("#title"),desc=document.querySelector("#description"),pay=document.querySelector("#pay"),message=document.querySelector("#message"),accountStrip=document.querySelector("#account-strip"),form=document.querySelector("#checkout-form"),couponInput=document.querySelector("#couponCode"),couponMessage=document.querySelector("#coupon-message");
-let product=null,account=null,appliedCoupon=null;
+const params=new URLSearchParams(location.search);
+const productIds=[...new Set((params.get("products")||params.get("product")||"").split(",").map(x=>x.trim()).filter(Boolean))];
+const title=document.querySelector("#title"),desc=document.querySelector("#description"),pay=document.querySelector("#pay"),message=document.querySelector("#message"),accountStrip=document.querySelector("#account-strip"),form=document.querySelector("#checkout-form"),couponInput=document.querySelector("#couponCode"),couponMessage=document.querySelector("#coupon-message");
+let products=[],account=null,appliedCoupon=null;
 const money=paise=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(Number(paise||0)/100);
 function say(text,kind=""){message.textContent=text;message.className="small "+kind}
 function couponSay(text,kind=""){couponMessage.textContent=text;couponMessage.className="small "+kind}
 async function post(url,data){const r=await fetch(url,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Request failed");return d}
 function customerValues(){return Object.fromEntries(["fullName","phone","addressLine1","addressLine2","city","state","pincode","country"].map(k=>[k,document.getElementById(k).value.trim()]));}
-function updateTotals(discount=0){const subtotal=Math.round((product?.price||0)*100);document.querySelector("#subtotal").textContent=money(subtotal);document.querySelector("#discount").textContent="−"+money(discount);document.querySelector("#discount-row").hidden=!discount;document.querySelector("#discount-label").textContent=appliedCoupon?"("+appliedCoupon.code+")":"";document.querySelector("#total").textContent=money(subtotal-discount);}
+function updateTotals(discount=0){const subtotal=products.reduce((sum,p)=>sum+Math.round((Number(p.price)||0)*100),0);document.querySelector("#subtotal").textContent=money(subtotal);document.querySelector("#discount").textContent="−"+money(discount);document.querySelector("#discount-row").hidden=!discount;document.querySelector("#discount-label").textContent=appliedCoupon?"("+appliedCoupon.code+")":"";document.querySelector("#total").textContent=money(subtotal-discount);}
 function fillProfile(p){if(!p)return;const map={fullName:"fullName",phone:"phone",addressLine1:"addressLine1",addressLine2:"addressLine2",city:"city",state:"state",pincode:"pincode",country:"country"};for(const [from,to] of Object.entries(map)){if(p[from])document.getElementById(to).value=p[from];}}
+function showPurchaseSuccess(downloads){
+ form.hidden=true;
+ document.querySelector("#apply-coupon").disabled=true;
+ couponInput.disabled=true;
+ title.textContent="Payment successful!";
+ desc.textContent="Your purchase is confirmed. Download your products below, or find them later in Account settings → Purchased.";
+ accountStrip.textContent="Payment verified securely by Razorpay.";
+ const list=document.createElement("div");list.className="success-downloads";
+ for(const item of downloads){const row=document.createElement("div");row.style.cssText="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)";
+ const name=document.createElement("strong");name.textContent=item.productName;
+ const link=document.createElement("a");link.href=item.downloadUrl;link.className="btn";link.style.cssText="width:auto;margin:0;padding:10px 14px";link.textContent="Download";
+ row.append(name,link);list.append(row);}
+ form.after(list);
+ const cartKey="taallab.store.cart.v1";
+ try{const cart=JSON.parse(localStorage.getItem(cartKey)||"[]");localStorage.setItem(cartKey,JSON.stringify(cart.filter(p=>!productIds.includes(p.id))))}catch{}
+ message.textContent="Order reference: "+(downloads[0]?.orderId||"confirmed");
+ message.className="small success";
+}
 async function start(){
-  try{
-    const authResponse=await fetch("/api/store/customer-profile",{credentials:"same-origin",cache:"no-store"});
-    if(authResponse.status===401){const next=location.pathname+location.search;location.href="/login?next="+encodeURIComponent(next);return;}
-    const auth=await authResponse.json().catch(()=>({}));
-    if(!authResponse.ok)throw new Error(auth.error||"Could not check your account.");
-    account=auth;document.querySelector("#email").value=auth.email||"";
-    accountStrip.textContent="Signed in as "+(auth.email||"your TaalLab account")+". Your purchase will be linked to this account.";
-    fillProfile(auth.profile);
-    const r=await fetch("/api/store/products",{cache:"no-store"}),d=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(d.error||"Could not load product");
-    product=(d.products||[]).find(p=>p.id===id);
-    if(!product)throw new Error("Product not found.");
-    title.textContent=product.name;desc.textContent=product.description;
-    if(product.active){pay.disabled=false;pay.textContent="Continue to secure payment";updateTotals(0);}
-    else{pay.textContent="Not available yet";say("This product is not available to purchase yet.","error");}
-  }catch(e){title.textContent="Checkout unavailable";accountStrip.textContent="We could not load your account.";say(e.message,"error");}
+ try{
+  if(!productIds.length)throw new Error("Your cart is empty. Return to the shop and add products.");
+  const authResponse=await fetch("/api/store/customer-profile",{credentials:"same-origin",cache:"no-store"});
+  if(authResponse.status===401){const next=location.pathname+location.search;location.href="/login?next="+encodeURIComponent(next);return;}
+  const auth=await authResponse.json().catch(()=>({}));
+  if(!authResponse.ok)throw new Error(auth.error||"Could not check your account.");
+  account=auth;document.querySelector("#email").value=auth.email||"";
+  accountStrip.textContent="Signed in as "+(auth.email||"your TaalLab account")+". Your purchase will be linked to this account.";
+  fillProfile(auth.profile);
+  const [catalog,historyResponse]=await Promise.all([
+   fetch("/api/store/products",{cache:"no-store"}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Could not load products");return d}),
+   fetch("/api/store/purchases",{credentials:"same-origin",cache:"no-store"}).then(async r=>r.ok?r.json():{purchases:[]}).catch(()=>({purchases:[]}))
+  ]);
+  products=productIds.map(id=>(catalog.products||[]).find(p=>p.id===id));
+  if(products.some(p=>!p))throw new Error("One or more products could not be found. Return to the shop and try again.");
+  if(products.some(p=>!p.active))throw new Error("One or more products are no longer available.");
+  const owned=new Set((historyResponse.purchases||[]).map(p=>p.productId));
+  if(products.some(p=>owned.has(p.id)))throw new Error("Your cart includes a product you already own. Return to the shop; purchased products are marked as Purchased.");
+  title.textContent=products.length===1?products[0].name:"Checkout "+products.length+" products";
+  desc.textContent=products.length===1?products[0].description:products.map(p=>p.name).join(" · ");
+  pay.disabled=false;pay.textContent="Pay securely for "+products.length+(products.length===1?" item":" items");updateTotals(0);
+ }catch(e){title.textContent="Checkout unavailable";accountStrip.textContent="We could not prepare your checkout.";say(e.message,"error");pay.disabled=true;}
 }
 document.querySelector("#apply-coupon").addEventListener("click",async()=>{
-  const code=couponInput.value.trim().toUpperCase();
-  if(!code){appliedCoupon=null;updateTotals(0);couponSay("Enter a coupon code first.","error");return;}
-  const btn=document.querySelector("#apply-coupon");btn.disabled=true;btn.textContent="Checking…";
-  try{const result=await post("/api/store/validate-coupon",{productId:id,code});appliedCoupon={code:result.code,discount:result.discount};couponInput.value=result.code;updateTotals(result.discount);couponSay("Coupon applied — "+result.percent+"% off, saving "+money(result.discount)+".","success");}
-  catch(e){appliedCoupon=null;updateTotals(0);couponSay(e.message,"error");}
-  finally{btn.disabled=false;btn.textContent="Apply";}
+ const code=couponInput.value.trim().toUpperCase();
+ if(!code){appliedCoupon=null;updateTotals(0);couponSay("Enter a coupon code first.","error");return;}
+ const btn=document.querySelector("#apply-coupon");btn.disabled=true;btn.textContent="Checking…";
+ try{const result=await post("/api/store/validate-coupon",{productIds,code});appliedCoupon={code:result.code,discount:result.discount};couponInput.value=result.code;updateTotals(result.discount);couponSay("Coupon applied — "+result.percent+"% off, saving "+money(result.discount)+".","success");}
+ catch(e){appliedCoupon=null;updateTotals(0);couponSay(e.message,"error");}
+ finally{btn.disabled=false;btn.textContent="Apply";}
 });
 couponInput.addEventListener("input",()=>{if(appliedCoupon){appliedCoupon=null;updateTotals(0);}couponInput.value=couponInput.value.toUpperCase();});
 form.addEventListener("submit",async e=>{
-  e.preventDefault();if(!product?.active||!account)return;
-  if(!form.reportValidity())return;
-  pay.disabled=true;pay.textContent="Starting secure checkout…";say("");
-  try{
-    const customer=customerValues();
-    const order=await post("/api/store/create-order",{productId:product.id,...customer,saveDetails:document.querySelector("#saveDetails").checked,couponCode:appliedCoupon?.code||""});
-    if(!window.Razorpay)throw new Error("Secure checkout could not load. Please disable script blockers and retry.");
-    const rz=new Razorpay({key:order.keyId,amount:order.amount,currency:order.currency,name:"TAAL LAB",description:product.name,order_id:order.orderId,prefill:{name:customer.fullName,email:account.email,contact:customer.phone},theme:{color:"#0878e8"},handler:async response=>{try{say("Verifying your payment…");const result=await post("/api/store/verify-payment",response);location.href=result.downloadUrl}catch(e){say(e.message,"error");pay.disabled=false;pay.textContent="Retry verification"}},modal:{ondismiss:()=>{pay.disabled=false;pay.textContent="Continue to secure payment"}}});
-    rz.on("payment.failed",r=>say(r.error?.description||"Payment did not complete.","error"));rz.open();
-  }catch(e){say(e.message,"error");pay.disabled=false;pay.textContent="Continue to secure payment";}
+ e.preventDefault();if(!products.length||products.some(p=>!p.active)||!account)return;
+ if(!form.reportValidity())return;
+ pay.disabled=true;pay.textContent="Starting secure checkout…";say("");
+ try{
+  const customer=customerValues();
+  const order=await post("/api/store/create-order",{productIds,...customer,saveDetails:document.querySelector("#saveDetails").checked,couponCode:appliedCoupon?.code||""});
+  if(!window.Razorpay)throw new Error("Secure checkout could not load. Please disable script blockers and retry.");
+  const description=products.length===1?products[0].name:"TaalLab — "+products.length+" digital products";
+  const rz=new Razorpay({key:order.keyId,amount:order.amount,currency:order.currency,name:"TAAL LAB",description,order_id:order.orderId,prefill:{name:customer.fullName,email:account.email,contact:customer.phone},theme:{color:"#0878e8"},handler:async response=>{try{say("Verifying your payment…");const result=await post("/api/store/verify-payment",response);const downloads=result.downloads||[];if(downloads.length===1)location.href=downloads[0].downloadUrl;else showPurchaseSuccess(downloads)}catch(e){say(e.message,"error");pay.disabled=false;pay.textContent="Retry verification"}},modal:{ondismiss:()=>{pay.disabled=false;pay.textContent="Pay securely for "+products.length+(products.length===1?" item":" items")}}});
+  rz.on("payment.failed",r=>say(r.error?.description||"Payment did not complete.","error"));rz.open();
+ }catch(e){say(e.message,"error");pay.disabled=false;pay.textContent="Pay securely for "+products.length+(products.length===1?" item":" items");}
 });
 start();
 </script></body></html>
