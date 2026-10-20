@@ -128,7 +128,36 @@ footer a{color:#4f5863;font-weight:600}footer a:hover{color:var(--blue)}
  }catch(e){console.warn("Could not load account navigation",e)}
 })();
 const root=document.querySelector("#products");
+const CART_KEY="taallab.store.cart.v1";
+const cartBackdrop=document.querySelector("#cart-backdrop");
+const cartItemsRoot=document.querySelector("#cart-items");
+const cartCount=document.querySelector("#cart-count");
+const cartSubtotal=document.querySelector("#cart-subtotal");
+const cartHint=document.querySelector("#cart-hint");
 const sortSelect=document.querySelector("#sort-products");
+const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(n);
+const cartRead=()=>{try{const v=JSON.parse(localStorage.getItem(CART_KEY)||"[]");return Array.isArray(v)?v:[]}catch{return []}};
+const cartWrite=items=>{localStorage.setItem(CART_KEY,JSON.stringify(items));renderCart()};
+const openCart=()=>{cartBackdrop.classList.add("open");cartBackdrop.setAttribute("aria-hidden","false");document.body.style.overflow="hidden"};
+const closeCart=()=>{cartBackdrop.classList.remove("open");cartBackdrop.setAttribute("aria-hidden","true");document.body.style.overflow=""};
+document.querySelector("#open-cart").addEventListener("click",openCart);
+document.querySelector("#close-cart").addEventListener("click",closeCart);
+cartBackdrop.addEventListener("click",e=>{if(e.target===cartBackdrop)closeCart()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCart()});
+const navToggle=document.querySelector(".mobile-nav-toggle");
+const siteNav=document.querySelector("#shop-navigation");
+navToggle.addEventListener("click",()=>{const open=siteNav.classList.toggle("mobile-open");navToggle.setAttribute("aria-expanded",String(open));navToggle.setAttribute("aria-label",open?"Close navigation":"Open navigation");navToggle.textContent=open?"×":"☰"});
+siteNav.querySelectorAll("a").forEach(a=>a.addEventListener("click",()=>{siteNav.classList.remove("mobile-open");navToggle.setAttribute("aria-expanded","false");navToggle.textContent="☰"}));
+function renderCart(){
+ const items=cartRead();cartCount.textContent=String(items.length);cartCount.style.display=items.length?"grid":"none";cartItemsRoot.replaceChildren();
+ cartSubtotal.textContent=money(items.reduce((sum,p)=>sum+Number(p.price||0),0));
+ cartHint.textContent=items.length>1?"Checkout currently processes one product at a time. Choose Checkout on the item you want to purchase first.":"Digital products are delivered securely after payment.";
+ if(!items.length){const empty=document.createElement("div");empty.className="cart-empty";empty.textContent="Your cart is empty. Add a product to get started.";cartItemsRoot.append(empty);return}
+ for(const p of items){const row=document.createElement("article");row.className="cart-item";const info=document.createElement("div");const name=document.createElement("strong");name.textContent=p.name;const category=document.createElement("small");category.textContent=p.category||"Digital download";info.append(name,category);const price=document.createElement("strong");price.textContent=money(Number(p.price||0));const actions=document.createElement("div");actions.className="cart-item-actions";const checkout=document.createElement("a");checkout.className="btn";checkout.textContent="Checkout";checkout.href="/checkout.html?product="+encodeURIComponent(p.id);const remove=document.createElement("button");remove.type="button";remove.className="cart-remove";remove.textContent="Remove";remove.addEventListener("click",()=>cartWrite(cartRead().filter(item=>item.id!==p.id)));actions.append(checkout,remove);row.append(info,price,actions);cartItemsRoot.append(row)}
+}
+renderCart();
+if(location.hash==="#cart")openCart();
+
 const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(n);
 let allProducts=[];
 const categoryOrder=["Max for Live Device","Audio Plugin","Sample Pack","Sound Library"];
