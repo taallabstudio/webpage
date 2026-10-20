@@ -7,7 +7,7 @@ import {
   ArrowDownToLine, ArrowLeft, Check, ChevronRight, Clock3, Copy, Download,
   Eye, File, FileAudio, FileImage, FileText, FileVideo, FolderOpen, Gauge,
   HardDrive, Link2, LockKeyhole, LogOut, Menu, MessageSquare, MoreHorizontal, Plus, RefreshCw, Search, Settings, ShieldCheck, Trash2, UploadCloud,
-  UserRound, X, ChevronDown, Mail, MapPin, MessageCircle, Phone
+  UserRound, X, ChevronDown, Mail, MapPin, MessageCircle, Phone, ShoppingCart
 } from "lucide-react";
 import "./styles.css";
 
@@ -52,7 +52,7 @@ function SiteAccountMenu({user,onLogout}) {
     <div className="site-account-dropdown">
       <div className="site-account-identity"><strong>{name}</strong><small>{user?.email}</small></div>
       <a href="/account/settings">Account settings</a>
-      {user?.role === "admin" && <a href="/login">Studio dashboard</a>}
+      {user?.role === "admin" && <a href="/admin">Studio dashboard</a>}
       <button type="button" onClick={onLogout}>Sign out</button>
     </div>
   </details>;
@@ -77,9 +77,9 @@ function Landing() {
   const [bookingSending, setBookingSending] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [bookingCooldown, setBookingCooldown] = useState(0);
-  const [currentAccount, setCurrentAccount] = useState(null);
+  const [currentAccount, setCurrentAccount] = useState(null);\n  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);\n  const [cartCount, setCartCount] = useState(0);
 
-  useEffect(() => { api("/auth/me").then(result => setCurrentAccount(result.authenticated ? result.user : null)).catch(() => setCurrentAccount(null)); }, []);
+  useEffect(() => { api("/auth/me").then(result => setCurrentAccount(result.authenticated ? result.user : null)).catch(() => setCurrentAccount(null)); }, []);\n  useEffect(() => { const sync=()=>{try{setCartCount(JSON.parse(localStorage.getItem("taallab.store.cart.v1")||"[]").length)}catch{setCartCount(0)}}; sync(); window.addEventListener("storage",sync); window.addEventListener("focus",sync); return ()=>{window.removeEventListener("storage",sync);window.removeEventListener("focus",sync)}; }, []);
   async function signOutFromSite() { try { await api("/auth/logout", { method: "POST" }); } catch {} setCurrentAccount(null); }
 
   useEffect(() => {
@@ -250,7 +250,7 @@ function Landing() {
     <header className="landing-nav">
       <a className="studio-brand" href="#home" aria-label="TaalLab home"><Logo studioOnly /></a>
 
-      <nav className="studio-nav" aria-label="Main navigation">
+      <button className="mobile-nav-toggle" type="button" aria-label={mobileMenuOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(v => !v)}><Menu size={21}/></button>\n      <nav className={`studio-nav${mobileMenuOpen ? " mobile-open" : ""}`} aria-label="Main navigation">
         <a href="#home">Home</a>
         <a href="/shop.html">Downloads</a>
 
@@ -782,7 +782,7 @@ function Admin({initialUpload=false}) {
   useEffect(()=>{refresh()},[]);
   if(authed===null) return <div className="loading"><RefreshCw className="spin"/> Checking session…</div>;
   if(!authed) return <Login onLogin={refresh}/>;
-  if(user?.role!=="admin") return <UserPortal user={user}/>;
+  if(user?.role!=="admin") { location.replace("/account"); return <div className="loading"><RefreshCw className="spin"/> Redirecting to your account…</div>; }
 
   async function logout(){await api("/auth/logout",{method:"POST"});setAuthed(false);setUser(null)}
   return <div className="admin-layout">
@@ -1215,7 +1215,7 @@ function AccountPage() {
   </div>;
 }
 
-function App(){
+function UserDashboard(){\n  const [user,setUser]=useState(null);\n  const [checking,setChecking]=useState(true);\n  useEffect(()=>{api("/auth/me").then(d=>{if(!d.authenticated){setUser(null);return}if(d.user?.role==="admin"){location.replace("/admin");return}setUser(d.user)}).catch(()=>setUser(null)).finally(()=>setChecking(false))},[]);\n  if(checking)return <div className="loading"><RefreshCw className="spin"/> Checking your account…</div>;\n  if(!user)return <Login/>;\n  return <UserPortal user={user}/>;\n}\n\nfunction App(){
   const path = getPath();
 
   if(path === "/") return <Landing/>;
