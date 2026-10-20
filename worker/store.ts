@@ -190,11 +190,12 @@ async function ensureStoreSchema(env: StoreEnv) {
     ["order_number", "TEXT"], ["user_id", "TEXT"], ["customer_name", "TEXT"], ["customer_phone", "TEXT"],
     ["address_line1", "TEXT"], ["address_line2", "TEXT"], ["city", "TEXT"],
     ["state", "TEXT"], ["pincode", "TEXT"], ["country", "TEXT"], ["coupon_code", "TEXT"],
-    ["discount_amount", "INTEGER NOT NULL DEFAULT 0"]
+    ["discount_amount", "INTEGER NOT NULL DEFAULT 0"], ["checkout_group_id", "TEXT"], ["group_total", "INTEGER"]
   ] as const) {
     try { await env.DBStore.prepare(`ALTER TABLE store_orders ADD COLUMN ${column} ${declaration}`).run(); } catch {}
   }
   await env.DBStore.prepare("CREATE INDEX IF NOT EXISTS idx_store_orders_status ON store_orders(status, created_at)").run();
+  await env.DBStore.prepare("CREATE INDEX IF NOT EXISTS idx_store_orders_group ON store_orders(checkout_group_id)").run();
   const existing = await env.DBStore.prepare("SELECT COUNT(*) AS n FROM store_products").first<{n:number}>();
   if (!existing?.n) {
     for (const p of PRODUCTS) await env.DBStore.prepare(`INSERT OR IGNORE INTO store_products
@@ -336,10 +337,13 @@ async function validateCoupon(req: Request, env: StoreEnv) {
   const user = await env.getCustomer?.(req);
   if (!user) return json({ error: "Please log in to continue checkout." }, 401);
   const body: any = await req.json().catch(() => ({}));
-  const product = (await allProducts(env)).find((p) => p.id === String(body.productId || ""));
-  if (!product || !product.active || product.price <= 0) return json({ error: "This product is not available for purchase yet." }, 400);
+  const rawIds: string[] = Array.isArray(body.productIds) ? body.productIds.map((id: any) => String(id)) : [String(body.productId || "")];
+  const ids = [...new Set(rawIds.filter(Boolean))];
+  const all = await allProducts(env);
+  const selected = ids.map(id => all.find(p => p.id === id));
+  if (!ids.length || selected.some(p => !p || !p.active || p.price <= 0)) return json({ error: "One or more products are not available for purchase." }, 400);
   try {
-    const subtotalPaise = Math.round(product.price * 100);
+    const subtotalPaise = selected.reduce((sum, p) => sum + Math.round(Number(p!.price) * 100), 0);
     const discount = couponDiscount(String(body.code || ""), subtotalPaise);
     return json({ code: discount.code, subtotal: subtotalPaise, discount: discount.discountPaise, total: subtotalPaise - discount.discountPaise, currency: "INR", percent: TEMP_COUPON.percent, maxDiscount: TEMP_COUPON.maxDiscountPaise });
   } catch (error) {
@@ -349,50 +353,65 @@ async function validateCoupon(req: Request, env: StoreEnv) {
 
 async function createOrder(req: Request, env: StoreEnv) {
   if (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) return json({ error: "Payments are not configured." }, 503);
-  if (!env.RAZORPAY_KEY_ID.startsWith("rzp_test_")) {
-    return json({ error: "Checkout is locked to protect you from real charges. Configure Razorpay Test Mode keys (rzp_test_...) to test checkout." }, 503);
-  }
+  if (!env.RAZORPAY_KEY_ID.startsWith("rzp_test_")) return json({ error: "Checkout is locked to protect you from real charges. Configure Razorpay Test Mode keys (rzp_test_...) to test checkout." }, 503);
   const user = await env.getCustomer?.(req);
   if (!user) return json({ error: "Please log in to continue checkout." }, 401);
   const body: any = await req.json().catch(() => ({}));
-  const product = (await allProducts(env)).find((p) => p.id === String(body.productId || ""));
-  if (!product || !product.active || product.price <= 0) return json({ error: "This product is not available for purchase yet." }, 400);
-  const amountPaise = Math.round(product.price * 100);
-  if (!Number.isSafeInteger(amountPaise) || amountPaise < 100) return json({ error: "Invalid product price." }, 400);
+  const rawIds: string[] = Array.isArray(body.productIds) ? body.productIds.map((id: any) => String(id)) : [String(body.productId || "")];
+  const ids = [...new Set(rawIds.filter(Boolean))];
+  if (!ids.length || ids.length > 30) return json({ error: "Choose between 1 and 30 products to check out." }, 400);
+  const all = await allProducts(env);
+  const products = ids.map(id => all.find(p => p.id === id));
+  if (products.some(p => !p || !p.active || p.price <= 0)) return json({ error: "One or more products are not available for purchase." }, 400);
+  await ensureStoreSchema(env);
+  const owned = await env.DBStore.prepare("SELECT DISTINCT product_id FROM store_orders WHERE user_id=? AND status='paid'").bind(user.id).all<{product_id:string}>();
+  const ownedIds = new Set((owned.results || []).map(p => p.product_id));
+  if (products.some(p => ownedIds.has(p!.id))) return json({ error: "Your cart contains a product you already own. Return to the shop and remove purchased products before checking out." }, 409);
+  const selected = products as Product[];
+  const itemSubtotals = selected.map(p => Math.round(Number(p.price) * 100));
+  if (itemSubtotals.some(n => !Number.isSafeInteger(n) || n < 100)) return json({ error: "One or more product prices are invalid." }, 400);
+  const subtotalPaise = itemSubtotals.reduce((sum,n)=>sum+n,0);
   let customer;
   try { customer = cleanCustomer(body); } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Check your details." }, 400);
   }
   let discount;
-  try { discount = couponDiscount(String(body.couponCode || ""), amountPaise); } catch (error) {
+  try { discount = couponDiscount(String(body.couponCode || ""), subtotalPaise); } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Invalid coupon." }, 400);
   }
-  const amount = amountPaise - discount.discountPaise;
-  if (!Number.isSafeInteger(amount) || amount < 100) return json({ error: "The final amount must be at least ₹1." }, 400);
-
-  await ensureStoreSchema(env);
-  const localId = crypto.randomUUID();
+  const totalAmount = subtotalPaise - discount.discountPaise;
+  if (!Number.isSafeInteger(totalAmount) || totalAmount < 100) return json({ error: "The final amount must be at least ₹1." }, 400);
+  const localGroupId = crypto.randomUUID();
+  const primaryLocalId = crypto.randomUUID();
   const orderNumber = "TL-" + new Date().getFullYear() + "-" + crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase();
   const created = unixNow();
   const auth = btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`);
   const response = await fetch("https://api.razorpay.com/v1/orders", {
     method: "POST",
     headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ amount, currency: "INR", receipt: localId.slice(0, 40), notes: { product_id: product.id, store_order_id: localId, customer_user_id: user.id, coupon_code: discount.code } }),
+    body: JSON.stringify({ amount: totalAmount, currency: "INR", receipt: primaryLocalId.slice(0, 40), notes: { product_ids: ids.join(","), store_order_id: primaryLocalId, checkout_group_id: localGroupId, customer_user_id: user.id, coupon_code: discount.code } }),
   });
   const razorOrder: any = await response.json().catch(() => ({}));
   if (!response.ok || !razorOrder.id) {
     console.error("Razorpay order creation failed", response.status, razorOrder?.error?.code || "unknown");
     return json({ error: "Could not start checkout. Please try again." }, 502);
   }
-  await env.DBStore.prepare(`INSERT INTO store_orders
-    (id,order_number,product_id,amount,currency,status,razorpay_order_id,customer_email,user_id,customer_name,customer_phone,
-     address_line1,address_line2,city,state,pincode,country,coupon_code,discount_amount,created_at,updated_at)
-    VALUES(?,?,?,?,'INR','created',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .bind(localId, orderNumber, product.id, amount, razorOrder.id, user.email, user.id, customer.fullName, customer.phone,
-      customer.addressLine1, customer.addressLine2, customer.city, customer.state, customer.pincode, customer.country,
-      discount.code || null, discount.discountPaise, created, created).run();
-
+  let remainingDiscount = discount.discountPaise;
+  for (let index = 0; index < selected.length; index++) {
+    const product = selected[index];
+    const proportional = index === selected.length - 1 ? remainingDiscount : Math.min(remainingDiscount, Math.round(discount.discountPaise * itemSubtotals[index] / subtotalPaise));
+    remainingDiscount -= proportional;
+    const amount = itemSubtotals[index] - proportional;
+    const localId = index === 0 ? primaryLocalId : crypto.randomUUID();
+    const itemOrderNumber = index === 0 ? orderNumber : "TL-" + new Date().getFullYear() + "-" + crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase();
+    await env.DBStore.prepare(`INSERT INTO store_orders
+      (id,order_number,product_id,amount,currency,status,razorpay_order_id,customer_email,user_id,customer_name,customer_phone,
+       address_line1,address_line2,city,state,pincode,country,coupon_code,discount_amount,created_at,updated_at,checkout_group_id,group_total)
+      VALUES(?,?,?,?,'INR','created',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .bind(localId, itemOrderNumber, product.id, amount, index === 0 ? razorOrder.id : null, user.email, user.id, customer.fullName, customer.phone,
+        customer.addressLine1, customer.addressLine2, customer.city, customer.state, customer.pincode, customer.country,
+        discount.code || null, proportional, created, created, localGroupId, totalAmount).run();
+  }
   if (body.saveDetails === true) {
     await env.DBStore.prepare(`INSERT INTO store_customer_profiles
       (user_id,full_name,phone,address_line1,address_line2,city,state,pincode,country,updated_at)
@@ -402,11 +421,10 @@ async function createOrder(req: Request, env: StoreEnv) {
       state=excluded.state,pincode=excluded.pincode,country=excluded.country,updated_at=excluded.updated_at`)
       .bind(user.id, customer.fullName, customer.phone, customer.addressLine1, customer.addressLine2, customer.city, customer.state, customer.pincode, customer.country, created).run();
   }
-
   return json({
-    keyId: env.RAZORPAY_KEY_ID, orderId: razorOrder.id, amount, currency: "INR",
-    product: publicProduct(product), storeOrderId: localId, subtotal: amountPaise,
-    discount: discount.discountPaise, couponCode: discount.code,
+    keyId: env.RAZORPAY_KEY_ID, orderId: razorOrder.id, amount: totalAmount, currency: "INR",
+    product: selected.length === 1 ? publicProduct(selected[0]) : null, products: selected.map(publicProduct),
+    storeOrderId: primaryLocalId, subtotal: subtotalPaise, discount: discount.discountPaise, couponCode: discount.code,
   });
 }
 
@@ -428,29 +446,33 @@ async function verifyPayment(req: Request, env: StoreEnv) {
   if (!orderId || !paymentId || !signature) return json({ error: "Missing payment verification details." }, 400);
   const expected = await hmac(env.RAZORPAY_KEY_SECRET, `${orderId}|${paymentId}`);
   if (!safeEqual(signature, expected)) return json({ error: "Payment signature is invalid." }, 400);
-
   await ensureStoreSchema(env);
   const order: any = await env.DBStore.prepare("SELECT * FROM store_orders WHERE razorpay_order_id=? LIMIT 1").bind(orderId).first();
   if (!order) return json({ error: "Order was not found." }, 404);
-  let newlyPaid = false;
-  if (order.status !== "paid") {
+  const groupId = String(order.checkout_group_id || order.id);
+  const groupRows = order.checkout_group_id ? await env.DBStore.prepare("SELECT * FROM store_orders WHERE checkout_group_id=? ORDER BY created_at,id").bind(groupId).all() : { results: [order] };
+  const orders: any[] = groupRows.results || [order];
+  const expectedAmount = Number(order.group_total || order.amount);
+  const newlyPaid = orders.some(item=>item.status !== "paid");
+  if (newlyPaid) {
     const auth = btoa(`${env.RAZORPAY_KEY_ID || ""}:${env.RAZORPAY_KEY_SECRET}`);
-    const paymentResponse = await fetch(`https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}`, {
-      headers: { Authorization: `Basic ${auth}` },
-    });
+    const paymentResponse = await fetch(`https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}`, { headers: { Authorization: `Basic ${auth}` } });
     const payment: any = await paymentResponse.json().catch(() => ({}));
-    if (!paymentResponse.ok || payment.order_id !== orderId || Number(payment.amount) !== Number(order.amount) || payment.currency !== order.currency || payment.status !== "captured") {
-      return json({ error: "Razorpay could not confirm this payment." }, 400);
-    }
-    await env.DBStore.prepare("UPDATE store_orders SET status='paid', razorpay_payment_id=?, paid_at=?, updated_at=? WHERE id=?")
-      .bind(paymentId, unixNow(), unixNow(), order.id).run();
-    order.status = 'paid'; order.razorpay_payment_id = paymentId; order.paid_at = unixNow(); newlyPaid = true;
+    if (!paymentResponse.ok || payment.order_id !== orderId || Number(payment.amount) !== expectedAmount || payment.currency !== order.currency || payment.status !== "captured") return json({ error: "Razorpay could not confirm this payment." }, 400);
+    const paidAt = unixNow();
+    await env.DBStore.prepare("UPDATE store_orders SET status='paid', razorpay_payment_id=?, paid_at=?, updated_at=? WHERE checkout_group_id=? OR id=?").bind(paymentId, paidAt, paidAt, groupId, groupId).run();
+    for (const item of orders) { item.status = "paid"; item.razorpay_payment_id = paymentId; item.paid_at = paidAt; }
   }
-  const product = (await allProducts(env,true)).find((p) => p.id === order.product_id);
-  if (!product) return json({ error: "Product configuration was not found." }, 500);
-  if (newlyPaid) { try { await sendPurchaseEmail(env, order, product); } catch (error) { console.error("Purchase email error", error); } }
-  const token = await makeDownloadToken(env, String(order.id), product.id);
-  return json({ ok: true, orderId: order.order_number || order.id, downloadUrl: `${downloadOrigin(req, env)}/download.html?token=${encodeURIComponent(token)}` });
+  const products = await allProducts(env,true);
+  const downloads = [];
+  for (const item of orders) {
+    const product = products.find(p => p.id === item.product_id);
+    if (!product) return json({ error: "Product configuration was not found." }, 500);
+    if (newlyPaid) { try { await sendPurchaseEmail(env, item, product); } catch (error) { console.error("Purchase email error", error); } }
+    const token = await makeDownloadToken(env, String(item.id), product.id);
+    downloads.push({ productId: product.id, productName: product.name, orderId: item.order_number || item.id, downloadUrl: `${downloadOrigin(req, env)}/download.html?token=${encodeURIComponent(token)}` });
+  }
+  return json({ ok: true, orderId: order.order_number || order.id, downloads, downloadUrl: downloads[0]?.downloadUrl || "" });
 }
 
 async function streamProductCover(req: Request, env: StoreEnv, productId: string) {
