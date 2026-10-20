@@ -420,11 +420,11 @@ async function createOrder(req: Request, env: StoreEnv) {
       state=excluded.state,pincode=excluded.pincode,country=excluded.country,updated_at=excluded.updated_at`)
       .bind(user.id, customer.fullName, customer.phone, customer.addressLine1, customer.addressLine2, customer.city, customer.state, customer.pincode, customer.country, created).run();
   }
-  return { __json: true, body: {
+  return json({
     keyId: env.RAZORPAY_KEY_ID, orderId: razorOrder.id, amount: totalAmount, currency: "INR",
     product: selected.length === 1 ? publicProduct(selected[0]) : null, products: selected.map(publicProduct),
     storeOrderId: primaryLocalId, subtotal: subtotalPaise, discount: discount.discountPaise, couponCode: discount.code,
-  }};
+  });
 }
 
 async function sendPurchaseEmail(env: StoreEnv, order: any, product: Product) {
