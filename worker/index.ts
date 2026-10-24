@@ -1151,7 +1151,8 @@ async function trashDriveFile(env: Env, fileId: string) {
     body: JSON.stringify({ trashed: true }),
   });
   if (!response.ok) {
-    console.error("Drive delete failed", fileId, await response.text());
+    const details = await response.text();
+    throw new Error(`Drive delete failed (${response.status}) for ${fileId}: ${details}`);
   }
 }
 
@@ -1308,20 +1309,25 @@ async function cleanup(env: Env) {
 
   for (const f of files.results as any[]) {
     const refs: any = await env.DB.prepare(
-      "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND id!=?"
-    ).bind(f.storage_key, f.id).first();
+      "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND expires_at>? AND id!=?"
+    ).bind(f.storage_key, cutoff, f.id).first();
 
-    if (Number(refs?.n || 0) > 0) continue;
+    // Another unexpired transfer still uses this physical Drive file.
+    if (Number(refs?.n || 0) > 0) {
+      await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(f.id).run();
+      continue;
+    }
 
     try {
       await trashDriveFile(env, f.storage_key);
+      await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(f.id).run();
     } catch (e) {
-      console.error("Drive delete failed", f.storage_key, e);
+      // Keep the record eligible for the next scheduled cleanup attempt.
+      console.error("Drive expiry cleanup failed; will retry", f.storage_key, e);
     }
   }
 
   await env.DB.batch([
-    env.DB.prepare("UPDATE files SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?").bind(cutoff),
@@ -1569,33 +1575,38 @@ export default {
         });
       }
 
+      const adminFileUploadSession = url.pathname.match(/^\/api\/admin\/files\/([^/]+)\/upload-session$/);
+      if (adminFileUploadSession && req.method === "POST") {
+        await requireAdmin(req, env);
+        const fileId = adminFileUploadSession[1];
+        const file: any = await env.DB.prepare(`SELECT f.*,t.status AS transfer_status FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE f.id=? LIMIT 1`).bind(fileId).first();
+        if (!file || file.status !== "active" || file.transfer_status !== "active" || Number(file.expires_at) <= now()) return json({ error: "Upload target is not available." }, { status: 404 });
+        const folderId = await ensureDriveFolder(env);
+        const uploadUrl = await createDriveUploadSession(env, String(file.storage_key), String(file.original_name || "file").replace(/[^a-zA-Z0-9._-]/g, "_"), String(file.mime_type || "application/octet-stream"), Number(file.size || 0), folderId);
+        await env.DB.prepare("INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind("upload_session_" + fileId, uploadUrl).run();
+        return json({ ok: true, chunkSize: 8 * 1024 * 1024 });
+      }
+
       const adminFileUpload = url.pathname.match(/^\/api\/admin\/files\/([^/]+)\/upload$/);
       if (adminFileUpload && req.method === "PUT") {
         await requireAdmin(req, env);
         const fileId = adminFileUpload[1];
-        const file: any = await env.DB.prepare(`SELECT f.*,t.status AS transfer_status
-          FROM files f JOIN transfers t ON t.id=f.transfer_id
-          WHERE f.id=? LIMIT 1`).bind(fileId).first();
-        if (!file || file.status !== "active" || file.transfer_status !== "active" || Number(file.expires_at) <= now()) {
-          return json({ error: "Upload target is not available." }, { status: 404 });
-        }
-        const folderId = await ensureDriveFolder(env);
-        const uploadUrl = await createDriveUploadSession(
-          env,
-          String(file.storage_key),
-          String(file.original_name || "file").replace(/[^a-zA-Z0-9._-]/g, "_"),
-          String(file.mime_type || "application/octet-stream"),
-          Number(file.size || 0),
-          folderId,
-        );
-        const headers = new Headers();
-        headers.set("Content-Type", String(file.mime_type || "application/octet-stream"));
-        headers.set("Content-Length", String(file.size || 0));
-        const response = await fetch(uploadUrl, { method: "PUT", headers, body: req.body });
-        return new Response(response.body, {
-          status: response.status,
-          headers: { "content-type": response.headers.get("content-type") || "application/json" },
-        });
+        const file: any = await env.DB.prepare(`SELECT f.*,t.status AS transfer_status FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE f.id=? LIMIT 1`).bind(fileId).first();
+        if (!file || file.status !== "active" || file.transfer_status !== "active" || Number(file.expires_at) <= now()) return json({ error: "Upload target is not available." }, { status: 404 });
+        const range = req.headers.get("Content-Range") || "";
+        const match = range.match(/^bytes (\d+)-(\d+)\/(\d+)$/);
+        if (!match) return json({ error: "A valid Content-Range header is required for chunked uploads." }, { status: 400 });
+        const start = Number(match[1]), end = Number(match[2]), total = Number(match[3]);
+        if (total !== Number(file.size) || end < start || end >= total || end - start + 1 > 16 * 1024 * 1024) return json({ error: "Upload chunk range is invalid." }, { status: 400 });
+        const session: any = await env.DB.prepare("SELECT value FROM app_settings WHERE key=?").bind("upload_session_" + fileId).first();
+        if (!session?.value) return json({ error: "Upload session not found. Please restart the upload." }, { status: 409 });
+        const headers = new Headers({ "Content-Type": String(file.mime_type || "application/octet-stream"), "Content-Length": String(end - start + 1), "Content-Range": range });
+        const response = await fetch(String(session.value), { method: "PUT", headers, body: req.body });
+        const body = await response.arrayBuffer();
+        if (response.status >= 200 && response.status < 300) await env.DB.prepare("DELETE FROM app_settings WHERE key=?").bind("upload_session_" + fileId).run();
+        else if (response.status !== 308) { console.error("Google Drive chunk upload failed", response.status, new TextDecoder().decode(body)); return json({ error: "Google Drive upload failed (HTTP " + response.status + "). Please retry the transfer." }, { status: 502 }); }
+        // Hide Google's 308 resumable-upload response from the browser; browsers may follow its Location redirect.
+        return json({ ok: true, complete: response.status >= 200 && response.status < 300, receivedThrough: end + 1 });
       }
 
       const complete = url.pathname.match(/^\/api\/admin\/transfers\/([^/]+)\/complete$/);
