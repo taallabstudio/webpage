@@ -1599,7 +1599,8 @@ export default {
         const body = await response.arrayBuffer();
         if (response.status >= 200 && response.status < 300) await env.DB.prepare("DELETE FROM app_settings WHERE key=?").bind("upload_session_" + fileId).run();
         else if (response.status !== 308) { console.error("Google Drive chunk upload failed", response.status, new TextDecoder().decode(body)); return json({ error: "Google Drive upload failed (HTTP " + response.status + "). Please retry the transfer." }, { status: 502 }); }
-        return new Response(body.byteLength ? body : null, { status: response.status, headers: { "content-type": response.headers.get("content-type") || "application/json" } });
+        // Hide Google's 308 resumable-upload response from the browser; browsers may follow its Location redirect.
+        return json({ ok: true, complete: response.status >= 200 && response.status < 300, receivedThrough: end + 1 });
       }
 
       const complete = url.pathname.match(/^\/api\/admin\/transfers\/([^/]+)\/complete$/);
