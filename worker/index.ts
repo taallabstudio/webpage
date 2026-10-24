@@ -1151,7 +1151,8 @@ async function trashDriveFile(env: Env, fileId: string) {
     body: JSON.stringify({ trashed: true }),
   });
   if (!response.ok) {
-    console.error("Drive delete failed", fileId, await response.text());
+    const details = await response.text();
+    throw new Error(`Drive delete failed (${response.status}) for ${fileId}: ${details}`);
   }
 }
 
@@ -1311,17 +1312,22 @@ async function cleanup(env: Env) {
       "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND expires_at>? AND id!=?"
     ).bind(f.storage_key, cutoff, f.id).first();
 
-    if (Number(refs?.n || 0) > 0) continue;
+    // Another unexpired transfer still uses this physical Drive file.
+    if (Number(refs?.n || 0) > 0) {
+      await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(f.id).run();
+      continue;
+    }
 
     try {
       await trashDriveFile(env, f.storage_key);
+      await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(f.id).run();
     } catch (e) {
-      console.error("Drive delete failed", f.storage_key, e);
+      // Keep the record eligible for the next scheduled cleanup attempt.
+      console.error("Drive expiry cleanup failed; will retry", f.storage_key, e);
     }
   }
 
   await env.DB.batch([
-    env.DB.prepare("UPDATE files SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?").bind(cutoff),
