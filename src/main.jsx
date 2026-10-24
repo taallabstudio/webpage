@@ -1134,16 +1134,23 @@ function Upload({onDone}) {
           continue;
         }
 
-        setProgress({done,total:init.files.length,active:item.name});
-        await new Promise((resolve,reject)=>{
-          const xhr=new XMLHttpRequest();
-          xhr.open("PUT",item.uploadUrl);
-          xhr.setRequestHeader("Content-Type",file.type||"application/octet-stream");
-          xhr.upload.onprogress=e=>{ if(e.lengthComputable) setProgress({done,total:init.files.length,active:`${item.name} — ${Math.round(e.loaded/e.total*100)}%`}); };
-          xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300) resolve(); else reject(new Error(`Upload failed for ${item.name} (${xhr.status})`));};
-          xhr.onerror=()=>reject(new Error(`Upload failed for ${item.name}`));
-          xhr.send(file);
-        });
+        setProgress({done,total:init.files.length,active:"Preparing "+item.name+"…"});
+        await api("/admin/files/"+item.id+"/upload-session",{method:"POST"});
+        const chunkSize=8*1024*1024;
+        for(let start=0;start<file.size;start+=chunkSize){
+          const end=Math.min(start+chunkSize,file.size)-1;
+          const chunk=file.slice(start,end+1);
+          await new Promise((resolve,reject)=>{
+            const xhr=new XMLHttpRequest();
+            xhr.open("PUT",item.uploadUrl);
+            xhr.setRequestHeader("Content-Type",file.type||"application/octet-stream");
+            xhr.setRequestHeader("Content-Range","bytes "+start+"-"+end+"/"+file.size);
+            xhr.upload.onprogress=e=>{if(e.lengthComputable){const loaded=start+e.loaded;setProgress({done,total:init.files.length,active:item.name+" — "+Math.round(loaded/file.size*100)+"%"});}};
+            xhr.onload=()=>{if((xhr.status>=200&&xhr.status<300)||xhr.status===308) resolve(); else reject(new Error("Upload failed for "+item.name+" ("+xhr.status+"): "+(xhr.responseText||"Please retry")));};
+            xhr.onerror=()=>reject(new Error("Upload failed for "+item.name+". Check your connection and retry."));
+            xhr.send(chunk);
+          });
+        }
         done++; setProgress({done,total:init.files.length,active:item.name});
       }
       const result=await api(`/admin/transfers/${init.transferId}/complete`,{method:"POST"});
