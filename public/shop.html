@@ -46,6 +46,23 @@ button,a{ -webkit-tap-highlight-color:transparent}
 .notice{display:flex;align-items:flex-start;gap:10px;color:#7a838d;margin-top:24px;font-size:11px;line-height:1.6}
 .notice-mark{flex:none;width:18px;height:18px;display:grid;place-items:center;border:1px solid #d8e4ef;border-radius:50%;color:var(--blue);font-size:11px}
 .error{color:#b7443a}.loading{color:var(--muted);grid-column:1/-1;padding:24px 0}
+/* Product catalogue skeleton: mirrors the real card layout while the API responds. */
+.skeleton-section{animation:skeleton-enter .22s ease-out both}
+.skeleton{display:block;position:relative;overflow:hidden;background:#e8edf2;border-radius:9px}
+.skeleton:after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.78),transparent);animation:skeleton-shimmer 1.35s ease-in-out infinite}
+.skeleton-heading{width:185px;height:17px;background:#e1e7ed}
+.skeleton-card{pointer-events:none}
+.skeleton-cover{width:100%;aspect-ratio:16/9;border-radius:14px;margin-bottom:2px;background:#e7edf3}
+.skeleton-tag{width:92px;height:9px;margin-top:25px}
+.skeleton-title{width:76%;height:22px;margin-top:9px;border-radius:6px}
+.skeleton-copy{width:100%;height:10px;margin-top:14px}
+.skeleton-copy-short{width:64%;margin-top:8px}
+.skeleton-foot{margin-top:auto}
+.skeleton-price{width:58px;height:13px}
+.skeleton-button{width:98px;height:36px;border-radius:999px}
+@keyframes skeleton-shimmer{100%{transform:translateX(100%)}}
+@keyframes skeleton-enter{from{opacity:.55}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.skeleton-section{animation:none}.skeleton:after{animation:none;transform:none;background:rgba(255,255,255,.25)}}
 footer{margin-top:86px;color:#818a95;font-size:11px;border-top:1px solid rgba(29,34,41,.1);padding-top:22px;display:flex;justify-content:space-between;gap:15px}
 footer a{color:#4f5863;font-weight:600}footer a:hover{color:var(--blue)}
 @media(max-width:850px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hero{padding-top:86px}.card{min-height:285px}}
@@ -93,7 +110,12 @@ footer a{color:#4f5863;font-weight:600}footer a:hover{color:var(--blue)}
 </nav><div class="landing-auth"><button class="cart-nav-btn" id="open-cart" type="button" aria-label="Open cart" title="Cart">🛒<span class="cart-count" id="cart-count">0</span></button><a class="login-nav-btn secondary" href="/login">Sign up</a><a class="login-nav-btn" href="/login">Login</a></div></header>
 <section class="hero"><div class="eyebrow"><span class="dot"></span> TAAL LAB · DIGITAL STORE</div><h1>Tools for the sound<br><em>in your head.</em></h1><p>Plugins, sample packs and sound libraries made for music creators. Digital downloads are delivered through secure, private links after payment.</p></section>
 <div class="catalog-tools"><div class="section-line">Made for your next idea</div><label class="sort-control" for="sort-products">Sort products <select id="sort-products"><option value="latest">Latest first</option><option value="featured">Featured</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="name-asc">Name: A to Z</option><option value="name-desc">Name: Z to A</option></select></label></div>
-<div id="products"><p class="loading">Loading products…</p></div>
+<div id="products" aria-busy="true"><section class="category-section skeleton-section" aria-label="Loading products"><h2 class="category-heading"><span class="skeleton skeleton-heading"></span></h2><div class="grid" aria-hidden="true"><article class="card skeleton-card"><div class="skeleton skeleton-cover"></div><div class="skeleton skeleton-tag"></div><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-copy"></div><div class="skeleton skeleton-copy skeleton-copy-short"></div><div class="foot skeleton-foot"><span class="skeleton skeleton-price"></span><span class="skeleton skeleton-button"></span></div></article>
+<article class="card skeleton-card"><div class="skeleton skeleton-cover"></div><div class="skeleton skeleton-tag"></div><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-copy"></div><div class="skeleton skeleton-copy skeleton-copy-short"></div><div class="foot skeleton-foot"><span class="skeleton skeleton-price"></span><span class="skeleton skeleton-button"></span></div></article>
+<article class="card skeleton-card"><div class="skeleton skeleton-cover"></div><div class="skeleton skeleton-tag"></div><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-copy"></div><div class="skeleton skeleton-copy skeleton-copy-short"></div><div class="foot skeleton-foot"><span class="skeleton skeleton-price"></span><span class="skeleton skeleton-button"></span></div></article>
+<article class="card skeleton-card"><div class="skeleton skeleton-cover"></div><div class="skeleton skeleton-tag"></div><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-copy"></div><div class="skeleton skeleton-copy skeleton-copy-short"></div><div class="foot skeleton-foot"><span class="skeleton skeleton-price"></span><span class="skeleton skeleton-button"></span></div></article>
+<article class="card skeleton-card"><div class="skeleton skeleton-cover"></div><div class="skeleton skeleton-tag"></div><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-copy"></div><div class="skeleton skeleton-copy skeleton-copy-short"></div><div class="foot skeleton-foot"><span class="skeleton skeleton-price"></span><span class="skeleton skeleton-button"></span></div></article>
+<article class="card skeleton-card"><div class="skeleton skeleton-cover"></div><div class="skeleton skeleton-tag"></div><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-copy"></div><div class="skeleton skeleton-copy skeleton-copy-short"></div><div class="foot skeleton-foot"><span class="skeleton skeleton-price"></span><span class="skeleton skeleton-button"></span></div></article></div></section></div>
 <p class="notice"><span class="notice-mark">i</span><span>Products marked “Coming soon” are not available to purchase yet. Never send payment outside the checkout on this site.</span></p>
 <footer><span>© TAAL LAB</span><a href="mailto:contact@taallab.work">Contact support ↗</a></footer>
 </main>
@@ -168,6 +190,7 @@ if(location.hash==="#cart")openCart();
 let allProducts=[];
 const categoryOrder=["Max for Live Device","Audio Plugin","Sample Pack","Sound Library"];
 function renderProducts(){
+ root.setAttribute("aria-busy","false");
  const mode=sortSelect.value;
  const products=[...allProducts].sort((a,b)=>{
   if(mode==="price-asc") return Number(a.price)-Number(b.price)||a.name.localeCompare(b.name);
@@ -204,5 +227,5 @@ function renderProducts(){
  }
 }
 sortSelect.addEventListener("change",renderProducts);
-fetch("/api/store/products",{cache:"default"}).then(async r=>{if(!r.ok)throw new Error("Could not load products");return r.json()}).then(catalog=>{allProducts=Array.isArray(catalog.products)?catalog.products:[];renderProducts();return fetch("/api/store/purchases",{credentials:"same-origin",cache:"no-store"}).then(async r=>r.ok?r.json():{purchases:[]}).catch(()=>({purchases:[]}));}).then(history=>{ownedProductIds=new Set((history.purchases||[]).map(p=>p.productId));localStorage.setItem(CART_KEY,JSON.stringify(cartRead().filter(p=>!ownedProductIds.has(p.id))));renderCart();renderProducts()}).catch(e=>{root.innerHTML='<p class="error">The store is temporarily unavailable. Please try again later.</p>';console.error(e)});
+fetch("/api/store/products",{cache:"default"}).then(async r=>{if(!r.ok)throw new Error("Could not load products");return r.json()}).then(catalog=>{allProducts=Array.isArray(catalog.products)?catalog.products:[];renderProducts();return fetch("/api/store/purchases",{credentials:"same-origin",cache:"no-store"}).then(async r=>r.ok?r.json():{purchases:[]}).catch(()=>({purchases:[]}));}).then(history=>{ownedProductIds=new Set((history.purchases||[]).map(p=>p.productId));localStorage.setItem(CART_KEY,JSON.stringify(cartRead().filter(p=>!ownedProductIds.has(p.id))));renderCart();renderProducts()}).catch(e=>{root.setAttribute("aria-busy","false");root.innerHTML='<p class="error">The store is temporarily unavailable. Please try again later.</p>';console.error(e)});
 </script></body></html>
