@@ -156,6 +156,13 @@ async function ensureSupportSchema(env: Env) {
     expires_at INTEGER NOT NULL
   )`).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_email_verification_user ON email_verification_tokens(user_id)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_tokens(user_id)").run();
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS google_identities (
     google_sub TEXT PRIMARY KEY,
     user_id TEXT NOT NULL UNIQUE,
@@ -339,6 +346,91 @@ async function authLogin(req: Request, env: Env) {
     { ok: true, user: { id: user.id, email: user.email, role: user.role } },
     { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400) } },
   );
+}
+
+async function requestPasswordReset(req: Request, env: Env) {
+  const body = await req.json().catch(() => ({}));
+  const email = normalizeEmail(body.email);
+  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    return json({ error: "Enter a valid email address." }, { status: 400 });
+  }
+
+  // Always return the same response whether or not an account exists.
+  const genericResponse = () => json({
+    ok: true,
+    message: "If an active account exists for that email, a password reset link will be sent shortly. The link expires in 30 minutes.",
+  });
+  const user: any = await env.DB.prepare("SELECT id,email,status FROM users WHERE email=? LIMIT 1").bind(email).first();
+  if (!user || user.status !== "active") return genericResponse();
+
+  const createdAt = now();
+  const recent: any = await env.DB.prepare(
+    "SELECT created_at FROM password_reset_tokens WHERE user_id=? ORDER BY created_at DESC LIMIT 1"
+  ).bind(user.id).first();
+  if (recent && createdAt - Number(recent.created_at) < 60) return genericResponse();
+
+  await env.DB.prepare("DELETE FROM password_reset_tokens WHERE user_id=?").bind(user.id).run();
+  const token = randomToken(32);
+  const tokenHash = await hashText(token);
+  await env.DB.prepare(
+    "INSERT INTO password_reset_tokens(token_hash,user_id,created_at,expires_at) VALUES(?,?,?,?)"
+  ).bind(tokenHash, user.id, createdAt, createdAt + 30 * 60).run();
+
+  const link = `${origin(env)}/reset-password?token=${encodeURIComponent(token)}`;
+  const safeEmail = String(user.email).replace(/[&<>"]/g, (x) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" } as any)[x]);
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033">
+      <h2>Reset your TaalLab password</h2>
+      <p>We received a request to reset the password for <strong>${safeEmail}</strong>.</p>
+      <p style="margin:28px 0"><a href="${link}" style="display:inline-block;background:#147ce5;color:white;text-decoration:none;padding:13px 20px;border-radius:8px;font-weight:600">Reset password</a></p>
+      <p style="font-size:13px;color:#687080">This link expires in 30 minutes and can only be used once.</p>
+      <p style="font-size:13px;color:#687080">If you did not request a password reset, you can ignore this email.</p>
+      <p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.work</p>
+    </div>`;
+  const text = `Reset your TaalLab password: ${link}
+
+This link expires in 30 minutes and can only be used once.
+If you did not request a password reset, you can ignore this email.
+
+TaalLab
+contact@taallab.work`;
+  const sent = await sendAuthEmail(env, user.email, "Reset your TaalLab password", html, text, `password-reset:${user.id}:${createdAt}`);
+  if (!sent.sent) {
+    await env.DB.prepare("DELETE FROM password_reset_tokens WHERE token_hash=?").bind(tokenHash).run();
+  }
+  return genericResponse();
+}
+
+async function confirmPasswordReset(req: Request, env: Env) {
+  const body = await req.json().catch(() => ({}));
+  const token = String(body.token || "");
+  const newPassword = String(body.new_password || "");
+  if (!token) return json({ error: "This password reset link is invalid or has expired. Request a new link." }, { status: 400 });
+  if (newPassword.length < 8) return json({ error: "Password must be at least 8 characters." }, { status: 400 });
+  if (newPassword.length > 256) return json({ error: "Password is too long." }, { status: 400 });
+
+  const tokenHash = await hashText(token);
+  const reset: any = await env.DB.prepare(
+    "SELECT token_hash,user_id,expires_at FROM password_reset_tokens WHERE token_hash=? LIMIT 1"
+  ).bind(tokenHash).first();
+  if (!reset || Number(reset.expires_at) <= now()) {
+    if (reset) await env.DB.prepare("DELETE FROM password_reset_tokens WHERE token_hash=?").bind(tokenHash).run();
+    return json({ error: "This password reset link is invalid or has expired. Request a new link." }, { status: 400 });
+  }
+
+  const user: any = await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active' LIMIT 1").bind(reset.user_id).first();
+  if (!user) {
+    await env.DB.prepare("DELETE FROM password_reset_tokens WHERE token_hash=?").bind(tokenHash).run();
+    return json({ error: "This password reset link is invalid or has expired. Request a new link." }, { status: 400 });
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+  await env.DB.prepare("UPDATE users SET password_hash=?,updated_at=? WHERE id=?").bind(passwordHash, now(), user.id).run();
+  // One-time use: remove every reset link for this account and revoke all sessions.
+  await env.DB.prepare("DELETE FROM password_reset_tokens WHERE user_id=?").bind(user.id).run();
+  await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(user.id).run();
+  await env.DB.prepare("DELETE FROM two_factor_challenges WHERE user_id=?").bind(user.id).run();
+  return json({ ok: true, message: "Your password has been reset. Please sign in with your new password." });
 }
 
 async function verifyTwoFactor(req: Request, env: Env) {
@@ -1420,6 +1512,8 @@ export default {
       }
 
       if (url.pathname === "/api/auth/signup" && req.method === "POST") return authSignup(req, env);
+      if (url.pathname === "/api/auth/password-reset/request" && req.method === "POST") return requestPasswordReset(req, env);
+      if (url.pathname === "/api/auth/password-reset/confirm" && req.method === "POST") return confirmPasswordReset(req, env);
       if (url.pathname === "/api/auth/setup" && req.method === "POST") return authSetup(req, env);
       if (url.pathname === "/api/auth/2fa/verify" && req.method === "POST") return verifyTwoFactor(req, env);
       if (url.pathname === "/api/auth/2fa/resend" && req.method === "POST") return resendTwoFactor(req, env);
