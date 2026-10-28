@@ -524,6 +524,11 @@ function Login({onLogin}) {
   const [twoFactor,setTwoFactor]=useState(loginParams.get("google_2fa")==="1");
   const [resendCooldown,setResendCooldown]=useState(0);
   const [verificationRequired,setVerificationRequired]=useState(false);
+  const [forgotMode,setForgotMode]=useState(false);
+  const [resetMode,setResetMode]=useState(location.pathname === "/reset-password");
+  const [resetToken,setResetToken]=useState(loginParams.get("token")||"");
+  const [resetPassword,setResetPassword]=useState("");
+  const [resetPasswordConfirm,setResetPasswordConfirm]=useState("");
 
   function afterLogin(){
     const next=new URLSearchParams(location.search).get("next")||"";
@@ -546,6 +551,41 @@ function Login({onLogin}) {
   async function submit(e) {
     e.preventDefault(); setError(""); setNotice("");
     try {
+      if (forgotMode) {
+        await api("/auth/password-reset/request",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({email})
+        });
+        setNotice("If an active account exists for that email, a password reset link will be sent shortly. The link expires in 30 minutes.");
+        return;
+      }
+
+      if (resetMode) {
+        if (!resetToken) {
+          setError("This password reset link is invalid or has expired. Request a new link.");
+          return;
+        }
+        if (resetPassword !== resetPasswordConfirm) {
+          setError("The passwords do not match.");
+          return;
+        }
+        await api("/auth/password-reset/confirm",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({token:resetToken,new_password:resetPassword})
+        });
+        setResetMode(false);
+        setForgotMode(false);
+        setResetPassword("");
+        setResetPasswordConfirm("");
+        setPassword("");
+        setSignup(false);
+        history.replaceState(null,"","/login");
+        setNotice("Password reset successfully. Please sign in with your new password.");
+        return;
+      }
+
       if (twoFactor) {
         await api("/auth/2fa/verify",{
           method:"POST",
@@ -673,6 +713,34 @@ function Login({onLogin}) {
     </button>
   </div></div>;
 
+  if(forgotMode) return <div className="login-page"><div className="login-card">
+    <Logo/><div className="login-icon"><LockKeyhole/></div>
+    <h1>Reset your password</h1>
+    <p>Enter the email address associated with your TaalLab account. If an account exists, we’ll send a reset link that expires in 30 minutes.</p>
+    <form onSubmit={submit}>
+      <label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus required/></label>
+      {error&&<div className="error-box">{error}</div>}
+      {notice&&<div className="success-pill">{notice}</div>}
+      <button className="primary-btn full">Send reset link</button>
+    </form>
+    <button type="button" className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setForgotMode(false);setError("");setNotice("");}}>Back to sign in</button>
+  </div></div>;
+
+  if(resetMode) return <div className="login-page"><div className="login-card">
+    <Logo/><div className="login-icon"><LockKeyhole/></div>
+    <h1>Choose a new password</h1>
+    <p>Your reset link is valid for 30 minutes and can only be used once.</p>
+    {!resetToken&&<div className="error-box">This reset link is missing or invalid. Request a new one.</div>}
+    <form onSubmit={submit}>
+      <label>New password<input type="password" value={resetPassword} onChange={e=>setResetPassword(e.target.value)} minLength={8} maxLength={256} autoComplete="new-password" required/></label>
+      <label>Confirm new password<input type="password" value={resetPasswordConfirm} onChange={e=>setResetPasswordConfirm(e.target.value)} minLength={8} maxLength={256} autoComplete="new-password" required/></label>
+      {error&&<div className="error-box">{error}</div>}
+      {notice&&<div className="success-pill">{notice}</div>}
+      <button className="primary-btn full" disabled={!resetToken}>Reset password</button>
+    </form>
+    <button type="button" className="ghost-btn full" style={{marginTop:12}} onClick={()=>{history.replaceState(null,"","/login");setResetMode(false);setForgotMode(false);setError("");setNotice("");}}>Back to sign in</button>
+  </div></div>;
+
   return <div className="login-page"><div className="login-card">
     <Logo/><div className="login-icon"><ShieldCheck/></div>
     <h1>{signup?"Create account":"Sign in"}</h1>
@@ -689,6 +757,7 @@ function Login({onLogin}) {
       {notice&&<div className="success-pill">{notice}</div>}
       <button className="primary-btn full">{signup?"Sign up & verify email":"Sign in"}</button>
     </form>
+    {!signup && <button type="button" className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setForgotMode(true);setError("");setNotice("");setVerificationRequired(false);}}>Forgot password?</button>}
     {verificationRequired && <button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendVerification}>
       {resendCooldown>0?`Resend verification in ${resendCooldown}s`:"Resend verification email"}
     </button>}
@@ -1238,7 +1307,7 @@ function App(){
     return <TransferPage id={path.split("/")[2]}/>;
   }
 
-  if(path === "/login") return <Login/>;
+  if(path === "/login" || path === "/reset-password") return <Login/>;
 
   if(path === "/admin") return <Admin/>;
 
