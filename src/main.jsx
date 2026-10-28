@@ -1192,28 +1192,65 @@ function Upload({onDone}) {
       const init=await api("/admin/transfers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,user_id:recipientId||null,recipient_email:recipientEmail.trim(),files:files.map(f=>({name:f.name,size:f.size,type:f.type}))})});
       setRecipientInfo(init.recipient||null);
       let done=0;
-      setProgress({done:0,total:init.files.length,active:"Preparing upload…"});
-      for(let i=0;i<init.files.length;i++){
+      let nextIndex=0;
+      const activeUploads=new Map();
+      const total=init.files.length;
+      const updateProgress=()=>setProgress({
+        done,
+        total,
+        active:activeUploads.size
+          ? `Uploading ${activeUploads.size} file${activeUploads.size===1?"":"s"} in parallel: ${[...activeUploads.values()].join(", ")}`
+          : (done===total?"Finishing uploads…":"Preparing parallel uploads…")
+      });
+      setProgress({done:0,total,active:"Preparing parallel uploads…"});
+      const uploadOne=async(i)=>{
         const item=init.files[i];
         const file=files[i];
-
         if(item.reused){
           done++;
-          setProgress({done,total:init.files.length,active:`${item.name} — reused existing Drive file`});
-          continue;
+          updateProgress();
+          return;
         }
 
-        setProgress({done,total:init.files.length,active:item.name});
+        activeUploads.set(i,`${item.name} — 0%`);
+        updateProgress();
         await new Promise((resolve,reject)=>{
           const xhr=new XMLHttpRequest();
           xhr.open("PUT",item.uploadUrl);
           xhr.setRequestHeader("Content-Type",file.type||"application/octet-stream");
-          xhr.upload.onprogress=e=>{ if(e.lengthComputable) setProgress({done,total:init.files.length,active:`${item.name} — ${Math.round(e.loaded/e.total*100)}%`}); };
-          xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300) resolve(); else reject(new Error(`Upload failed for ${item.name} (${xhr.status})`));};
+          xhr.upload.onprogress=e=>{
+            if(e.lengthComputable){
+              activeUploads.set(i,`${item.name} — ${Math.round(e.loaded/e.total*100)}%`);
+              updateProgress();
+            }
+          };
+          xhr.onload=()=>{
+            if(xhr.status>=200&&xhr.status<300) resolve();
+            else reject(new Error(`Upload failed for ${item.name} (${xhr.status})`));
+          };
           xhr.onerror=()=>reject(new Error(`Upload failed for ${item.name}`));
           xhr.send(file);
         });
-        done++; setProgress({done,total:init.files.length,active:item.name});
+        activeUploads.delete(i);
+        done++;
+        updateProgress();
+      };
+      // Upload up to four files at once to improve throughput without
+      // overwhelming the browser or storage service.
+      const worker=async()=>{
+        while(true){
+          const i=nextIndex++;
+          if(i>=total)return;
+          await uploadOne(i);
+        }
+      };
+      const results=await Promise.allSettled(
+        Array.from({length:Math.min(4,total)},()=>worker())
+      );
+      const failed=results.find(result=>result.status==="rejected");
+      if(failed){
+        setProgress({done,total,active:"Upload failed"});
+        throw failed.reason;
       }
       const result=await api(`/admin/transfers/${init.transferId}/complete`,{method:"POST"});
       if (result.notification?.sent) alert("Transfer created. Notification email sent successfully.");
