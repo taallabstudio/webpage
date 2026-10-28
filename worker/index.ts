@@ -63,7 +63,7 @@ function expiresLabel(ts: number) {
 }
 
 function parseCookie(req: Request, name: string) {
-  return (req.headers.get("Cookie") || "").match(new RegExp("(?:^|;\\s*)" + name + "=([^;]+)"))?.[1] || "";
+  return (req.headers.get("Cookie") || "").match(new RegExp("(?:^|;\s*)" + name + "=([^;]+)"))?.[1] || "";
 }
 
 function base64Url(bytes: Uint8Array) {
@@ -351,7 +351,7 @@ async function authLogin(req: Request, env: Env) {
 async function requestPasswordReset(req: Request, env: Env) {
   const body = await req.json().catch(() => ({}));
   const email = normalizeEmail(body.email);
-  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return json({ error: "Enter a valid email address." }, { status: 400 });
   }
 
