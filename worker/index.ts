@@ -907,6 +907,8 @@ async function googleAuthCallback(req: Request, env: Env) {
 async function googleLogin(req: Request, env: Env) {
   await requireAdmin(req, env);
   const state = randomToken(24);
+  // Store OAuth state server-side; privacy settings can otherwise drop the state cookie.
+  await setSetting(env, "google_drive_oauth_state", JSON.stringify({ state, expires_at: now() + 600 }));
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", env.GOOGLE_CLIENT_ID);
   url.searchParams.set("redirect_uri", `${origin(env)}/api/google/callback`);
@@ -918,7 +920,7 @@ async function googleLogin(req: Request, env: Env) {
   url.searchParams.set("state", state);
   return new Response(null, {
     status: 302,
-    headers: { location: url.toString(), "set-cookie": cookie("google_oauth_state", state, 600) },
+    headers: { location: url.toString(), "cache-control": "no-store" },
   });
 }
 
@@ -927,10 +929,20 @@ async function googleCallback(req: Request, env: Env) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code") || "";
   const state = url.searchParams.get("state") || "";
-  const expectedState = parseCookie(req, "google_oauth_state");
+  const storedState = await getSetting(env, "google_drive_oauth_state");
+  await env.DB.prepare("DELETE FROM app_settings WHERE key=?").bind("google_drive_oauth_state").run();
+  let expectedState = "";
+  let stateExpiresAt = 0;
+  try {
+    const parsed = JSON.parse(storedState || "{}");
+    expectedState = String(parsed.state || "");
+    stateExpiresAt = Number(parsed.expires_at || 0);
+  } catch {
+    expectedState = "";
+  }
 
-  if (!code || !state || !expectedState || state !== expectedState) {
-    return new Response("Google authorization failed: invalid state.", { status: 400 });
+  if (!code || !state || !expectedState || state !== expectedState || stateExpiresAt < now()) {
+    return new Response("Google authorization failed: invalid or expired state. Please try Connect Google Drive again.", { status: 400 });
   }
 
   const body = new URLSearchParams({
