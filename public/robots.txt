@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /login
+Disallow: /account
+Disallow: /reset-password
+Disallow: /d/
+Disallow: /api/
+
+Sitemap: https://taallab.work/sitemap.xml
