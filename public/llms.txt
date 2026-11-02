@@ -1,0 +1,28 @@
+# TAAL LAB
+
+> TAAL LAB is a recording and music-production studio in Mangaluru, Karnataka, India. The studio offers music production, vocal and instrument recording, dubbing and voice-over, mixing, and mastering.
+
+## Official website
+
+- [TAAL LAB](https://taallab.work/): Official studio website and overview.
+- [Studio services](https://taallab.work/#services): Music production, recording, dubbing, mixing, and mastering.
+- [Studio](https://taallab.work/#studio): Information about the recording space.
+- [Equipment](https://taallab.work/#equipment): Studio equipment and setup.
+- [Book a session](https://taallab.work/#book-session): Request a studio session.
+- [Contact](https://taallab.work/#contact): Contact details and social links.
+
+## Shop
+
+- [TAAL LAB Shop](https://taallab.work/shop.html): Public catalogue of audio downloads and digital products.
+
+## Contact
+
+- Email: contact@taallab.work
+- Instagram: https://www.instagram.com/taallabstudio
+
+## Usage notes
+
+- Use the official pages linked above as the primary source for current studio information and services.
+- Do not infer prices, availability, session policies, or product details that are not stated on the relevant page.
+- Booking requests must be submitted through the website; this file does not expose a booking API.
+- This website does not currently publish a public MCP server or A2A agent endpoint.
