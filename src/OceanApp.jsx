@@ -48,13 +48,15 @@ function OceanApp(){
  const [toast,setToast]=useState("");
  const editorRef=useRef(null),slashInput=useRef(null),saveTimer=useRef(null),blockRefs=useRef({});
  const [activeView,setActiveView]=useState("Table");
- const [mobileNav,setMobileNav]=useState(false);\n const [activePanel,setActivePanel]=useState("page"),[adminUsers,setAdminUsers]=useState([]),[adminLoading,setAdminLoading]=useState(false),[adminError,setAdminError]=useState("");
+ const [mobileNav,setMobileNav]=useState(false);
+ const [activePanel,setActivePanel]=useState("page"),[adminUsers,setAdminUsers]=useState([]),[adminLoading,setAdminLoading]=useState(false),[adminError,setAdminError]=useState("");
 
  const loadPages=useCallback(async()=>{const data=await api("/ocean/pages");setPages(data.pages||[]);return data.pages||[];},[]);
  const openPage=useCallback(async(id)=>{setLoading(true);setShowSlash(false);setShowPageMenu(false);try{const data=await api("/ocean/pages/"+id);const p=data.page;p.blocks=JSON.parse(p.blocks_json||"[]");setPage(p);setShowComments(false);}catch(e){setToast(e.message);}finally{setLoading(false);}},[]);
  useEffect(()=>{let alive=true;api("/auth/me").then(async d=>{if(!alive)return;if(!d.authenticated){setChecking(false);return;}setUser(d.user);if(d.user.role!=="admin"&&d.user.role!=="super_user")return;const list=await loadPages();if(alive&&list.length)await openPage(list[0].id);}).catch(e=>setAuthError(e.message)).finally(()=>{if(alive)setChecking(false);});return()=>{alive=false;};},[loadPages,openPage]);
  useEffect(()=>{if(!page)return;clearTimeout(saveTimer.current);setSaving(true);saveTimer.current=setTimeout(async()=>{try{await api("/ocean/pages/"+page.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:page.title,icon:page.icon,cover:page.cover,blocks:page.blocks,is_favorite:!!page.is_favorite})});setPages(old=>old.map(p=>p.id===page.id?{...p,title:page.title,icon:page.icon,cover:page.cover,is_favorite:page.is_favorite,updated_at:Math.floor(Date.now()/1000)}:p));setSaving(false);}catch(e){setSaving(false);setToast("Couldn't save: "+e.message);}},650);return()=>clearTimeout(saveTimer.current);},[page]);
- useEffect(()=>{if(showSlash){slashInput.current?.focus();}},[showSlash]);\n useEffect(()=>{if(activePanel==="access"&&user?.role==="admin"){setAdminLoading(true);api("/ocean/admin/users").then(d=>setAdminUsers(d.users||[])).catch(e=>setAdminError(e.message)).finally(()=>setAdminLoading(false));}},[activePanel,user?.role]);
+ useEffect(()=>{if(showSlash){slashInput.current?.focus();}},[showSlash]);
+ useEffect(()=>{if(activePanel==="access"&&user?.role==="admin"){setAdminLoading(true);api("/ocean/admin/users").then(d=>setAdminUsers(d.users||[])).catch(e=>setAdminError(e.message)).finally(()=>setAdminLoading(false));}},[activePanel,user?.role]);
  useEffect(()=>{const onKey=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();setShowSearch(v=>!v);}if(e.key==="Escape"){setShowSearch(false);setShowPageMenu(false);setShowSlash(false);}};window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);},[]);
 
  useEffect(()=>{if(showComments&&page)api("/ocean/pages/"+page.id+"/comments").then(d=>setComments(d.comments||[])).catch(()=>{});},[showComments,page?.id]);
@@ -106,7 +108,8 @@ function OceanApp(){
  const commandGroups=[...new Set(filteredCommands.map(c=>c[2]))];
 
  if(checking)return <div className="ocean-loading"><div className="ocean-mark">O</div><span>Opening your workspace…</span></div>;
- if(!user)return <OceanLogin onLogin={async()=>{try{const d=await api("/auth/me");setUser(d.user);if(d.user.role!=="admin"&&d.user.role!=="super_user")return;const list=await loadPages();if(list[0])await openPage(list[0].id);}catch(e){setAuthError(e.message);}}}/>;\n if(user.role!=="admin"&&user.role!=="super_user")return <div className="ocean-access-denied"><div className="ocean-auth-card"><div className="ocean-mark"><OceanWaveMark/></div><div className="ocean-wordmark">OCEAN</div><h1>Access not enabled</h1><p>Your TaalLab account is signed in, but it does not have OCEAN access. Ask an administrator to assign you the Super User role.</p><button className="ocean-primary" onClick={signOut}>Sign out</button></div></div>;
+ if(!user)return <OceanLogin onLogin={async()=>{try{const d=await api("/auth/me");setUser(d.user);if(d.user.role!=="admin"&&d.user.role!=="super_user")return;const list=await loadPages();if(list[0])await openPage(list[0].id);}catch(e){setAuthError(e.message);}}}/>;
+ if(user.role!=="admin"&&user.role!=="super_user")return <div className="ocean-access-denied"><div className="ocean-auth-card"><div className="ocean-mark"><OceanWaveMark/></div><div className="ocean-wordmark">OCEAN</div><h1>Access not enabled</h1><p>Your TaalLab account is signed in, but it does not have OCEAN access. Ask an administrator to assign you the Super User role.</p><button className="ocean-primary" onClick={signOut}>Sign out</button></div></div>;
 
  const renderBlock=(block,index)=>{
   const isText=["text","heading1","heading2","heading3","heading4","bullet","numbered","todo","quote","callout","toggle","code","mermaid","equation","inline-equation","toc","page","pageLink","form","meeting","button","breadcrumb","tabs","synced","toggle-heading1","toggle-heading2","toggle-heading3","mention","mention-page","date","emoji"].includes(block.type);
