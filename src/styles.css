@@ -1500,3 +1500,17 @@ html{scroll-behavior:smooth}
     transition: none !important; animation: none !important;
   }
 }
+
+/* Progressive AVIF images: low-resolution preview, then full image. */
+.progressive-image{position:relative;display:block;width:100%;height:100%;overflow:hidden;isolation:isolate;background:#e8edf2}
+.image-skeleton{position:absolute;inset:0;z-index:0;background:linear-gradient(110deg,#e8edf2 8%,#f5f7f9 18%,#e8edf2 33%);background-size:200% 100%;animation:image-skeleton-shimmer 1.45s ease-in-out infinite;transition:opacity .25s ease}
+.image-skeleton.is-hidden{opacity:0;pointer-events:none}
+.progressive-image .progressive-preview,.progressive-image picture,.progressive-image .progressive-full{position:absolute;inset:0;display:block;width:100%;height:100%}
+.progressive-image .progressive-preview{z-index:1;object-fit:cover;filter:blur(8px);transform:scale(1.04)}
+.progressive-image picture{z-index:2}
+.progressive-image .progressive-full{object-fit:cover;opacity:0;transition:opacity .28s ease}
+.progressive-image .progressive-full.is-loaded{opacity:1}
+.progressive-image.scroll-headphone{aspect-ratio:1/1;height:auto}
+.progressive-image.scroll-headphone .progressive-full{object-fit:contain}
+@keyframes image-skeleton-shimmer{to{background-position-x:-200%}}
+@media(prefers-reduced-motion:reduce){.image-skeleton{animation:none}.progressive-image .progressive-full{transition:none}}

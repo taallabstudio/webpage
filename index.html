@@ -9,6 +9,11 @@
     <link rel="icon" type="image/png" href="/logo.png?v=2" />
     <link rel="apple-touch-icon" href="/logo.png?v=2" />
     <link rel="canonical" href="https://taallab.work/" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" /></noscript>
+    <link rel="preload" as="image" href="/headphones-preview.avif" type="image/avif" />
     <meta property="og:url" content="https://taallab.work/" />
     <meta property="og:image" content="https://taallab.work/logo.png" />
     <meta property="og:image:alt" content="TAAL LAB recording and music production studio logo" />
@@ -39,7 +44,10 @@
     <title>TAAL LAB | Recording &amp; Music Production Studio</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="boot-skeleton" aria-label="Loading TaalLab"><div class="boot-nav"><i></i><span></span><span></span><span></span></div><div class="boot-hero"><span></span><i></i><b></b><b></b></div></div></div>
+<style>
+.boot-skeleton{min-height:100vh;padding:0 5vw;background:linear-gradient(135deg,#eef2f5,#f9fafb);font-family:system-ui,sans-serif}.boot-nav{height:82px;display:flex;align-items:center;gap:24px}.boot-nav i,.boot-nav span,.boot-hero span,.boot-hero i,.boot-hero b{display:block;border-radius:9px;background:linear-gradient(100deg,#e4e9ee 20%,#f8fafb 40%,#e4e9ee 60%);background-size:200% 100%;animation:boot-shimmer 1.4s linear infinite}.boot-nav i{width:130px;height:28px;margin-right:auto}.boot-nav span{width:58px;height:12px}.boot-hero{min-height:70vh;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:18px}.boot-hero span{width:220px;height:12px}.boot-hero i{width:min(540px,80vw);height:90px}.boot-hero b{width:min(460px,72vw);height:13px}.boot-hero b:last-child{width:min(330px,60vw)}@keyframes boot-shimmer{to{background-position-x:-200%}}@media(prefers-reduced-motion:reduce){.boot-nav i,.boot-nav span,.boot-hero span,.boot-hero i,.boot-hero b{animation:none}}
+</style>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

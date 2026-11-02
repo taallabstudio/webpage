@@ -10,7 +10,8 @@
     "deploy": "npm run build",
     "worker:dev": "wrangler dev worker/index.ts",
     "worker:deploy": "wrangler deploy worker/index.ts",
-    "db:migrate": "wrangler d1 migrations apply taallab-transfers --remote"
+    "db:migrate": "wrangler d1 migrations apply taallab-transfers --remote",
+    "prebuild": "node scripts/optimize-images.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",
@@ -23,6 +24,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
-    "wrangler": "4.145.0"
+    "wrangler": "4.145.0",
+    "sharp": "^0.34.5"
   }
 }

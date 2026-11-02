@@ -1,6 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import {
@@ -57,6 +55,23 @@ function SiteAccountMenu({user,onLogout}) {
     </div>
   </details>;
 }
+function ProgressiveImage({src, previewSrc, alt, className="", priority=false}) {
+  const [previewReady, setPreviewReady] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const avifSrc = src.replace(/\\.webp$/i, ".avif");
+  return <span className={`progressive-image ${className}`} aria-busy={!loaded}>
+    <span className={`image-skeleton${previewReady ? " is-hidden" : ""}`} aria-hidden="true" />
+    <img className="progressive-preview" src={previewSrc} alt="" aria-hidden="true"
+      loading={priority ? "eager" : "lazy"} decoding="async"
+      onLoad={() => setPreviewReady(true)} onError={(event) => { event.currentTarget.style.display = "none"; setPreviewReady(true); }} />
+    <picture><source type="image/avif" srcSet={avifSrc} />
+      <img className={`progressive-full${loaded ? " is-loaded" : ""}`} src={src} alt={alt}
+        loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : "auto"}
+        decoding="async" onLoad={() => { setLoaded(true); setPreviewReady(true); }} />
+    </picture>
+  </span>;
+}
+
 function Logo({studioOnly=false}) {
   return <div className="brand" aria-label={studioOnly ? "TaalLab" : "TrackDeliver by TaalLab"}>
     <span className="brand-logo" aria-hidden="true"><img src="/logo.png" alt="" /></span>
@@ -114,61 +129,29 @@ function Landing() {
 
     revealElements.forEach((element) => observer.observe(element));
 
-    // Fallback/initial sync: calculate viewport visibility directly.
-    const syncReveals = () => {
-      const viewportHeight = window.innerHeight;
-
-      revealElements.forEach((element) => {
-        const rect = element.getBoundingClientRect();
-        const visible =
-          rect.bottom > viewportHeight * 0.08 &&
-          rect.top < viewportHeight * 0.92;
-
-        setVisibility(element, visible);
-      });
-    };
-
-    let revealRaf = 0;
-    const onRevealScroll = () => {
-      if (!revealRaf) {
-        revealRaf = requestAnimationFrame(() => {
-          revealRaf = 0;
-          syncReveals();
+    // IntersectionObserver handles initial visibility and scroll updates
+    // without repeatedly measuring every reveal element on the main thread.
+    let headphoneTween = null;
+    let gsapDisposed = false;
+    Promise.all([import("gsap"), import("gsap/ScrollTrigger")]).then(([gsapModule, triggerModule]) => {
+      if (gsapDisposed) return;
+      const gsap = gsapModule.gsap;
+      const ScrollTrigger = triggerModule.ScrollTrigger;
+      gsap.registerPlugin(ScrollTrigger);
+      const scrollHeadphone = document.querySelector(".scroll-headphone");
+      const landing = document.querySelector(".landing");
+      if (scrollHeadphone && landing) {
+        gsap.set(scrollHeadphone, { rotation: 0, transformOrigin: "50% 50%" });
+        headphoneTween = gsap.to(scrollHeadphone, {
+          rotation: 720, ease: "none",
+          scrollTrigger: {
+            trigger: landing, start: "top top",
+            end: () => "+=" + Math.max(document.documentElement.scrollHeight - window.innerHeight, 1),
+            scrub: true, invalidateOnRefresh: true,
+          },
         });
       }
-    };
-
-    syncReveals();
-    window.addEventListener("scroll", onRevealScroll, { passive: true });
-    window.addEventListener("resize", syncReveals);
-
-    gsap.registerPlugin(ScrollTrigger);
-
-    const scrollHeadphone = document.querySelector(".scroll-headphone");
-    const landing = document.querySelector(".landing");
-    let headphoneTween = null;
-
-    if (scrollHeadphone && landing) {
-      gsap.set(scrollHeadphone, {
-        rotation: 0,
-        transformOrigin: "50% 50%",
-      });
-
-      headphoneTween = gsap.to(scrollHeadphone, {
-        rotation: 720,
-        ease: "none",
-        scrollTrigger: {
-          trigger: landing,
-          start: "top top",
-          end: () => "+=" + Math.max(
-            document.documentElement.scrollHeight - window.innerHeight,
-            1
-          ),
-          scrub: true,
-          invalidateOnRefresh: true,
-        },
-      });
-    }
+    }).catch((error) => console.warn("Scroll animation could not be loaded:", error));
 
     // Keep the existing hero scroll animation untouched.
     const stage = document.querySelector(".hero-scroll-stage");
@@ -198,9 +181,7 @@ function Landing() {
 
     return () => {
       observer.disconnect();
-      window.removeEventListener("scroll", onRevealScroll);
-      window.removeEventListener("resize", syncReveals);
-      if (revealRaf) cancelAnimationFrame(revealRaf);
+      gsapDisposed = true;
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", updateHero);
       if (raf) cancelAnimationFrame(raf);
@@ -297,12 +278,7 @@ function Landing() {
     </header>
 
     {typeof document !== "undefined" && createPortal(
-      <img
-        className="scroll-headphone"
-        src="/headphones.webp"
-        alt=""
-        aria-hidden="true"
-      />,
+      <ProgressiveImage className="scroll-headphone" src="/headphones.webp" previewSrc="/headphones-preview.avif" alt="" priority />,
       document.body
     )}
 
@@ -361,7 +337,7 @@ function Landing() {
 
     <section className="site-section studio-section-new reveal-on-scroll" id="studio">
       <div className="studio-visual studio-photo-wrap reveal" aria-label="TaalLab recording studio">
-        <img className="studio-photo" src="/studio.webp" alt="TaalLab recording studio" />
+        <ProgressiveImage className="studio-photo" src="/studio.webp" previewSrc="/studio-preview.avif" alt="TaalLab recording studio" />
         <div className="studio-photo-overlay" />
         <div className="studio-visual-label"><span>TAAL LAB</span><small>RECORDING STUDIO</small></div>
       </div>
