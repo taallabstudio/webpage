@@ -17,8 +17,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "lucide-react": "^0.468.0",
-    "aws4fetch": "^1.0.20",
-    "gsap": "^3.12.5"
+    "aws4fetch": "^1.0.20"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

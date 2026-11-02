@@ -3,7 +3,25 @@ import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: "taallab-non-blocking-css",
+      transformIndexHtml: {
+        order: "post",
+        handler(html) {
+          // Keep the inline boot skeleton as the first paint, then apply the
+          // compiled stylesheet as soon as its preload finishes. A noscript
+          // stylesheet preserves styling when JavaScript is disabled.
+          return html.replace(
+            /<link rel="stylesheet"([^>]*href="([^"]+\.css)"[^>]*)>/g,
+            (_tag, attrs) =>
+              `<link rel="preload" as="style"${attrs} onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet"${attrs}></noscript>`
+          );
+        }
+      }
+    }
+  ],
   build: {
     rollupOptions: {
       input: {
