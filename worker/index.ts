@@ -42,7 +42,7 @@ function origin(env: Env) {
 }
 
 function cookie(name: string, value: string, maxAge: number) {
-  return `${name}=${value}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=Lax`;
+  return `${name}=${value}; Max-Age=${maxAge}; Domain=.taallab.work; Path=/; HttpOnly; Secure; SameSite=Lax`;
 }
 
 function fileKind(mime: string, name: string) {
@@ -1467,16 +1467,170 @@ async function transferSharePage(req: Request, env: Env, transferId: string) {
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store" } });
 }
 
+
+async function ensureOceanSchema(env: Env) {
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS ocean_pages (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      parent_id TEXT,
+      title TEXT NOT NULL DEFAULT 'Untitled',
+      icon TEXT NOT NULL DEFAULT '',
+      cover TEXT NOT NULL DEFAULT '',
+      blocks_json TEXT NOT NULL DEFAULT '[]',
+      is_favorite INTEGER NOT NULL DEFAULT 0,
+      is_archived INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_pages_user_updated ON ocean_pages(user_id,is_archived,updated_at DESC)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_pages_parent ON ocean_pages(user_id,parent_id)"),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS ocean_comments (
+      id TEXT PRIMARY KEY,
+      page_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_comments_page ON ocean_comments(page_id,created_at)")
+  ]);
+}
+
+function oceanId() { return randomToken(12); }
+
+async function oceanPageForUser(env: Env, userId: string, pageId: string) {
+  return env.DB.prepare("SELECT * FROM ocean_pages WHERE id=? AND user_id=? AND is_archived=0 LIMIT 1")
+    .bind(pageId, userId).first();
+}
+
+async function handleOceanRequest(req: Request, env: Env, pathname: string) {
+  if (!pathname.startsWith("/api/ocean/")) return null;
+  const user = await requireUser(req, env);
+  await ensureOceanSchema(env);
+
+  if (pathname === "/api/ocean/pages" && req.method === "GET") {
+    let rows = await env.DB.prepare(`SELECT id,user_id,parent_id,title,icon,cover,blocks_json,is_favorite,created_at,updated_at
+      FROM ocean_pages WHERE user_id=? AND is_archived=0 ORDER BY is_favorite DESC,updated_at DESC`)
+      .bind(user.id).all();
+    if (!rows.results?.length) {
+      const created = now(), id = oceanId();
+      const starter = [
+        { id: oceanId(), type: "heading1", text: "Welcome to OCEAN" },
+        { id: oceanId(), type: "text", text: "Your workspace is ready. Type / to explore the block menu and start building your own pages." },
+        { id: oceanId(), type: "heading2", text: "A place for everything" },
+        { id: oceanId(), type: "bullet", text: "Write notes and ideas" },
+        { id: oceanId(), type: "todo", text: "Create your first page", checked: false },
+        { id: oceanId(), type: "callout", text: "Your OCEAN pages are private to your account." }
+      ];
+      await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,icon,cover,blocks_json,created_at,updated_at) VALUES(?,?,NULL,?,?,?,?,?,?)")
+        .bind(id,user.id,"Getting started","🌊","",JSON.stringify(starter),created,created).run();
+      rows = await env.DB.prepare(`SELECT id,user_id,parent_id,title,icon,cover,blocks_json,is_favorite,created_at,updated_at
+        FROM ocean_pages WHERE user_id=? AND is_archived=0 ORDER BY is_favorite DESC,updated_at DESC`)
+        .bind(user.id).all();
+    }
+    return json({ pages: rows.results || [] });
+  }
+
+  if (pathname === "/api/ocean/pages" && req.method === "POST") {
+    const body = await req.json().catch(() => ({}));
+    const title = String(body.title || "Untitled").trim().slice(0,160) || "Untitled";
+    const parentId = String(body.parent_id || "").trim() || null;
+    if (parentId && !(await oceanPageForUser(env,user.id,parentId))) return json({error:"Parent page not found."},{status:404});
+    const id = oceanId(), created = now();
+    const starter = [{id:oceanId(),type:"text",text:""}];
+    await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,blocks_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)")
+      .bind(id,user.id,parentId,title,JSON.stringify(starter),created,created).run();
+    const page = await oceanPageForUser(env,user.id,id);
+    return json({page},{status:201});
+  }
+
+  const match = pathname.match(/^\/api\/ocean\/pages\/([a-f0-9]+)(?:\/(comments))?$/i);
+  if (!match) return json({error:"OCEAN endpoint not found."},{status:404});
+  const pageId = match[1], commentsRoute = !!match[2];
+  const page = await oceanPageForUser(env,user.id,pageId);
+  if (!page) return json({error:"Page not found."},{status:404});
+
+  if (commentsRoute && req.method === "GET") {
+    const comments = await env.DB.prepare(`SELECT c.id,c.page_id,c.user_id,c.body,c.created_at,u.display_name,u.email
+      FROM ocean_comments c JOIN users u ON u.id=c.user_id
+      WHERE c.page_id=? ORDER BY c.created_at ASC`).bind(pageId).all();
+    return json({comments:comments.results || []});
+  }
+  if (commentsRoute && req.method === "POST") {
+    const body = await req.json().catch(() => ({}));
+    const comment = String(body.body || "").trim().slice(0,4000);
+    if (!comment) return json({error:"Write a comment first."},{status:400});
+    const id = oceanId(), created = now();
+    await env.DB.prepare("INSERT INTO ocean_comments(id,page_id,user_id,body,created_at) VALUES(?,?,?,?,?)")
+      .bind(id,pageId,user.id,comment,created).run();
+    return json({ok:true,id,created_at:created},{status:201});
+  }
+  if (commentsRoute) return json({error:"Method not allowed."},{status:405});
+
+  if (req.method === "GET") return json({page});
+  if (req.method === "PATCH") {
+    const body = await req.json().catch(() => ({}));
+    const updates: string[] = [], values: any[] = [];
+    if (Object.prototype.hasOwnProperty.call(body,"title")) {
+      const title = String(body.title || "").trim().slice(0,160);
+      updates.push("title=?"); values.push(title || "Untitled");
+    }
+    if (Object.prototype.hasOwnProperty.call(body,"icon")) { updates.push("icon=?"); values.push(String(body.icon || "").slice(0,32)); }
+    if (Object.prototype.hasOwnProperty.call(body,"cover")) {
+      const cover = String(body.cover || "");
+      if (cover.length > 200000 || (cover && !/^https:\/\//i.test(cover) && !/^data:image\/(png|jpeg|webp);base64,/i.test(cover))) {
+        return json({error:"Cover must be an HTTPS image URL or a supported image under 150 KB."},{status:400});
+      }
+      updates.push("cover=?"); values.push(cover);
+    }
+    if (Object.prototype.hasOwnProperty.call(body,"blocks")) {
+      if (!Array.isArray(body.blocks) || body.blocks.length > 500) return json({error:"Invalid page content."},{status:400});
+      const blocks = JSON.stringify(body.blocks);
+      if (blocks.length > 350000) return json({error:"This page is too large to save."},{status:413});
+      updates.push("blocks_json=?"); values.push(blocks);
+    }
+    if (Object.prototype.hasOwnProperty.call(body,"is_favorite")) { updates.push("is_favorite=?"); values.push(body.is_favorite ? 1 : 0); }
+    if (Object.prototype.hasOwnProperty.call(body,"parent_id")) {
+      const parentId = String(body.parent_id || "").trim() || null;
+      if (parentId === pageId) return json({error:"A page cannot be its own parent."},{status:400});
+      if (parentId && !(await oceanPageForUser(env,user.id,parentId))) return json({error:"Parent page not found."},{status:404});
+      updates.push("parent_id=?"); values.push(parentId);
+    }
+    if (!updates.length) return json({ok:true});
+    updates.push("updated_at=?"); values.push(now());
+    values.push(pageId,user.id);
+    await env.DB.prepare(`UPDATE ocean_pages SET ${updates.join(",")} WHERE id=? AND user_id=?`).bind(...values).run();
+    return json({ok:true});
+  }
+  if (req.method === "DELETE") {
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM ocean_comments WHERE page_id=?").bind(pageId),
+      env.DB.prepare("UPDATE ocean_pages SET is_archived=1,updated_at=? WHERE id=? AND user_id=?").bind(now(),pageId,user.id),
+      env.DB.prepare("UPDATE ocean_pages SET parent_id=NULL WHERE parent_id=? AND user_id=?").bind(pageId,user.id)
+    ]);
+    return json({ok:true});
+  }
+  return json({error:"Method not allowed."},{status:405});
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     try {
+      if (url.pathname === "/" && req.method === "GET") {
+        const assetPath = url.hostname === "app.taallab.work" ? "/ocean.html" : "/index.html";
+        return env.ASSETS.fetch(new Request(new URL(assetPath, req.url), { headers: req.headers }));
+      }
       const sharedTransfer = url.pathname.match(/^\/d\/([a-f0-9]+)$/i);
       if (sharedTransfer && req.method === "GET") {
         const sharePage = await transferSharePage(req, env, sharedTransfer[1]);
         if (sharePage) return sharePage;
       }
       await ensureSupportSchema(env);
+      if (url.pathname.startsWith("/api/ocean/")) {
+        const oceanResponse = await handleOceanRequest(req, env, url.pathname);
+        if (oceanResponse) return oceanResponse;
+      }
       if (url.pathname.startsWith("/api/store/")) {
         const storeResponse = await handleStoreRequest(req, {
           ...env,

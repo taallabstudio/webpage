@@ -28,7 +28,8 @@ export default defineConfig({
         main: resolve(__dirname, "index.html"),
         admin: resolve(__dirname, "admin/index.html"),
         upload: resolve(__dirname, "admin/upload/index.html"),
-        notFound: resolve(__dirname, "404.html")
+        notFound: resolve(__dirname, "404.html"),
+        ocean: resolve(__dirname, "ocean.html")
       }
     }
   },
