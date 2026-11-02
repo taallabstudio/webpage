@@ -1492,7 +1492,9 @@ async function ensureOceanSchema(env: Env) {
       body TEXT NOT NULL,
       created_at INTEGER NOT NULL
     )`),
-    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_comments_page ON ocean_comments(page_id,created_at)")
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_comments_page ON ocean_comments(page_id,created_at)"),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS ocean_assets (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,page_id TEXT NOT NULL,storage_key TEXT NOT NULL UNIQUE,file_name TEXT NOT NULL,mime_type TEXT NOT NULL,size INTEGER NOT NULL,created_at INTEGER NOT NULL)`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_assets_user_page ON ocean_assets(user_id,page_id,created_at)")
   ]);
 }
 
@@ -1503,10 +1505,88 @@ async function oceanPageForUser(env: Env, userId: string, pageId: string) {
     .bind(pageId, userId).first();
 }
 
+async function requireOceanUser(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  if (user.role !== "admin" && user.role !== "super_user") throw json({ error: "OCEAN is available only to Admin and Super User accounts. Contact your TaalLab administrator for access." }, { status: 403 });
+  return user;
+}
+async function oceanAdminUsers(env: Env) {
+  const rows = await env.DB.prepare("SELECT id,email,display_name,role,status,created_at FROM users ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'super_user' THEN 1 ELSE 2 END,created_at DESC").all();
+  return json({ users: rows.results || [] });
+}
+async function updateOceanUserRole(req: Request, env: Env, id: string) {
+  const admin = await requireAdmin(req, env);
+  const body = await req.json().catch(() => ({}));
+  const role = String(body.role || "");
+  if (role !== "super_user" && role !== "user") return json({ error: "Choose Super User or User. Admin accounts are managed separately." }, { status: 400 });
+  const target: any = await env.DB.prepare("SELECT id,email,role FROM users WHERE id=? LIMIT 1").bind(id).first();
+  if (!target) return json({ error: "User not found." }, { status: 404 });
+  if (target.role === "admin") return json({ error: "Admin roles cannot be changed from OCEAN access management." }, { status: 400 });
+  await env.DB.prepare("UPDATE users SET role=?,updated_at=? WHERE id=?").bind(role,now(),id).run();
+  await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(id).run();
+  return json({ ok: true, user: { id, email: target.email, role } });
+}
+async function uploadOceanAsset(req: Request, env: Env, user: any) {
+  if (!env.B2_KEY_ID || !env.B2_APPLICATION_KEY || !env.B2_BUCKET_NAME) return json({ error: "Backblaze B2 storage is not configured." }, { status: 503 });
+  const url = new URL(req.url), pageId = String(url.searchParams.get("page_id") || "");
+  const page: any = await oceanPageForUser(env,user.id,pageId);
+  if (!page) return json({ error: "Page not found." }, { status: 404 });
+  const filename = (url.searchParams.get("filename") || "upload.bin").split("/").pop()!.replace(/[^a-zA-Z0-9._ -]/g,"_").slice(-180);
+  const mime = (req.headers.get("Content-Type") || "application/octet-stream").split(";")[0].trim();
+  const declared = Number(req.headers.get("Content-Length") || 0);
+  if (declared > 100 * 1024 * 1024) return json({ error: "OCEAN uploads are limited to 100 MB per file." }, { status: 413 });
+  const bytes = await req.arrayBuffer();
+  if (!bytes.byteLength) return json({ error: "Choose a non-empty file." }, { status: 400 });
+  if (bytes.byteLength > 100 * 1024 * 1024) return json({ error: "OCEAN uploads are limited to 100 MB per file." }, { status: 413 });
+  const auth = await fetch("https://api.backblazeb2.com/b2api/v3/b2_authorize_account", { headers: { Authorization: "Basic " + btoa(env.B2_KEY_ID + ":" + env.B2_APPLICATION_KEY) } });
+  const ad: any = await auth.json().catch(() => ({}));
+  if (!auth.ok || !ad.authorizationToken || !ad.apiInfo?.storageApi?.apiUrl) return json({ error: "Could not authorize Backblaze B2 storage." }, { status: 502 });
+  const apiUrl = ad.apiInfo.storageApi.apiUrl;
+  let bucketId = ad.apiInfo?.storageApi?.bucketId || ad.allowed?.bucketId || ad.allowed?.buckets?.find((b: any) => b.bucketName === env.B2_BUCKET_NAME)?.bucketId;
+  if (!bucketId) {
+    const listed = await fetch(apiUrl.replace(/\/$/,"") + "/b2api/v3/b2_list_buckets", { method: "POST", headers: { Authorization: ad.authorizationToken, "Content-Type": "application/json" }, body: JSON.stringify({ accountId: ad.accountId, bucketName: env.B2_BUCKET_NAME }) });
+    const ld: any = await listed.json().catch(() => ({}));
+    bucketId = ld.buckets?.find((b: any) => b.bucketName === env.B2_BUCKET_NAME)?.bucketId;
+    if (!listed.ok || !bucketId) return json({ error: "B2 key cannot access the configured private bucket. Check listBuckets and writeFiles permissions." }, { status: 502 });
+  }
+  const uploadInfo = await fetch(apiUrl.replace(/\/$/,"") + "/b2api/v3/b2_get_upload_url", { method: "POST", headers: { Authorization: ad.authorizationToken, "Content-Type": "application/json" }, body: JSON.stringify({ bucketId }) });
+  const ud: any = await uploadInfo.json().catch(() => ({}));
+  if (!uploadInfo.ok || !ud.uploadUrl || !ud.authorizationToken) return json({ error: "Could not prepare a B2 upload." }, { status: 502 });
+  const id = oceanId(), key = "ocean/" + user.id + "/" + id + "-" + filename;
+  const uploaded = await fetch(ud.uploadUrl, { method: "POST", headers: { Authorization: ud.authorizationToken, "X-Bz-File-Name": encodeURIComponent(key), "Content-Type": mime, "X-Bz-Content-Sha1": "do_not_verify" }, body: bytes });
+  const up: any = await uploaded.json().catch(() => ({}));
+  if (!uploaded.ok || !up.fileId) return json({ error: "Backblaze could not store this OCEAN file." }, { status: 502 });
+  await env.DB.prepare("INSERT INTO ocean_assets(id,user_id,page_id,storage_key,file_name,mime_type,size,created_at) VALUES(?,?,?,?,?,?,?,?)").bind(id,user.id,pageId,key,filename,mime,bytes.byteLength,now()).run();
+  return json({ ok: true, asset: { id, file_name: filename, mime_type: mime, size: bytes.byteLength, url: "/api/ocean/assets/" + id } }, { status: 201 });
+}
+async function streamOceanAsset(req: Request, env: Env, user: any, id: string) {
+  const asset: any = await env.DB.prepare("SELECT * FROM ocean_assets WHERE id=? AND user_id=? LIMIT 1").bind(id,user.id).first();
+  if (!asset) return json({ error: "File not found." }, { status: 404 });
+  if (!env.B2_KEY_ID || !env.B2_APPLICATION_KEY || !env.B2_BUCKET_NAME) return json({ error: "Backblaze B2 storage is not configured." }, { status: 503 });
+  const auth = await fetch("https://api.backblazeb2.com/b2api/v3/b2_authorize_account", { headers: { Authorization: "Basic " + btoa(env.B2_KEY_ID + ":" + env.B2_APPLICATION_KEY) } });
+  const ad: any = await auth.json().catch(() => ({}));
+  if (!auth.ok || !ad.authorizationToken || !ad.apiInfo?.storageApi?.downloadUrl) return json({ error: "Could not authorize B2 file access." }, { status: 502 });
+  const objectPath = String(asset.storage_key).split("/").map((part: string) => encodeURIComponent(part)).join("/");
+  const headers = new Headers({ Authorization: ad.authorizationToken });
+  const range = req.headers.get("Range"); if (range) headers.set("Range",range);
+  const response = await fetch(ad.apiInfo.storageApi.downloadUrl.replace(/\/$/,"") + "/file/" + encodeURIComponent(env.B2_BUCKET_NAME) + "/" + objectPath,{headers});
+  if (!response.ok || !response.body) return json({ error: response.status === 404 ? "File is missing from B2." : "Could not retrieve file from B2." }, response.status === 404 ? 404 : 502);
+  const out = new Headers({ "Content-Type": asset.mime_type || "application/octet-stream", "Content-Disposition": "inline; filename*=UTF-8''" + encodeURIComponent(asset.file_name), "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" });
+  if (response.headers.get("Content-Length")) out.set("Content-Length",response.headers.get("Content-Length")!);
+  if (response.headers.get("Content-Range")) out.set("Content-Range",response.headers.get("Content-Range")!);
+  if (response.status === 206) out.set("Accept-Ranges","bytes");
+  return new Response(response.body,{status:response.status,headers:out});
+}
 async function handleOceanRequest(req: Request, env: Env, pathname: string) {
   if (!pathname.startsWith("/api/ocean/")) return null;
-  const user = await requireUser(req, env);
+  const user = await requireOceanUser(req, env);
   await ensureOceanSchema(env);
+  if (pathname === "/api/ocean/admin/users" && req.method === "GET") { await requireAdmin(req,env); return oceanAdminUsers(env); }
+  const roleMatch = pathname.match(/^\/api\/ocean\/admin\/users\/([^/]+)$/);
+  if (roleMatch && req.method === "PATCH") return updateOceanUserRole(req,env,roleMatch[1]);
+  if (pathname === "/api/ocean/assets" && req.method === "POST") return uploadOceanAsset(req,env,user);
+  const assetMatch = pathname.match(/^\/api\/ocean\/assets\/([a-f0-9]+)$/i);
+  if (assetMatch && req.method === "GET") return streamOceanAsset(req,env,user,assetMatch[1]);
 
   if (pathname === "/api/ocean/pages" && req.method === "GET") {
     let rows = await env.DB.prepare(`SELECT id,user_id,parent_id,title,icon,cover,blocks_json,is_favorite,created_at,updated_at
