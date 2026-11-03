@@ -226,3 +226,13 @@
 .ocean-db-cards>button{display:flex;align-items:center;gap:5px;color:#87929d;padding:8px;font-size:12px}
 .ocean-db-footer{display:flex;gap:6px;padding:8px 2px;color:#97a1ab;font-size:10px}
 @media(max-width:760px){.ocean-db-heading{align-items:flex-start}.ocean-db-heading>input{font-size:19px}.ocean-db-controls{align-items:flex-start}.ocean-db-control-left{max-width:calc(100% - 78px)}.ocean-db-controls button{padding:6px;font-size:11px}.ocean-db-popover{max-width:min(280px,calc(100vw - 80px))}}
+
+/* Simple table controls: always visible above the grid */
+.ocean-simple-table-wrap{overflow:visible!important;padding:0;background:#fff;border:1px solid #dce4ec;border-radius:8px}
+.ocean-simple-table-actions{display:flex!important;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px;border-bottom:1px solid #e5eaf0;background:#f8fafc;border-radius:8px 8px 0 0}
+.ocean-simple-table-actions button{display:inline-flex!important;align-items:center;gap:5px;padding:6px 9px!important;border:1px solid #dce4ec!important;border-radius:5px;background:#fff!important;color:#526170!important;font-size:12px!important;cursor:pointer}
+.ocean-simple-table-actions button:hover{background:#edf5ff!important;border-color:#9fc8f3!important;color:#0878e8!important}
+.ocean-simple-table-actions button.ocean-table-delete{margin-left:auto;color:#c43d45!important;border-color:#efc9cc!important}
+.ocean-simple-table-actions button.ocean-table-delete:hover{background:#fff0f0!important;border-color:#e5a5aa!important}
+.ocean-simple-table-wrap .ocean-table{width:100%;border-collapse:collapse}
+.ocean-simple-table-wrap .ocean-table td{min-width:110px}
