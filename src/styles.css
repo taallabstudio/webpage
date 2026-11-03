@@ -1514,3 +1514,7 @@ html{scroll-behavior:smooth}
 .progressive-image.scroll-headphone .progressive-full{object-fit:contain}
 @keyframes image-skeleton-shimmer{to{background-position-x:-200%}}
 @media(prefers-reduced-motion:reduce){.image-skeleton{animation:none}.progressive-image .progressive-full{transition:none}}
+
+
+/* Site-wide typography: Google Roboto across every interface. */
+html, body, body * { font-family: "Roboto", sans-serif !important; }
