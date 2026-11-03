@@ -1142,8 +1142,6 @@ html{scroll-behavior:smooth}
 .progressive-image picture{z-index:2}
 .progressive-image .progressive-full{object-fit:cover;opacity:0;transition:opacity .28s ease}
 .progressive-image .progressive-full.is-loaded{opacity:1}
-.progressive-image.scroll-headphone{aspect-ratio:1/1;height:auto}
-.progressive-image.scroll-headphone .progressive-full{object-fit:contain}
 @keyframes image-skeleton-shimmer{to{background-position-x:-200%}}
 @media(prefers-reduced-motion:reduce){.image-skeleton{animation:none}.progressive-image .progressive-full{transition:none}}
 
