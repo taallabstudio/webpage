@@ -162,10 +162,12 @@ function OceanApp(){
    setPage(old=>{
     if(!old)return old;
     const arr=[...(old.blocks||[])];let idx=afterId?arr.findIndex(b=>b.id===afterId):-1;
-    if(removeSlash&&idx>=0)arr[idx]={...arr[idx],text:(arr[idx].text||"").replace(new RegExp("/[^/]*$"),"")};
+    if(removeSlash&&idx>=0){const liveText=blockRefs.current[afterId]?.innerText??arr[idx].text??"";const cleaned=liveText.replace(/\\/[^/]*$/,"");arr[idx]={...arr[idx],text:cleaned,html:""};}
     arr.splice(idx+1,0,block);if(following)arr.splice(idx+2,0,following);return {...old,blocks:arr};
    });
    setShowSlash(false);setSlashQuery("");setSlashBlock(null);
+   setTimeout(()=>focusContentEnd(blockRefs.current[following?.id||block.id]),80);
+  };
    setTimeout(()=>focusContentEnd(blockRefs.current[following?.id||block.id]),80);
   };
  const chooseCommand=(type)=>{if(type==="highlight-blue"){const target=slashBlock||page.blocks.at(-1)?.id;updatePage({blocks:page.blocks.map(b=>b.id===target?{...b,text:"",html:"",background:"blue"}:b)});setShowSlash(false);setSlashQuery("");setSlashBlock(null);setTimeout(()=>focusContentEnd(blockRefs.current[target]),30);return;}insertBlock(type,slashBlock||page.blocks.at(-1)?.id,!!slashBlock);};
