@@ -1009,16 +1009,17 @@ html{scroll-behavior:smooth}
 .scroll-headphone{
   position:fixed;
   left:70%;
-  top:53%;
-  width:min(34vw,500px);
+  top:47%;
+  width:min(30vw,440px);
   height:auto;
+  aspect-ratio:1 / 1;
   z-index:15;
   margin:0;
-  margin-left:calc(min(34vw,500px) / -2);
-  margin-top:calc(min(34vw,500px) / -2);
+  margin-left:calc(min(30vw,440px) / -2);
+  margin-top:calc(min(30vw,440px) / -2);
   display:block;
   object-fit:contain;
-  transform:none;
+  transform:rotate(var(--headphone-rotation,0deg));
   transform-origin:50% 50%;
   pointer-events:none;
   user-select:none;

@@ -150,9 +150,13 @@ function Landing() {
       stage.classList.toggle("hero-exiting", progress > 0.34);
 
       if (scrollHeadphone) {
-        const pageScrollable = Math.max(document.documentElement.scrollHeight - viewportHeight, 1);
-        const pageProgress = Math.min(1, Math.max(0, window.scrollY / pageScrollable));
-        scrollHeadphone.style.transform = `rotate(${(pageProgress * 720).toFixed(2)}deg)`;
+        // Keep the headphone animation tied to the hero's own scroll range.
+        // It should finish its turn as the hero scrolls away, not rotate
+        // throughout the entire website or drift down the page.
+        scrollHeadphone.style.setProperty(
+          "--headphone-rotation",
+          `${(progress * 360).toFixed(2)}deg`
+        );
       }
 
     };
