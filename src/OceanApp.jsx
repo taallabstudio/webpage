@@ -162,7 +162,7 @@ function OceanApp(){
    setPage(old=>{
     if(!old)return old;
     const arr=[...(old.blocks||[])];let idx=afterId?arr.findIndex(b=>b.id===afterId):-1;
-    if(removeSlash&&idx>=0){const liveText=blockRefs.current[afterId]?.innerText??arr[idx].text??"";const cleaned=liveText.replace(/\\/[^/]*$/,"");arr[idx]={...arr[idx],text:cleaned,html:""};}
+    if(removeSlash&&idx>=0){const liveText=blockRefs.current[afterId]?.innerText??arr[idx].text??"";const slashAt=liveText.lastIndexOf("/");const cleaned=slashAt>=0?liveText.slice(0,slashAt):liveText;arr[idx]={...arr[idx],text:cleaned,html:""};}
     arr.splice(idx+1,0,block);if(following)arr.splice(idx+2,0,following);return {...old,blocks:arr};
    });
    setShowSlash(false);setSlashQuery("");setSlashBlock(null);
