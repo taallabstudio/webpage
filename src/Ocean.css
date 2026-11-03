@@ -236,3 +236,7 @@
 .ocean-simple-table-actions button.ocean-table-delete:hover{background:#fff0f0!important;border-color:#e5a5aa!important}
 .ocean-simple-table-wrap .ocean-table{width:100%;border-collapse:collapse}
 .ocean-simple-table-wrap .ocean-table td{min-width:110px}
+
+
+/* OCEAN also uses the site-wide Google Roboto typography. */
+.ocean-shell, .ocean-shell *, .ocean-auth, .ocean-auth *, .ocean-loading, .ocean-loading *, .ocean-access-denied, .ocean-access-denied * { font-family: "Roboto", sans-serif !important; }
