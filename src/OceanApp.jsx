@@ -168,8 +168,6 @@ function OceanApp(){
    setShowSlash(false);setSlashQuery("");setSlashBlock(null);
    setTimeout(()=>focusContentEnd(blockRefs.current[following?.id||block.id]),80);
   };
-   setTimeout(()=>focusContentEnd(blockRefs.current[following?.id||block.id]),80);
-  };
  const chooseCommand=(type)=>{if(type==="highlight-blue"){const target=slashBlock||page.blocks.at(-1)?.id;updatePage({blocks:page.blocks.map(b=>b.id===target?{...b,text:"",html:"",background:"blue"}:b)});setShowSlash(false);setSlashQuery("");setSlashBlock(null);setTimeout(()=>focusContentEnd(blockRefs.current[target]),30);return;}insertBlock(type,slashBlock||page.blocks.at(-1)?.id,!!slashBlock);};
  const createPage=async(parentId=null)=>{try{const d=await api("/ocean/pages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:"Untitled",parent_id:parentId})});await loadPages();await openPage(d.page.id);setMobileNav(false);}catch(e){setToast(e.message);}};
  const deletePage=async()=>{if(!page||!confirm("Move this page to trash?"))return;try{await api("/ocean/pages/"+page.id,{method:"DELETE"});const list=await loadPages();setPage(null);if(list[0])openPage(list[0].id);setShowPageMenu(false);}catch(e){setToast(e.message);}};
