@@ -126,7 +126,7 @@ function Landing() {
         // Hide it completely as soon as the hero stage has scrolled out.
         const heroStillVisible = rect.bottom > 0 && rect.top < viewportHeight;
         scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 720).toFixed(2)}deg`);
-        scrollHeadphone.style.opacity = heroStillVisible ? String(Math.max(0, 1 - progress * 1.2)) : "0";
+        scrollHeadphone.style.opacity = heroStillVisible ? "1" : "0";
       }
     };
 
