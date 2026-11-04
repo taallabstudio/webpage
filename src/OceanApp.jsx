@@ -118,7 +118,7 @@ function OceanDatabaseBlock({block,updateBlock}){
  }));
  const saveProperties=next=>updateBlock(block.id,{properties:next});
  const updateProperty=(index,patch)=>saveProperties(properties.map((p,i)=>i===index?{...p,...patch}:p));
- const changePropertyType=(index,type)=>{
+ const changePropertyType=(index,type)=>{if(locked)return;
   const previous=properties[index]?.type||"text";
   const existing=rows.slice(1).map(row=>String(row[index]??"").trim()).filter(Boolean);
   const unique=[...new Set(existing.flatMap(value=>previous==="multi_select"?(()=>{try{return JSON.parse(value)}catch{return value.split(",").map(x=>x.trim()).filter(Boolean)}})():[value]))];
@@ -132,25 +132,25 @@ function OceanDatabaseBlock({block,updateBlock}){
   updateProperty(index,{type,options});
   setPropertyMenu(null);setPropertyTypeMenu(false);
  };
- const addPropertyOption=index=>{
+ const addPropertyOption=index=>{if(locked)return;
   const current=properties[index]?.options||[];
   const value=prompt("New option name","New option");
   if(value?.trim()&&!current.includes(value.trim()))updateProperty(index,{options:[...current,value.trim()]});
  };
- const renamePropertyOption=(index,oldValue)=>{const value=prompt("Rename option",oldValue);if(value?.trim()&&value.trim()!==oldValue){const colors={...(properties[index]?.optionColors||{})};if(colors[oldValue]!==undefined){colors[value.trim()]=colors[oldValue];delete colors[oldValue];}updateProperty(index,{options:(properties[index]?.options||[]).map(x=>x===oldValue?value.trim():x),optionColors:colors});}};
- const removePropertyOption=(index,option)=>{const colors={...(properties[index]?.optionColors||{})};delete colors[option];updateProperty(index,{options:(properties[index]?.options||[]).filter(x=>x!==option),optionColors:colors});};
- const insertProperty=(index,side)=>{
+ const renamePropertyOption=(index,oldValue)=>{if(locked)return;const value=prompt("Rename option",oldValue);if(value?.trim()&&value.trim()!==oldValue){const colors={...(properties[index]?.optionColors||{})};if(colors[oldValue]!==undefined){colors[value.trim()]=colors[oldValue];delete colors[oldValue];}updateProperty(index,{options:(properties[index]?.options||[]).map(x=>x===oldValue?value.trim():x),optionColors:colors});}};
+ const removePropertyOption=(index,option)=>{if(locked)return;const colors={...(properties[index]?.optionColors||{})};delete colors[option];updateProperty(index,{options:(properties[index]?.options||[]).filter(x=>x!==option),optionColors:colors});};
+ const insertProperty=(index,side)=>{if(locked)return;
   const at=index+(side==="right"?1:0);
   const next=rows.map((row,ri)=>{const copy=[...row];copy.splice(at,0,ri===0?"New property":"");return copy;});
   saveRows(next);
   const meta=[...properties];meta.splice(at,0,{name:"New property",type:"text",options:[]});saveProperties(meta);
   setPropertyMenu(null);
  };
- const duplicateProperty=index=>{
+ const duplicateProperty=index=>{if(locked)return;
   const at=index+1;saveRows(rows.map(row=>{const copy=[...row];copy.splice(at,0,row[index]||"");return copy;}));
   const meta=[...properties];meta.splice(at,0,{...properties[index],name:(properties[index].name||"Property")+" (copy)",options:[...(properties[index].options||[])]});saveProperties(meta);setPropertyMenu(null);
  };
- const deleteProperty=index=>{
+ const deleteProperty=index=>{if(locked)return;
   if(headers.length<=1){alert("A database needs at least one property.");return;}
   if(!confirm("Delete the "+headers[index]+" property and all its values?"))return;
   saveRows(rows.map(row=>row.filter((_,i)=>i!==index)));
@@ -198,9 +198,9 @@ function OceanDatabaseBlock({block,updateBlock}){
  const saveRows=next=>updateBlock(block.id,{rows:next});
  const addRecordComment=()=>{const text=commentDraft.trim();if(!text||activeRecordIndex===null)return;const comments={...(block.recordComments||{})};comments[activeRecordIndex]=[...(comments[activeRecordIndex]||[]),{id:uid(),text,createdAt:new Date().toISOString()}];updateBlock(block.id,{recordComments:comments});setCommentDraft("");};
  const deleteRecord=(rowIndex)=>{const comments={};Object.entries(block.recordComments||{}).forEach(([key,value])=>{const index=Number(key);if(index<rowIndex)comments[index]=value;else if(index>rowIndex)comments[index-1]=value;});saveRows(rows.filter((_,i)=>i!==rowIndex));updateBlock(block.id,{recordComments:comments});setActiveRecordIndex(null);};
- const editCell=(row,col,value)=>{const next=rows.map(r=>[...r]);next[row][col]=value;saveRows(next);};
- const addRow=(groupValue="")=>{const row=Array(width).fill("");if(groupValue&&groupBy<width)row[groupBy]=groupValue;saveRows([...rows,row]);};
- const addRowOnDate=day=>{const baseRows=detectedDateCol<0?rows.map((r,i)=>i===0?[...r,"Date"]:[...r,""]):rows;const targetDateCol=detectedDateCol<0?width:dateCol;const row=Array(Math.max(width,targetDateCol+1)).fill("");row[targetDateCol]=dateKey(day);saveRows([...baseRows,row]);};
+ const editCell=(row,col,value)=>{if(locked)return;const next=rows.map(r=>[...r]);next[row][col]=value;saveRows(next);};
+ const addRow=(groupValue="")=>{if(locked)return;const row=Array(width).fill("");if(groupValue&&groupBy<width)row[groupBy]=groupValue;saveRows([...rows,row]);};
+ const addRowOnDate=day=>{if(locked)return;const baseRows=detectedDateCol<0?rows.map((r,i)=>i===0?[...r,"Date"]:[...r,""]):rows;const targetDateCol=detectedDateCol<0?width:dateCol;const row=Array(Math.max(width,targetDateCol+1)).fill("");row[targetDateCol]=dateKey(day);saveRows([...baseRows,row]);};
  const resetQuickAdd=()=>{setQuickAddDate("");setQuickAddTitle("");setQuickAddAllDay(false);setQuickAddStart("10:00");setQuickAddEnd("11:00");setQuickAddLocation("");setQuickAddDescription("");setQuickAddReminder(true);setQuickAddReminderMinutes(10);setQuickAddColorId("");setQuickAddError("");};
  const openQuickAdd=day=>{setQuickAddDate(dateKey(day));setQuickAddTitle("");setQuickAddAllDay(false);setQuickAddStart("10:00");setQuickAddEnd("11:00");setQuickAddError("");};
  const createQuickAdd=async()=>{
@@ -299,9 +299,9 @@ function OceanDatabaseBlock({block,updateBlock}){
   }catch(e){setSyncMessage(e.message||"Could not sync existing items.");}
   finally{setSyncBusy(false);}
  };
- const addProperty=()=>{setNewPropertyName("");setNewPropertyType("text");setPropertyTypeSearch("");setAddingProperty(true);};
- const confirmAddProperty=()=>{const name=newPropertyName.trim()||"New property";saveRows(rows.map((r,i)=>i===0?[...r,name]:[...r,""]));saveProperties([...properties,{name,type:newPropertyType,options:newPropertyType==="status"?["Not started","In progress","Done"]:["select","multi_select"].includes(newPropertyType)?["Option 1","Option 2"]:[]}]);setAddingProperty(false);};
- const renameProperty=i=>{const name=prompt("Rename property",headers[i]);if(name?.trim())editCell(0,i,name.trim());};
+ const addProperty=()=>{if(locked)return;setNewPropertyName("");setNewPropertyType("text");setPropertyTypeSearch("");setAddingProperty(true);};
+ const confirmAddProperty=()=>{if(locked)return;const name=newPropertyName.trim()||"New property";saveRows(rows.map((r,i)=>i===0?[...r,name]:[...r,""]));saveProperties([...properties,{name,type:newPropertyType,options:newPropertyType==="status"?["Not started","In progress","Done"]:["select","multi_select"].includes(newPropertyType)?["Option 1","Option 2"]:[]}]);setAddingProperty(false);};
+ const renameProperty=i=>{if(locked)return;const name=prompt("Rename property",headers[i]);if(name?.trim())editCell(0,i,name.trim());};
  const addView=v=>{updateBlock(block.id,{view:v});setMenu("");};
  const detectedDateCol=headers.findIndex(h=>/date|due|start/i.test(String(h)));
  const dateCol=detectedDateCol>=0?detectedDateCol:width;
