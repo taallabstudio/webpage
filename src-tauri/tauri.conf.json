@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "OCEAN",
+  "version": "1.0.0",
+  "identifier": "taallab.ocean",
+  "build": {
+    "devUrl": "https://app.taallab.work",
+    "frontendDist": "https://app.taallab.work"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "OCEAN",
+        "url": "https://app.taallab.work",
+        "width": 1440,
+        "height": 920,
+        "minWidth": 900,
+        "minHeight": 620,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "category": "Productivity",
+    "shortDescription": "Your TaalLab workspace",
+    "longDescription": "OCEAN is your private TaalLab workspace for notes, pages and ideas.",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}
