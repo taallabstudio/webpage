@@ -240,3 +240,34 @@
 
 /* OCEAN also uses the site-wide Google Roboto typography. */
 .ocean-shell, .ocean-shell *, .ocean-auth, .ocean-auth *, .ocean-loading, .ocean-loading *, .ocean-access-denied, .ocean-access-denied * { font-family: "Roboto", sans-serif !important; }
+
+/* OCEAN Google Calendar integration */
+.ocean-calendar-content{max-width:980px}
+.ocean-calendar-connection{margin-bottom:20px}
+.ocean-calendar-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:14px}
+.ocean-calendar-actions>button,.ocean-calendar-event-actions>button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:8px 12px;border:1px solid #dce4ec;border-radius:8px;background:#fff;color:#526170;font-size:12px;font-weight:600}
+.ocean-calendar-actions>button:hover,.ocean-calendar-event-actions>button:hover{background:#f2f7fc;color:#0878e8}
+.ocean-calendar-actions>button.ocean-primary{background:#0878e8;border-color:#0878e8;color:#fff}
+.ocean-calendar-actions>button.ocean-calendar-danger{color:#c43d45;border-color:#efc9cc}
+.ocean-calendar-events-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:30px 0 12px}
+.ocean-calendar-events-head h2{margin:0;color:#263442;font-size:20px}
+.ocean-calendar-events-head p{margin:5px 0 0;color:#84909b;font-size:12px}
+.ocean-calendar-events-head>.ocean-primary{display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border-radius:8px;background:#0878e8;color:#fff;font-size:12px;font-weight:600}
+.ocean-calendar-event-list{display:grid;border-top:1px solid #e3e9ef}
+.ocean-calendar-event{display:flex;align-items:center;gap:16px;padding:15px 8px;border-bottom:1px solid #e7ecf1}
+.ocean-calendar-event-time{width:88px;flex:none;display:grid;gap:4px}
+.ocean-calendar-event-time strong{color:#263442;font-size:13px}
+.ocean-calendar-event-time span{color:#84909b;font-size:11px}
+.ocean-calendar-event-info{min-width:0;flex:1;display:grid;gap:5px}
+.ocean-calendar-event-info strong{color:#354352;font-size:13px;overflow-wrap:anywhere}
+.ocean-calendar-event-info span{color:#84909b;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ocean-calendar-event-actions{display:flex;gap:5px}
+.ocean-calendar-event-actions>button{width:32px;height:32px;padding:0}
+.ocean-calendar-form{display:grid;gap:13px;margin:16px 0}
+.ocean-calendar-form>.ocean-access-card-head{margin-bottom:2px}
+.ocean-calendar-form label{display:grid;gap:6px;color:#586675;font-size:12px;font-weight:600}
+.ocean-calendar-form input,.ocean-calendar-form textarea{width:100%;min-width:0;padding:10px 11px;border:1px solid #dce4ec;border-radius:7px;background:#fff;color:#34404c;font-size:13px;outline:0}
+.ocean-calendar-form input:focus,.ocean-calendar-form textarea:focus{border-color:#78b5ed;box-shadow:0 0 0 3px #0878e812}
+.ocean-calendar-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ocean-calendar-form .ocean-calendar-actions{margin-top:2px}
+@media(max-width:640px){.ocean-calendar-events-head{align-items:flex-start}.ocean-calendar-event{gap:9px;padding:13px 2px}.ocean-calendar-event-time{width:65px}.ocean-calendar-event-actions{flex-direction:column}.ocean-calendar-form-grid{grid-template-columns:1fr}.ocean-calendar-event-info span{white-space:normal}}
