@@ -120,18 +120,21 @@ function OceanDatabaseBlock({block,updateBlock}){
  useEffect(()=>{
   if(propertyMenu===null)return;
   const closeOutside=event=>{
-   if(propertyMenuRef.current?.contains(event.target))return;
-   if(event.target.closest?.(".ocean-db-property-head button"))return;
+   const target=event.target;
+   if(propertyMenuRef.current?.contains(target))return;
+   // Any pointer press outside the open menu closes it. Header buttons are
+   // deliberately not exempt: their subsequent click handler can open the
+   // newly selected column menu after this one has closed.
    setPropertyMenu(null);
    setPropertyTypeMenu(false);
    setCalculationMenu(null);
   };
   const closeOnScroll=()=>setPropertyMenu(null);
-  document.addEventListener("pointerdown",closeOutside);
+  document.addEventListener("pointerdown",closeOutside,true);
   document.addEventListener("scroll",closeOnScroll,true);
   window.addEventListener("resize",closeOnScroll);
   return()=>{
-   document.removeEventListener("pointerdown",closeOutside);
+   document.removeEventListener("pointerdown",closeOutside,true);
    document.removeEventListener("scroll",closeOnScroll,true);
    window.removeEventListener("resize",closeOnScroll);
   };
