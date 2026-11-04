@@ -7,7 +7,7 @@ import {
   FileText,Film,Folder,FolderPlus,GalleryHorizontal,Globe,Grid2X2,Hash,Heart,
   Image as ImageIcon,Inbox,Link,LogOut,Map,Menu,MessageCircle,MoreHorizontal,
   PanelLeftClose,PanelLeftOpen,Plus,Search,Settings,Share2,ShieldCheck,SlidersHorizontal,
-  Smile,Table2,Text,Trash2,Upload,User,Users,Video,X
+  Smile,Table2,Text,Trash2,Upload,User,Users,Video,X,Moon,Sun
 } from "lucide-react";
 
 const api=async(path,options={})=>{
@@ -236,13 +236,15 @@ function OceanGoogleCalendarBlock(){
 function OceanApp(){
  const [user,setUser]=useState(null),[checking,setChecking]=useState(true),[authError,setAuthError]=useState("");
  const [pages,setPages]=useState([]),[page,setPage]=useState(null),[loading,setLoading]=useState(false),[saving,setSaving]=useState(false);
- const [collapsed,setCollapsed]=useState(false),[query,setQuery]=useState(""),[showSearch,setShowSearch]=useState(false),[showSlash,setShowSlash]=useState(false),[slashQuery,setSlashQuery]=useState(""),[slashBlock,setSlashBlock]=useState(null),[slashFromTyping,setSlashFromTyping]=useState(false),[activeSlashIndex,setActiveSlashIndex]=useState(0);
+ const [collapsed,setCollapsed]=useState(false),[theme,setTheme]=useState("light"),[query,setQuery]=useState(""),[showSearch,setShowSearch]=useState(false),[showSlash,setShowSlash]=useState(false),[slashQuery,setSlashQuery]=useState(""),[slashBlock,setSlashBlock]=useState(null),[slashFromTyping,setSlashFromTyping]=useState(false),[activeSlashIndex,setActiveSlashIndex]=useState(0);
  const [showComments,setShowComments]=useState(false),[comments,setComments]=useState([]),[comment,setComment]=useState("");
  const [showAccount,setShowAccount]=useState(false),[showPageMenu,setShowPageMenu]=useState(false),[menuBlock,setMenuBlock]=useState(null),[colorMenu,setColorMenu]=useState(false);
  const [toast,setToast]=useState("");
  const editorRef=useRef(null),slashInput=useRef(null),saveTimer=useRef(null),blockRefs=useRef({});
  const [activeView,setActiveView]=useState("Table");
  const [mobileNav,setMobileNav]=useState(false);
+ useEffect(()=>{const saved=localStorage.getItem("ocean-theme");if(saved==="dark"||saved==="light")setTheme(saved);},[]);
+ useEffect(()=>{localStorage.setItem("ocean-theme",theme);},[theme]);
  const [activePanel,setActivePanel]=useState("page"),[adminUsers,setAdminUsers]=useState([]),[adminLoading,setAdminLoading]=useState(false),[adminError,setAdminError]=useState("");
  const [calendarConnection,setCalendarConnection]=useState({connected:false,email:""});
  const [calendarEvents,setCalendarEvents]=useState([]);
@@ -411,7 +413,7 @@ function OceanApp(){
     {menuBlock===block.id&&<div className="ocean-block-actions"><button title="Block options" onClick={()=>setColorMenu(v=>!v)}><MoreHorizontal size={15}/></button>{colorMenu&&<div className="ocean-color-menu"><strong>Text color</strong>{COLORS.map(([name,value])=><button key={name} onClick={()=>{updateBlock(block.id,{color:value});setColorMenu(false);}}>{name}</button>)}<strong>Background color</strong>{COLORS.map(([name,value])=><button key={name} onClick={()=>{updateBlock(block.id,{background:value});setColorMenu(false);}}>{name} background</button>)}<button onClick={()=>{updatePage({blocks:page.blocks.filter(b=>b.id!==block.id)});setColorMenu(false);}}>Delete block</button></div>}</div>}
   </div>;
  };
- return <div className={"ocean-shell "+(collapsed?"sidebar-collapsed":"")}>
+ return <div className={"ocean-shell "+(collapsed?"sidebar-collapsed":"")} data-theme={theme}>
   <aside className={"ocean-sidebar "+(mobileNav?"mobile-open":"")}>
    <div className="ocean-sidebar-top"><a className="ocean-brand" href="/"><span className="ocean-brand-mark"><OceanWaveMark/></span><span>OCEAN</span></a><button title="Collapse sidebar" onClick={()=>setCollapsed(v=>!v)}><PanelLeftClose size={17}/></button></div>
    <button className="ocean-search" onClick={()=>setShowSearch(v=>!v)}><Search size={15}/><span>Search pages</span><kbd>Ctrl K</kbd></button>
@@ -426,7 +428,7 @@ function OceanApp(){
    <div className="ocean-user"><button onClick={()=>setShowAccount(v=>!v)}><span className="ocean-avatar">{(user.display_name||user.email||"U").slice(0,1).toUpperCase()}</span><span className="ocean-user-name">{user.display_name||user.email}<small>{user.role==="admin"?"Admin":"Super User"}</small></span><MoreHorizontal size={16}/></button>{showAccount&&<div className="ocean-account-pop"><strong>{user.email}</strong><button onClick={signOut}><LogOut size={14}/> Sign out</button></div>}</div>
   </aside>
   <main className="ocean-main">
-   <header className="ocean-topbar"><button className="ocean-mobile-menu" onClick={()=>setMobileNav(v=>!v)}><Menu size={19}/></button><div className="ocean-crumb"><span>{activePanel==="access"?"Administration":"Private"}</span>{activePanel==="access"?<><ChevronRight size={13}/><strong>Access management</strong></>:page&&<><ChevronRight size={13}/><strong>{page.title||"Untitled"}</strong></>}</div><div className="ocean-top-actions"><span className="ocean-save-state">{saving?"Saving…":"Saved"}</span><button title="Comments" onClick={()=>setShowComments(v=>!v)}><MessageCircle size={17}/></button><button title="Favorite" onClick={()=>updatePage({is_favorite:!page?.is_favorite})}><Heart size={17} fill={page?.is_favorite?"currentColor":"none"}/></button><button title="Page menu" onClick={()=>setShowPageMenu(v=>!v)}><MoreHorizontal size={19}/></button></div></header>
+   <header className="ocean-topbar"><button className={"ocean-sidebar-reopen "+(collapsed?"visible":"")} title="Open sidebar" aria-label="Open sidebar" onClick={()=>setCollapsed(false)}><PanelLeftOpen size={17}/></button><button className="ocean-mobile-menu" onClick={()=>setMobileNav(v=>!v)}><Menu size={19}/></button><div className="ocean-crumb"><span>{activePanel==="access"?"Administration":"Private"}</span>{activePanel==="access"?<><ChevronRight size={13}/><strong>Access management</strong></>:page&&<><ChevronRight size={13}/><strong>{page.title||"Untitled"}</strong></>}</div><div className="ocean-top-actions"><button className="ocean-theme-toggle" title={theme==="light"?"Switch to dark theme":"Switch to light theme"} aria-label={theme==="light"?"Switch to dark theme":"Switch to light theme"} onClick={()=>setTheme(v=>v==="light"?"dark":"light")}>{theme==="light"?<Moon size={16}/>:<Sun size={16}/>}</button><span className="ocean-save-state">{saving?"Saving…":"Saved"}</span><button title="Comments" onClick={()=>setShowComments(v=>!v)}><MessageCircle size={17}/></button><button title="Favorite" onClick={()=>updatePage({is_favorite:!page?.is_favorite})}><Heart size={17} fill={page?.is_favorite?"currentColor":"none"}/></button><button title="Page menu" onClick={()=>setShowPageMenu(v=>!v)}><MoreHorizontal size={19}/></button></div></header>
    {showSearch&&<div className="ocean-search-modal"><div><Search size={17}/><input autoFocus placeholder="Search pages…" value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Escape"&&setShowSearch(false)}/><button onClick={()=>{setQuery("");setShowSearch(false);}}><X size={16}/></button></div>{filteredPages.map(p=><button key={p.id} onClick={()=>{openPage(p.id);setShowSearch(false);setQuery("");}}>{p.icon||"▤"} {p.title}</button>)}</div>}
    {showPageMenu&&<div className="ocean-page-menu"><button onClick={()=>{navigator.clipboard?.writeText(location.href);setToast("Link copied");setShowPageMenu(false);}}><Copy size={14}/> Copy link</button><button onClick={()=>{updatePage({is_favorite:!page?.is_favorite});setShowPageMenu(false);}}><Heart size={14}/> {page?.is_favorite?"Remove from favorites":"Add to favorites"}</button><button onClick={deletePage}><Trash2 size={14}/> Move to trash</button></div>}
    {activePanel==="calendar"?<div className="ocean-admin-scroll"><section className="ocean-admin-content ocean-calendar-content">

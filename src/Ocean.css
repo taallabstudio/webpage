@@ -487,3 +487,124 @@
 .ocean-block-text[style*="color"]{text-decoration-thickness:from-font}
 .ocean-block-text[style*="background-color"]{outline:1px solid rgba(60,90,120,.12)}
 @media(max-width:760px){.ocean-db-calendar-add{opacity:1}}
+
+
+/* OCEAN theme switch and persistent sidebar controls */
+.ocean-sidebar-reopen{display:none;width:30px;height:30px;flex:none;place-items:center;border-radius:6px;color:var(--ocean-muted);margin-right:8px}
+.ocean-sidebar-reopen.visible{display:grid}
+.ocean-sidebar-reopen:hover{background:var(--ocean-hover);color:var(--ocean-accent)}
+.ocean-theme-toggle{width:30px;height:30px;display:grid;place-items:center;border-radius:6px;color:var(--ocean-muted)}
+.ocean-theme-toggle:hover{background:var(--ocean-hover);color:var(--ocean-accent)}
+@media(min-width:761px){.ocean-sidebar-reopen.visible{display:grid}}
+@media(max-width:760px){.ocean-sidebar-reopen{display:none!important}}
+/* Dark appearance is scoped to OCEAN; the public TaalLab site is untouched. */
+.ocean-shell[data-theme="dark"]{--ocean-bg:#171a1f;--ocean-panel:#20252c;--ocean-panel2:#252b33;--ocean-hover:#2b3541;--ocean-border:#363e49;--ocean-text:#e5eaf0;--ocean-muted:#a0aab6;--ocean-dim:#818c99;--ocean-accent:#69aef5;color:var(--ocean-text);background:var(--ocean-bg)}
+.ocean-shell[data-theme="dark"] .ocean-sidebar{background:#1d2229;border-color:#343c46}
+.ocean-shell[data-theme="dark"] .ocean-brand{color:#eef3f8}
+.ocean-shell[data-theme="dark"] .ocean-sidebar-top>button,.ocean-shell[data-theme="dark"] .ocean-top-actions>button{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-search{background:#252b33!important;border-color:#3a424d!important;color:#aab5c1!important}
+.ocean-shell[data-theme="dark"] .ocean-search kbd,.ocean-shell[data-theme="dark"] .ocean-slash-search kbd{background:#303844;color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-nav{border-color:#343c46}
+.ocean-shell[data-theme="dark"] .ocean-nav button{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-nav button:hover,.ocean-shell[data-theme="dark"] .ocean-nav button.active{background:#2b3541;color:#eaf3fc}
+.ocean-shell[data-theme="dark"] .ocean-side-label{color:#8e9aa7}
+.ocean-shell[data-theme="dark"] .ocean-page-link{color:#c1cad4}
+.ocean-shell[data-theme="dark"] .ocean-page-link>span:first-child{color:#8dbff2}
+.ocean-shell[data-theme="dark"] .ocean-page-link:hover,.ocean-shell[data-theme="dark"] .ocean-page-link.selected{background:#2b3541;color:#eaf3fc}
+.ocean-shell[data-theme="dark"] .ocean-new-page{color:#aab5c1!important}
+.ocean-shell[data-theme="dark"] .ocean-new-page:hover{background:#2b3541;color:#8fc2f5!important}
+.ocean-shell[data-theme="dark"] .ocean-user{border-color:#343c46}
+.ocean-shell[data-theme="dark"] .ocean-user>button{color:#c5ced8}
+.ocean-shell[data-theme="dark"] .ocean-account-pop,.ocean-shell[data-theme="dark"] .ocean-page-menu,.ocean-shell[data-theme="dark"] .ocean-color-menu,.ocean-shell[data-theme="dark"] .ocean-search-modal,.ocean-shell[data-theme="dark"] .ocean-slash-menu{background:#242a32;border-color:#3a424d;box-shadow:0 16px 45px rgba(0,0,0,.38);color:#e1e7ed}
+.ocean-shell[data-theme="dark"] .ocean-account-pop strong,.ocean-shell[data-theme="dark"] .ocean-color-menu strong{color:#bdc8d3}
+.ocean-shell[data-theme="dark"] .ocean-account-pop button,.ocean-shell[data-theme="dark"] .ocean-page-menu button,.ocean-shell[data-theme="dark"] .ocean-color-menu button,.ocean-shell[data-theme="dark"] .ocean-search-modal>button{color:#c6d0da}
+.ocean-shell[data-theme="dark"] .ocean-account-pop button:hover,.ocean-shell[data-theme="dark"] .ocean-page-menu button:hover,.ocean-shell[data-theme="dark"] .ocean-color-menu button:hover,.ocean-shell[data-theme="dark"] .ocean-search-modal>button:hover{background:#303a46;color:#91c3f5}
+.ocean-shell[data-theme="dark"] .ocean-main,.ocean-shell[data-theme="dark"] .ocean-page-scroll{background:#171a1f}
+.ocean-shell[data-theme="dark"] .ocean-topbar{background:rgba(29,34,41,.94);border-color:#343c46;color:#8f9ba8}
+.ocean-shell[data-theme="dark"] .ocean-crumb strong{color:#dce4ec}
+.ocean-shell[data-theme="dark"] .ocean-save-state{color:#8d99a6}
+.ocean-shell[data-theme="dark"] .ocean-title{color:#edf2f7}
+.ocean-shell[data-theme="dark"] .ocean-title::placeholder{color:#6f7b88}
+.ocean-shell[data-theme="dark"] .ocean-block-text{color:#d5dde6}
+.ocean-shell[data-theme="dark"] .ocean-block-text.heading1,.ocean-shell[data-theme="dark"] .ocean-block-text.heading2{color:#edf2f7}
+.ocean-shell[data-theme="dark"] .ocean-block-text.heading3,.ocean-shell[data-theme="dark"] .ocean-block-text.heading4{color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-block-text.quote{color:#b8c3ce;border-color:#69aef5}
+.ocean-shell[data-theme="dark"] .ocean-block-text.callout{background:#253545;border-color:#344c62;color:#d5e8f8}
+.ocean-shell[data-theme="dark"] .ocean-block-text.code,.ocean-shell[data-theme="dark"] .ocean-block-text.mermaid,.ocean-shell[data-theme="dark"] .ocean-block-text.equation{background:#222830;border-color:#3a424d;color:#d4dde6}
+.ocean-shell[data-theme="dark"] .ocean-block-text.color-gray{color:#aab4bf}.ocean-shell[data-theme="dark"] .ocean-block-text.color-brown{color:#d1aa8d}.ocean-shell[data-theme="dark"] .ocean-block-text.color-orange{color:#f0ad79}.ocean-shell[data-theme="dark"] .ocean-block-text.color-yellow{color:#e8d184}.ocean-shell[data-theme="dark"] .ocean-block-text.color-green{color:#8fd0a8}.ocean-shell[data-theme="dark"] .ocean-block-text.color-blue{color:#91c5f5}.ocean-shell[data-theme="dark"] .ocean-block-text.color-purple{color:#c2a9ed}.ocean-shell[data-theme="dark"] .ocean-block-text.color-pink{color:#e7a9c8}.ocean-shell[data-theme="dark"] .ocean-block-text.color-red{color:#f09a9a}
+.ocean-shell[data-theme="dark"] .ocean-block-text.bg-gray{background:#343b44}.ocean-shell[data-theme="dark"] .ocean-block-text.bg-brown{background:#46382f}.ocean-shell[data-theme="dark"] .ocean-block-text.bg-orange{background:#493629}.ocean-shell[data-theme="dark"] .ocean-block-text.bg-yellow{background:#49412b}.ocean-shell[data-theme="dark"] .ocean-block-text.bg-green{background:#294333}.ocean-shell[data-theme="dark"] .ocean-block-text.bg-blue{background:#2d4053}.ocean-shell[data-theme="dark"] .ocean-block-text.bg-purple{background:#3d3450}.ocean-shell[data-theme="dark"] .ocean-block-text.bg-pink{background:#493441}.ocean-shell[data-theme="dark"] .ocean-block-text.bg-red{background:#4a3032}
+.ocean-shell[data-theme="dark"] .ocean-list-marker{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-divider>div{background:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-table-wrap,.ocean-shell[data-theme="dark"] .ocean-database-block{background:#20252c;border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-table td{border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-table input{color:#d5dde6}
+.ocean-shell[data-theme="dark"] .ocean-table input:focus{background:#2b3541}
+.ocean-shell[data-theme="dark"] .ocean-inline-add{color:#aab5c1!important}
+.ocean-shell[data-theme="dark"] .ocean-columns>div{border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-columns textarea{color:#d5dde6}
+.ocean-shell[data-theme="dark"] .ocean-db-title,.ocean-shell[data-theme="dark"] .ocean-db-toolbar{color:#bdc7d1;border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-db-title input{color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-db-title select{background:#2b323b;color:#d5dde6;border-color:#444e5b}
+.ocean-shell[data-theme="dark"] .ocean-view-placeholder{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-view-placeholder strong{color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-view-row{border-color:#3a424d;color:#d5dde6}
+.ocean-shell[data-theme="dark"] .ocean-embed-block,.ocean-shell[data-theme="dark"] .ocean-asset-block{border-color:#3a424d;background:#20252c}
+.ocean-shell[data-theme="dark"] .ocean-embed-icon{background:#2b3e52;color:#91c5f5}
+.ocean-shell[data-theme="dark"] .ocean-embed-content strong{color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-embed-content span,.ocean-shell[data-theme="dark"] .ocean-embed-content a{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-add-line button{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-slash-search{border-color:#3a424d;color:#91c5f5}
+.ocean-shell[data-theme="dark"] .ocean-slash-search input{color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-slash-results section small{color:#9aa6b2}
+.ocean-shell[data-theme="dark"] .ocean-slash-results section button{color:#d2dbe4}
+.ocean-shell[data-theme="dark"] .ocean-command-icon{border-color:#46515e;color:#91c5f5}
+.ocean-shell[data-theme="dark"] .ocean-slash-results section button.is-active,.ocean-shell[data-theme="dark"] .ocean-slash-results section button[aria-selected="true"]{background:#2c4054;color:#a7d1fa;outline-color:#46637f}
+.ocean-shell[data-theme="dark"] .ocean-empty,.ocean-shell[data-theme="dark"] .ocean-loading{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-empty h2{color:#e8eef4}
+.ocean-shell[data-theme="dark"] .ocean-comments{background:#20252c;border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-comments header{border-color:#3a424d;color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-comment-list p{color:#d1dae3}
+.ocean-shell[data-theme="dark"] .ocean-comment-list small{color:#9aa6b2}
+.ocean-shell[data-theme="dark"] .ocean-comments form{border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-comments textarea{background:#252b33;border-color:#3a424d;color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-toast{background:#e7edf4;color:#1d2732}
+.ocean-shell[data-theme="dark"] .ocean-admin-scroll{background:#171a1f}
+.ocean-shell[data-theme="dark"] .ocean-admin-heading h1{color:#edf2f7}
+.ocean-shell[data-theme="dark"] .ocean-admin-heading p{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-access-card{background:#20252c;border-color:#3a424d;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.ocean-shell[data-theme="dark"] .ocean-access-card-head{border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-access-card-head strong{color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-access-card-head span{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-managed-user{border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-managed-info strong{color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-managed-info span{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-managed-user select{background:#252b33;border-color:#3a424d;color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-access-note{background:#253545;border-color:#344c62;color:#91c5f5}
+.ocean-shell[data-theme="dark"] .ocean-access-note strong{color:#cfe5f8}
+.ocean-shell[data-theme="dark"] .ocean-access-note span{color:#aabed0}
+.ocean-shell[data-theme="dark"] .ocean-calendar-connection{background:#20252c;border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-calendar-events-head{border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-calendar-events-head h2{color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-calendar-events-head p{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-calendar-event{background:#252b33;border-color:#3a424d;color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-grid{border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-weekday{background:#252b33;border-color:#3a424d;color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-day{background:#20252c;border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-day.outside{background:#1b2026}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-day.today{background:#253545}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-date{color:#d5dde6}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-day.outside .ocean-db-calendar-date{color:#73808d}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-items button{background:#2b4054!important;color:#c7e1f8!important;border-left-color:#69aef5!important}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-toolbar>div:first-child strong{color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-toolbar>div:first-child small,.ocean-shell[data-theme="dark"] .ocean-db-calendar-hint{color:#9aa6b2}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-toolbar>div:last-child>button{background:#252b33!important;border-color:#3a424d!important;color:#d1dae3!important}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-toolbar>div:last-child>button.ocean-db-new{background:#0878e8!important;border-color:#0878e8!important;color:#fff!important}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-add{background:#252b33!important;border-color:#46515e!important;color:#c2d0de!important}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd{background:#20252c;border-color:#3a424d;color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd-head strong{color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd-head>button{background:#303844!important;color:#c2ccd6!important}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd label{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd input{background:#252b33;border-color:#3a424d;color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd-actions button{background:#252b33!important;border-color:#3a424d!important;color:#d1dae3!important}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd-actions button[type="submit"]{background:#0878e8!important;border-color:#0878e8!important;color:#fff!important}
+.ocean-shell[data-theme="dark"] .ocean-sidebar-reopen{color:#c1cad4}
