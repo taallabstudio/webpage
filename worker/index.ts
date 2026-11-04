@@ -1740,6 +1740,7 @@ async function handleOceanCalendar(req: Request,env: Env,user: any,pathname: str
     if(body.description)event.description=String(body.description).slice(0,8000);
     if(body.location)event.location=String(body.location).slice(0,1000);
     if(body.colorId)event.colorId=String(body.colorId).slice(0,2);
+    if(body.sourceDatabaseId)event.extendedProperties={private:{oceanSource:"ocean",oceanDatabaseId:String(body.sourceDatabaseId).slice(0,100)}};
     if(body.recurrence)event.recurrence=[String(body.recurrence).slice(0,100)];
     event.reminders=body.reminderEnabled?{useDefault:false,overrides:[{method:"popup",minutes:Math.max(0,Math.min(40320,Number.isFinite(Number(body.reminderMinutes))?Number(body.reminderMinutes):10))}]}:{useDefault:false,overrides:[]};
     return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/"+encodeURIComponent(calendarId)+"/events",{method:"POST",body:JSON.stringify(event)}),{status:201});
@@ -1753,6 +1754,7 @@ async function handleOceanCalendar(req: Request,env: Env,user: any,pathname: str
     if(Object.prototype.hasOwnProperty.call(body,"description"))event.description=String(body.description).slice(0,8000);
     if(Object.prototype.hasOwnProperty.call(body,"location"))event.location=String(body.location).slice(0,1000);
     if(Object.prototype.hasOwnProperty.call(body,"colorId"))event.colorId=body.colorId?String(body.colorId).slice(0,2):null;
+    if(body.sourceDatabaseId)event.extendedProperties={private:{oceanSource:"ocean",oceanDatabaseId:String(body.sourceDatabaseId).slice(0,100)}};
     if(body.allDay){
       const startDate=String(body.startDate||"").slice(0,10),endDate=String(body.endDate||startDate).slice(0,10);
       const exclusiveEnd=new Date(endDate+"T12:00:00");exclusiveEnd.setDate(exclusiveEnd.getDate()+1);
