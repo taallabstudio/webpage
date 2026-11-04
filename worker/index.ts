@@ -1722,7 +1722,7 @@ async function handleOceanCalendar(req: Request,env: Env,user: any,pathname: str
     if(body.location)event.location=String(body.location).slice(0,1000);
     return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/primary/events",{method:"POST",body:JSON.stringify(event)}),{status:201});
   }
-  const eventMatch=pathname.match(/^\\/api\\/ocean\\/calendar\\/events\\/([^/]+)$/);
+  const eventMatch=pathname.match(/^\/api\/ocean\/calendar\/events\/([^/]+)$/);
   if(eventMatch&&req.method==="PATCH"){
     const body:any=await req.json().catch(()=>({}));
     const event:any={};
