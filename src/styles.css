@@ -979,7 +979,7 @@ html{scroll-behavior:smooth}
   margin:0;
   display:block;
   object-fit:contain;
-  transform:translate3d(-50%,-50%,0);
+  transform:translate3d(-50%,-50%,0) rotate(var(--headphone-rotation,0deg));
   transform-origin:50% 50%;
   backface-visibility:hidden;
   pointer-events:none;
