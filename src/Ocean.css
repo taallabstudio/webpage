@@ -689,3 +689,43 @@
 .ocean-shell[data-theme="dark"] .ocean-db-quickadd-actions button{background:#2b323b!important;border-color:#414c58!important;color:#d5dee7!important}
 .ocean-shell[data-theme="dark"] .ocean-db-quickadd-actions button[type="submit"]{background:#0878e8!important;border-color:#0878e8!important;color:#fff!important}
 .ocean-shell[data-theme="dark"] .ocean-db-quickadd-error{background:#482f30;color:#f1aaaa}
+
+
+/* Google Calendar-style event details and colour controls. */
+.ocean-month-event{background:color-mix(in srgb,var(--event-color,#4285f4) 22%,#fff)!important;border-left:3px solid var(--event-color,#4285f4)!important;color:#27384a!important}
+.ocean-shell[data-theme="dark"] .ocean-month-event{background:color-mix(in srgb,var(--event-color,#4285f4) 35%,#242b34)!important;color:#e8edf4!important}
+.ocean-google-event-color{display:grid;gap:10px;padding:13px 16px 15px;border-top:1px solid #e2e7ec}
+.ocean-google-event-color>div:first-child{display:flex;align-items:center;gap:12px;color:#738091;font-size:12px}
+.ocean-google-event-swatches{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding-left:30px}
+.ocean-google-event-swatches button{width:23px;height:23px;min-width:23px;padding:0;border:2px solid transparent;border-radius:50%;background:var(--swatch,#d9e1ea);position:relative;display:grid;place-items:center}
+.ocean-google-event-swatches button.selected{outline:2px solid #4285f4;outline-offset:2px}
+.ocean-google-event-swatches button.selected:after{content:"✓";font-size:12px;font-weight:800;color:#fff;text-shadow:0 1px 2px #333}
+.ocean-google-event-swatches button.default{background:#fff;border:1px solid #cbd4df}
+.ocean-google-event-swatches button.default span{width:13px;height:2px;background:#7a8796;transform:rotate(-40deg)}
+.ocean-google-event-reminder>input[type="number"]{width:105px;max-width:30%;padding:9px 10px;border:1px solid #dfe5eb;border-radius:7px;background:#fff;color:#334253;font-size:12px}
+.ocean-google-event-detail{width:min(510px,100%);max-height:88vh;overflow:auto;padding:22px 24px 18px;border-radius:17px;background:#fff;color:#293746;box-shadow:0 24px 90px rgba(0,0,0,.35);display:grid;gap:13px}
+.ocean-google-detail-top{display:flex;align-items:center;justify-content:space-between}
+.ocean-google-detail-top>span{width:13px;height:13px;border-radius:50%}
+.ocean-google-detail-top>button{width:31px;height:31px;display:grid;place-items:center;border-radius:8px;background:#f1f4f7;color:#687788}
+.ocean-google-event-detail h3{margin:0 0 3px;padding:0 0 13px;border-bottom:1px solid #e6ebf0;font-size:21px;font-weight:650;line-height:1.3;overflow-wrap:anywhere}
+.ocean-google-event-detail>p{display:flex;align-items:flex-start;gap:13px;margin:0;color:#586879;font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.ocean-google-event-detail>p>svg{flex:none;margin-top:2px;color:#7b8998}
+.ocean-google-event-detail .ocean-google-detail-date{color:#33485d;font-weight:600}
+.ocean-google-event-detail .ocean-google-detail-description{padding-top:8px;border-top:1px solid #edf0f3}
+.ocean-google-detail-actions{display:flex;align-items:center;gap:9px;padding-top:14px;margin-top:5px;border-top:1px solid #e6ebf0}
+.ocean-google-detail-actions>span{flex:1}
+.ocean-google-detail-actions button{display:inline-flex;align-items:center;gap:6px;padding:9px 11px;border:1px solid #dfe5eb;border-radius:8px;background:#fff;color:#59697a;font-size:12px;font-weight:650}
+.ocean-google-detail-actions button.primary{border-color:#4285f4;background:#4285f4;color:#fff}
+.ocean-google-detail-actions button.danger{color:#c43e49}
+.ocean-shell[data-theme="dark"] .ocean-google-event-detail{background:#20252c;color:#e5eaf0}
+.ocean-shell[data-theme="dark"] .ocean-google-detail-top>button{background:#303943;color:#c4ced8}
+.ocean-shell[data-theme="dark"] .ocean-google-event-detail h3{border-color:#414c58;color:#e5eaf0}
+.ocean-shell[data-theme="dark"] .ocean-google-event-detail>p{color:#bac5d0}
+.ocean-shell[data-theme="dark"] .ocean-google-event-detail .ocean-google-detail-date{color:#e0e8f0}
+.ocean-shell[data-theme="dark"] .ocean-google-detail-actions{border-color:#414c58}
+.ocean-shell[data-theme="dark"] .ocean-google-detail-actions button{background:#2b323b;border-color:#414c58;color:#d5dee7}
+.ocean-shell[data-theme="dark"] .ocean-google-detail-actions button.primary{background:#4285f4;color:#fff}
+.ocean-shell[data-theme="dark"] .ocean-google-event-color{border-color:#414c58}
+.ocean-shell[data-theme="dark"] .ocean-google-event-color>div:first-child{color:#b6c1cc}
+.ocean-shell[data-theme="dark"] .ocean-google-event-reminder>input[type="number"]{background:#2b323b;border-color:#414c58;color:#e5eaf0}
+@media(max-width:520px){.ocean-google-event-detail{padding:18px 16px}.ocean-google-detail-actions{flex-wrap:wrap}.ocean-google-detail-actions>span{display:none}.ocean-google-detail-actions button{flex:1;justify-content:center}}
