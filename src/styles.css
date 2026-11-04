@@ -283,7 +283,9 @@ html{scroll-behavior:smooth}
   .hero-art-caption{right:7%;bottom:18%}
 }
 @media(prefers-reduced-motion:reduce){
-  .hero-scroll-stage{height:100vh}
+  /* Keep the hero's scroll track intact. Collapsing it to 100vh makes
+     the JS progress jump straight to 1 on the first scroll pixel, which
+     hides the fixed headphone before its rotation can be seen. */
   .hero-copy,.hero-art,.hero-art-ring,.hero-art-caption,.hero-scroll-stage .hero-note,.hero-scroll-hint{transform:none!important;opacity:1!important}
   .hero-scroll-hint{display:none}
 }
