@@ -96,7 +96,7 @@ function OceanDatabaseBlock({block,updateBlock}){
  const [renamePageTitle,setRenamePageTitle]=useState("");
  const [syncBusy,setSyncBusy]=useState(false);
  const [syncMessage,setSyncMessage]=useState("");
- const [propertyMenu,setPropertyMenu]=useState(null);const [cellPicker,setCellPicker]=useState(null);const [cellSearch,setCellSearch]=useState("");const [viewSettingsOpen,setViewSettingsOpen]=useState(false);
+ const [propertyMenu,setPropertyMenu]=useState(null);const [cellPicker,setCellPicker]=useState(null);const [cellSearch,setCellSearch]=useState("");const [viewSettingsOpen,setViewSettingsOpen]=useState(false);const [addingProperty,setAddingProperty]=useState(false);const [newPropertyName,setNewPropertyName]=useState("");const [newPropertyType,setNewPropertyType]=useState("text");const [propertyTypeSearch,setPropertyTypeSearch]=useState("");const [cellPicker,setCellPicker]=useState(null);const [cellSearch,setCellSearch]=useState("");const [viewSettingsOpen,setViewSettingsOpen]=useState(false);
  const [propertyTypeMenu,setPropertyTypeMenu]=useState(false);
  const [propertyVisibility,setPropertyVisibility]=useState(()=>block.hiddenProperties||[]);
  const [frozenProperties,setFrozenProperties]=useState(()=>block.frozenProperties||[]);
@@ -272,7 +272,8 @@ function OceanDatabaseBlock({block,updateBlock}){
   }catch(e){setSyncMessage(e.message||"Could not sync existing items.");}
   finally{setSyncBusy(false);}
  };
- const addProperty=()=>{const name=prompt("Property name","New property");if(!name?.trim())return;saveRows(rows.map((r,i)=>i===0?[...r,name.trim()]:[...r,""]));saveProperties([...properties,{name:name.trim(),type:"text",options:[]}]);};
+ const addProperty=()=>{setNewPropertyName("");setNewPropertyType("text");setPropertyTypeSearch("");setAddingProperty(true);};
+ const confirmAddProperty=()=>{const name=newPropertyName.trim()||"New property";saveRows(rows.map((r,i)=>i===0?[...r,name]:[...r,""]));saveProperties([...properties,{name,type:newPropertyType,options:newPropertyType==="status"?["Not started","In progress","Done"]:["select","multi_select"].includes(newPropertyType)?["Option 1","Option 2"]:[]}]);setAddingProperty(false);};
  const renameProperty=i=>{const name=prompt("Rename property",headers[i]);if(name?.trim())editCell(0,i,name.trim());};
  const addView=v=>{updateBlock(block.id,{view:v});setMenu("");};
  const detectedDateCol=headers.findIndex(h=>/date|due|start/i.test(String(h)));
@@ -325,6 +326,7 @@ function OceanDatabaseBlock({block,updateBlock}){
    {renamePageTarget!==null&&<div className="ocean-db-quickadd-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setRenamePageTarget(null);}}><form className="ocean-db-quickadd" onSubmit={e=>{e.preventDefault();editCell(renamePageTarget,0,renamePageTitle);setRenamePageTarget(null);}}><div className="ocean-db-quickadd-head"><strong>Rename page</strong><button type="button" aria-label="Close" onClick={()=>setRenamePageTarget(null)}>×</button></div><label>Page title<input autoFocus value={renamePageTitle} onChange={e=>setRenamePageTitle(e.target.value)} placeholder="Page title"/></label><div className="ocean-db-quickadd-actions ocean-db-rename-actions"><button type="button" className="ocean-db-delete-page" onClick={()=>{if(window.confirm("Delete this page from the database? This cannot be undone.")){saveRows(rows.filter((_,rowIndex)=>rowIndex!==renamePageTarget));setRenamePageTarget(null);}}}><Trash2 size={14}/> Delete page</button><span/><button type="button" onClick={()=>setRenamePageTarget(null)}>Cancel</button><button type="submit" disabled={!renamePageTitle.trim()}>Save</button></div></form></div>}
   </div>}
   {["list","gallery","timeline"].includes(view)&&<div className={"ocean-db-cards "+view}>{data.map(({r,i})=><article key={i}>{visible.map(c=><label key={c}><small>{headers[c]}</small><input value={r[c]||""} onChange={e=>editCell(i+1,c,e.target.value)}/></label>)}</article>)}<button onClick={addRow}><Plus size={14}/> New page</button></div>}
+  {addingProperty&&<div className="ocean-db-quickadd-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setAddingProperty(false);}}><div className="ocean-db-property-create"><div className="ocean-db-quickadd-head"><strong>Add a property</strong><button type="button" aria-label="Close" onClick={()=>setAddingProperty(false)}>×</button></div><label>Property name<input autoFocus value={newPropertyName} onChange={e=>setNewPropertyName(e.target.value)} placeholder="Property name"/></label><input className="ocean-db-type-search" placeholder="Search property types…" value={propertyTypeSearch} onChange={e=>setPropertyTypeSearch(e.target.value)}/><div className="ocean-db-type-picker">{propertyTypes.filter(([label,type])=>(label+" "+type).toLowerCase().includes(propertyTypeSearch.toLowerCase())).map(([label,type])=><button type="button" className={newPropertyType===type?"selected":""} key={type} onClick={()=>setNewPropertyType(type)}><span>{label}</span>{newPropertyType===type?"✓":""}</button>)}</div><div className="ocean-db-quickadd-actions"><button type="button" onClick={()=>setAddingProperty(false)}>Cancel</button><button type="button" onClick={confirmAddProperty}>Add property</button></div></div></div>}
   <div className="ocean-db-footer">{data.length} {data.length===1?"page":"pages"} <span>·</span> {headers.length} properties</div>
  </div>;
 }
