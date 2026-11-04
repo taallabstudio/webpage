@@ -124,14 +124,15 @@ function Landing() {
     const updateHero = () => {
       raf = 0;
       if (!stage) return;
-      const viewportHeight = window.innerHeight;
-      const rect = stage.getBoundingClientRect();
-      const scrollable = Math.max(stage.offsetHeight - viewportHeight, 1);
-      // Progress runs from 0 at the top of the hero track to 1 at its bottom.
-      const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
+      // Map the entire document scroll range to one 720-degree rotation.
+      // 0 degrees at the top of the page; 720 degrees at the very bottom.
+      const scrollable = Math.max(
+        document.documentElement.scrollHeight - window.innerHeight,
+        1
+      );
+      const progress = Math.min(1, Math.max(0, window.scrollY / scrollable));
       stage.style.setProperty("--hero-progress", progress.toFixed(4));
 
-      // Rotate exactly two full turns over the complete hero scroll distance.
       if (scrollHeadphone) {
         scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 720).toFixed(2)}deg`);
       }
