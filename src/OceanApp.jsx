@@ -90,6 +90,7 @@ function OceanDatabaseBlock({block,updateBlock}){
  const [quickAddDescription,setQuickAddDescription]=useState("");
  const [quickAddReminder,setQuickAddReminder]=useState(true);
  const [quickAddColorId,setQuickAddColorId]=useState("");
+ const [quickAddReminderMinutes,setQuickAddReminderMinutes]=useState(10);
  const [quickAddError,setQuickAddError]=useState("");
  const [renamePageTarget,setRenamePageTarget]=useState(null);
  const [renamePageTitle,setRenamePageTitle]=useState("");
@@ -109,7 +110,7 @@ function OceanDatabaseBlock({block,updateBlock}){
  const editCell=(row,col,value)=>{const next=rows.map(r=>[...r]);next[row][col]=value;saveRows(next);};
  const addRow=(groupValue="")=>{const row=Array(width).fill("");if(groupValue&&groupBy<width)row[groupBy]=groupValue;saveRows([...rows,row]);};
  const addRowOnDate=day=>{const baseRows=detectedDateCol<0?rows.map((r,i)=>i===0?[...r,"Date"]:[...r,""]):rows;const targetDateCol=detectedDateCol<0?width:dateCol;const row=Array(Math.max(width,targetDateCol+1)).fill("");row[targetDateCol]=dateKey(day);saveRows([...baseRows,row]);};
- const resetQuickAdd=()=>{setQuickAddDate("");setQuickAddTitle("");setQuickAddAllDay(true);setQuickAddStart("10:00");setQuickAddEnd("11:00");setQuickAddLocation("");setQuickAddDescription("");setQuickAddReminder(true);setQuickAddColorId("");setQuickAddError("");};
+ const resetQuickAdd=()=>{setQuickAddDate("");setQuickAddTitle("");setQuickAddAllDay(true);setQuickAddStart("10:00");setQuickAddEnd("11:00");setQuickAddLocation("");setQuickAddDescription("");setQuickAddReminder(true);setQuickAddReminderMinutes(10);setQuickAddColorId("");setQuickAddError("");};
  const openQuickAdd=day=>{setQuickAddDate(dateKey(day));setQuickAddTitle("");setQuickAddError("");};
  const createQuickAdd=async()=>{
   const title=quickAddTitle.trim();if(!title||!quickAddDate)return;
@@ -117,7 +118,7 @@ function OceanDatabaseBlock({block,updateBlock}){
   try{
    const connection=await api("/ocean/calendar/connection");
    if(!connection.connected){setQuickAddError("Connect Google Calendar first to sync this item.");return;}
-   const payload={summary:title,calendarId:"primary",allDay:quickAddAllDay,startDate:quickAddDate,endDate:quickAddDate,location:quickAddLocation,description:quickAddDescription,reminderEnabled:quickAddReminder,reminderMinutes:10,colorId:quickAddColorId};
+   const payload={summary:title,calendarId:"primary",allDay:quickAddAllDay,startDate:quickAddDate,endDate:quickAddDate,location:quickAddLocation,description:quickAddDescription,reminderEnabled:quickAddReminder,reminderMinutes:quickAddReminderMinutes,colorId:quickAddColorId};
    if(!quickAddAllDay){
     const start=new Date(quickAddDate+"T"+quickAddStart),end=new Date(quickAddDate+"T"+quickAddEnd);
     if(end<=start){setQuickAddError("The end time must be after the start time.");return;}
@@ -198,7 +199,7 @@ function OceanDatabaseBlock({block,updateBlock}){
     {!quickAddAllDay&&<div className="ocean-db-quickadd-time"><label>Starts<input type="time" value={quickAddStart} onChange={e=>setQuickAddStart(e.target.value)}/></label><label>Ends<input type="time" value={quickAddEnd} onChange={e=>setQuickAddEnd(e.target.value)}/></label></div>}
     <label>Location<input value={quickAddLocation} onChange={e=>setQuickAddLocation(e.target.value)} placeholder="Add location"/></label>
     <label>Description<textarea rows={3} value={quickAddDescription} onChange={e=>setQuickAddDescription(e.target.value)} placeholder="Add description"/></label>
-    <label className="ocean-db-quickadd-check"><input type="checkbox" checked={quickAddReminder} onChange={e=>setQuickAddReminder(e.target.checked)}/> Notification (10 minutes before)</label>
+    <div className="ocean-db-quickadd-reminder"><label className="ocean-db-quickadd-check"><input type="checkbox" checked={quickAddReminder} onChange={e=>setQuickAddReminder(e.target.checked)}/> Notification</label><select disabled={!quickAddReminder} value={quickAddReminderMinutes} onChange={e=>setQuickAddReminderMinutes(Number(e.target.value))}><option value="0">At event time</option><option value="5">5 minutes before</option><option value="10">10 minutes before</option><option value="15">15 minutes before</option><option value="30">30 minutes before</option><option value="60">1 hour before</option><option value="120">2 hours before</option><option value="1440">1 day before</option><option value="2880">2 days before</option><option value="10080">1 week before</option></select></div>
     <div className="ocean-google-event-color"><div><Palette size={16}/> Event colour</div><div className="ocean-google-event-swatches"><button type="button" title="Default colour" className={!quickAddColorId?"selected default":""} onClick={()=>setQuickAddColorId("")}><span/></button>{OCEAN_EVENT_COLORS.map(c=><button type="button" key={c.id} title={c.name} aria-label={c.name} className={quickAddColorId===c.id?"selected":""} style={{"--swatch":c.hex}} onClick={()=>setQuickAddColorId(c.id)}/>)}</div></div>
     {quickAddError&&<p className="ocean-db-quickadd-error">{quickAddError} {quickAddError.includes("Connect Google")&&<button type="button" onClick={()=>{window.location.href="/api/ocean/calendar/connect";}}>Connect Google Calendar</button>}</p>}
     <div className="ocean-db-quickadd-actions"><button type="button" onClick={resetQuickAdd}>Cancel</button><button type="submit" disabled={!quickAddTitle.trim()||!quickAddDate}>Create event</button></div>
