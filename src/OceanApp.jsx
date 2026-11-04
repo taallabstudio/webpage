@@ -93,12 +93,12 @@ function OceanDatabaseBlock({block,updateBlock}){
  const saveRows=next=>updateBlock(block.id,{rows:next});
  const editCell=(row,col,value)=>{const next=rows.map(r=>[...r]);next[row][col]=value;saveRows(next);};
  const addRow=(groupValue="")=>{const row=Array(width).fill("");if(groupValue&&groupBy<width)row[groupBy]=groupValue;saveRows([...rows,row]);};
- const addRowOnDate=day=>{const row=Array(width).fill("");row[0]="New page";row[dateCol]=dateKey(day);saveRows([...rows,row]);};
+ const addRowOnDate=day=>{const baseRows=detectedDateCol<0?rows.map((r,i)=>i===0?[...r,"Date"]:[...r,""]):rows;const targetDateCol=detectedDateCol<0?width:dateCol;const row=Array(Math.max(width,targetDateCol+1)).fill("");row[0]="New page";row[targetDateCol]=dateKey(day);saveRows([...baseRows,row]);};
  const addProperty=()=>{const name=prompt("Property name","New property");if(!name?.trim())return;saveRows(rows.map((r,i)=>i===0?[...r,name.trim()]:[...r,""]));};
  const renameProperty=i=>{const name=prompt("Rename property",headers[i]);if(name?.trim())editCell(0,i,name.trim());};
  const addView=v=>{updateBlock(block.id,{view:v});setMenu("");};
  const detectedDateCol=headers.findIndex(h=>/date|due|start/i.test(String(h)));
- const dateCol=detectedDateCol>=0?detectedDateCol:Math.min(2,width-1);
+ const dateCol=detectedDateCol>=0?detectedDateCol:width;
  const firstWeekday=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth(),1).getDay();
  const daysInMonth=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+1,0).getDate();
  const weekCount=Math.ceil((firstWeekday+daysInMonth)/7);
