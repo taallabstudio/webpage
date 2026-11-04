@@ -108,10 +108,18 @@ function Landing() {
 
     const stage = document.querySelector(".hero-scroll-stage");
     const heroArt = stage?.querySelector(".hero-art");
-    // Keep the fixed image outside the sticky hero so its viewport position
-    // survives the sticky container releasing at the end of the scroll track.
     const scrollHeadphone = document.querySelector(".scroll-headphone");
     let raf = 0;
+
+    // Measure the headphone's starting position once. Do not follow the
+    // artwork while scrolling: the headphone must remain fixed on screen.
+    const positionHeadphone = () => {
+      if (!heroArt || !scrollHeadphone) return;
+      const artRect = heroArt.getBoundingClientRect();
+      scrollHeadphone.style.setProperty("--headphone-x", `${(artRect.left + artRect.width / 2).toFixed(2)}px`);
+      scrollHeadphone.style.setProperty("--headphone-y", `${(artRect.top + artRect.height / 2).toFixed(2)}px`);
+      scrollHeadphone.style.setProperty("--headphone-size", `${Math.min(artRect.width * 0.88, 620).toFixed(2)}px`);
+    };
 
     const updateHero = () => {
       raf = 0;
@@ -119,41 +127,34 @@ function Landing() {
       const viewportHeight = window.innerHeight;
       const rect = stage.getBoundingClientRect();
       const scrollable = Math.max(stage.offsetHeight - viewportHeight, 1);
-      // One continuous progress value drives the hero and the headphone.
-      // The headphone stays pinned to the artwork centre while later
-      // sections naturally scroll in front of it.
+      // Progress runs from 0 at the top of the hero track to 1 at its bottom.
       const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
       stage.style.setProperty("--hero-progress", progress.toFixed(4));
 
-      if (heroArt && scrollHeadphone) {
-        // While the sticky hero is active, keep the headphone aligned with
-        // the artwork. Once the hero reaches its release point, freeze those
-        // viewport coordinates so the next sections can scroll over it.
-        // On upward scrolling the hero re-enters the sticky interval and the
-        // coordinates are measured again.
-        if (rect.bottom >= viewportHeight - 1) {
-          const artRect = heroArt.getBoundingClientRect();
-          scrollHeadphone.style.setProperty("--headphone-x", `${(artRect.left + artRect.width / 2).toFixed(2)}px`);
-          scrollHeadphone.style.setProperty("--headphone-y", `${(artRect.top + artRect.height / 2).toFixed(2)}px`);
-          scrollHeadphone.style.setProperty("--headphone-size", `${Math.min(artRect.width * 0.88, 620).toFixed(2)}px`);
-        }
-        scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 360).toFixed(2)}deg`);
+      // Two complete turns (720 degrees) across the full hero scroll distance.
+      if (scrollHeadphone) {
+        scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 720).toFixed(2)}deg`);
       }
     };
 
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(updateHero);
     };
+    const onResize = () => {
+      positionHeadphone();
+      updateHero();
+    };
 
+    positionHeadphone();
     updateHero();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", updateHero);
+    window.addEventListener("resize", onResize);
 
     return () => {
-      observer.disconnect();
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", updateHero);
+      window.removeEventListener("resize", onResize);
       if (raf) cancelAnimationFrame(raf);
+      observer.disconnect();
     };
   }, []);
 
