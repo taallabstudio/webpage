@@ -118,7 +118,7 @@ function OceanDatabaseBlock({block,updateBlock}){
   try{
    const connection=await api("/ocean/calendar/connection");
    if(!connection.connected){setQuickAddError("Connect Google Calendar first to sync this item.");return;}
-   const payload={summary:title,calendarId:"primary",allDay:quickAddAllDay,startDate:quickAddDate,endDate:quickAddDate,location:quickAddLocation,description:quickAddDescription,reminderEnabled:quickAddReminder,reminderMinutes:quickAddReminderMinutes,colorId:quickAddColorId};
+   const payload={summary:title,calendarId:"primary",allDay:quickAddAllDay,startDate:quickAddDate,endDate:quickAddDate,location:quickAddLocation,description:quickAddDescription,reminderEnabled:quickAddReminder,reminderMinutes:quickAddReminderMinutes,colorId:quickAddColorId,sourceDatabaseId:block.id};
    if(!quickAddAllDay){
     const start=new Date(quickAddDate+"T"+quickAddStart),end=new Date(quickAddDate+"T"+quickAddEnd);
     if(end<=start){setQuickAddError("The end time must be after the start time.");return;}
@@ -138,19 +138,56 @@ function OceanDatabaseBlock({block,updateBlock}){
   try{
    const connection=await api("/ocean/calendar/connection");
    if(!connection.connected){setSyncMessage("Connect Google Calendar before syncing.");return;}
-   const dates=dated.map(x=>dateKey(x.date)).sort();
-   const min=new Date(dates[0]+"T00:00:00"),max=new Date(dates[dates.length-1]+"T00:00:00");max.setDate(max.getDate()+1);
-   const q=new URLSearchParams({timeMin:min.toISOString(),timeMax:max.toISOString(),calendarId:"primary"});
+   // Reconcile the whole visible month, not only the dates currently used by database rows.
+   const monthStart=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth(),1);
+   const monthEnd=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+1,1);
+   const q=new URLSearchParams({timeMin:monthStart.toISOString(),timeMax:monthEnd.toISOString(),calendarId:"primary"});
    const existing=await api("/ocean/calendar/events?"+q.toString());
-   const keys=new Set((existing.items||[]).map(e=>String(e.summary||"").trim().toLowerCase()+"|"+(e.start?.date||e.start?.dateTime?.slice(0,10)||"")));
-   let added=0;
+   const items=existing.items||[];
+   const eventKey=e=>String(e.summary||"").trim().toLowerCase()+"|"+(e.start?.date||e.start?.dateTime?.slice(0,10)||"");
+   const desired=new Set(dated.map(x=>x.title.toLowerCase()+"|"+dateKey(x.date)));
+   const matchedIds=new Set();
+   let added=0,tagged=0,deleted=0;
    for(const item of dated){
     const key=item.title.toLowerCase()+"|"+dateKey(item.date);
-    if(keys.has(key))continue;
-    await api("/ocean/calendar/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({summary:item.title,calendarId:"primary",allDay:true,startDate:dateKey(item.date),endDate:dateKey(item.date)})});
-    keys.add(key);added++;
+    const match=items.find(e=>eventKey(e)===key&&!matchedIds.has(e.id));
+    if(match){
+     matchedIds.add(match.id);
+     const privateProps=match.extendedProperties?.private||{};
+     if(privateProps.oceanSource!=="ocean"||privateProps.oceanDatabaseId!==block.id){
+      await api("/ocean/calendar/events/"+encodeURIComponent(match.id),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({calendarId:"primary",sourceDatabaseId:block.id})});
+      tagged++;
+     }
+     continue;
+    }
+    await api("/ocean/calendar/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({summary:item.title,calendarId:"primary",allDay:true,startDate:dateKey(item.date),endDate:dateKey(item.date),sourceDatabaseId:block.id})});
+    added++;
    }
-   setSyncMessage(added?added+" item"+(added===1?"":"s")+" synced to Google Calendar.":"All dated items are already in Google Calendar.");
+   // Remove events owned by this database, plus legacy all-day OCEAN sync entries
+   // that predate ownership tags. Never touch untagged timed events.
+   const stale=items.filter(e=>{
+    if(matchedIds.has(e.id))return false;
+    const privateProps=e.extendedProperties?.private||{};
+    const owned=privateProps.oceanSource==="ocean"&&privateProps.oceanDatabaseId===block.id;
+    const legacy=!privateProps.oceanSource&&!!e.start?.date;
+    return owned||legacy;
+   });
+   if(stale.length){
+    const names=stale.slice(0,12).map(e=>"• "+(e.summary||"Untitled")+" — "+(e.start?.date||e.start?.dateTime?.slice(0,10)||"date unknown")).join("\n");
+    const extra=stale.length>12?"\n… and "+(stale.length-12)+" more":"";
+    const approved=window.confirm("Remove "+stale.length+" Google Calendar event"+(stale.length===1?"":"s")+" that no longer exist in this database?\n\n"+names+extra+"\n\nOnly this selected calendar is affected.");
+    if(approved){
+     for(const event of stale){
+      await api("/ocean/calendar/events/"+encodeURIComponent(event.id)+"?calendarId=primary",{method:"DELETE"});
+      deleted++;
+     }
+    }
+   }
+   const parts=[];
+   if(added)parts.push(added+" added");
+   if(tagged)parts.push(tagged+" matched event"+(tagged===1?"":"s")+" linked");
+   if(deleted)parts.push(deleted+" old event"+(deleted===1?"":"s")+" removed");
+   setSyncMessage(parts.length?parts.join(" · ")+".":stale.length?"No changes made; old events were kept.":"Google Calendar already matches this database.");
   }catch(e){setSyncMessage(e.message||"Could not sync existing items.");}
   finally{setSyncBusy(false);}
  };
