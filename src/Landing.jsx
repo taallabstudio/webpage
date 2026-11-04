@@ -122,8 +122,11 @@ function Landing() {
       stage.classList.toggle("hero-exiting", progress > 0.34);
 
       if (scrollHeadphone) {
-        scrollHeadphone.style.transform = `rotate(${(progress * 720).toFixed(2)}deg)`;
-        scrollHeadphone.style.opacity = String(Math.max(0, 1 - progress * 1.2));
+        // Keep the headphone centered in the viewport while the hero is active.
+        // Hide it completely as soon as the hero stage has scrolled out.
+        const heroStillVisible = rect.bottom > 0 && rect.top < viewportHeight;
+        scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 720).toFixed(2)}deg`);
+        scrollHeadphone.style.opacity = heroStillVisible ? String(Math.max(0, 1 - progress * 1.2)) : "0";
       }
     };
 

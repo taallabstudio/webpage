@@ -950,22 +950,23 @@ html{scroll-behavior:smooth}
    every actual piece of page content. */
 .scroll-headphone{
   position:fixed;
-  left:70%;
-  top:53%;
-  width:min(34vw,500px);
+  left:66%;
+  top:50%;
+  width:min(42vw,620px);
+  max-height:82vh;
   height:auto;
   z-index:15;
   margin:0;
-  margin-left:calc(min(34vw,500px) / -2);
-  margin-top:calc(min(34vw,500px) / -2);
   display:block;
   object-fit:contain;
-  transform:none;
+  transform:translate(-50%,-50%) rotate(var(--headphone-rotation,0deg));
   transform-origin:50% 50%;
   pointer-events:none;
   user-select:none;
   filter:drop-shadow(0 35px 45px rgba(10,54,88,.18));
   will-change:transform,opacity;
+  opacity:0;
+  transition:opacity .18s linear;
 }
 .landing > .landing-nav{
   position:fixed;
@@ -998,10 +999,9 @@ html{scroll-behavior:smooth}
 @media(max-width:760px){
   .scroll-headphone{
     left:50%;
-    top:82%;
-    width:min(76vw,380px);
-    margin-left:calc(min(76vw,380px) / -2);
-    margin-top:calc(min(76vw,380px) / -2);
+    top:58%;
+    width:min(78vw,440px);
+    max-height:62vh;
   }
 
   .hero-scroll-stage .hero-art{
