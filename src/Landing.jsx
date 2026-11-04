@@ -122,7 +122,8 @@ function Landing() {
       stage.classList.toggle("hero-exiting", progress > 0.34);
 
       if (scrollHeadphone) {
-        scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 360).toFixed(2)}deg`);
+        scrollHeadphone.style.transform = `rotate(${(progress * 720).toFixed(2)}deg)`;
+        scrollHeadphone.style.opacity = String(Math.max(0, 1 - progress * 1.2));
       }
     };
 
@@ -231,7 +232,7 @@ function Landing() {
     </header>
 
     {typeof document !== "undefined" && createPortal(
-      <ProgressiveImage className="scroll-headphone" src="/headphones.webp" previewSrc="/headphones-preview.avif" alt="" priority />,
+      <img className="scroll-headphone" src="/headphones.webp" alt="" aria-hidden="true" />,
       document.body
     )}
 
