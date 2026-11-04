@@ -90,6 +90,7 @@ html{scroll-behavior:smooth}
 .hero-scroll-stage{
   --hero-progress:0;
   position:relative;
+  z-index:0;
   /* Give the scroll-scrubbed headphone enough travel to rotate visibly. */
   height:155vh;
   background:
@@ -971,7 +972,7 @@ html{scroll-behavior:smooth}
   user-select:none;
   filter:drop-shadow(0 35px 45px rgba(10,54,88,.18));
   will-change:transform;
-  /* Above the hero's background, below every following content section. */
+  /* Paint after the hero stage but below all following content sections. */
   z-index:0;
 }
 .landing > .landing-nav{
