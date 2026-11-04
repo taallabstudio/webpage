@@ -184,7 +184,7 @@ function OceanGoogleCalendarBlock(){
   <div className="ocean-calendar-month-heading"><h4>{month.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</h4><span>Click a day to add an event</span></div>
   {!connection.connected&&!loading?<div className="ocean-note-calendar-connect"><p>Connect Google Calendar to add and manage events from this note.</p><button className="ocean-primary" onClick={()=>{window.location.href="/api/ocean/calendar/connect";}}>Connect Google Calendar</button></div>:null}
   {error&&<div className="ocean-admin-error">{error}</div>}
-  {loading?<div className="ocean-note-calendar-loading"><span className="ocean-mini-spinner"/> Loading your calendar…</div>:connection.connected?<div className="ocean-month-grid">
+  {loading?<div className="ocean-note-calendar-loading"><span className="ocean-mini-spinner"/> Loading your calendar…</div>:connection.connected?<div className="ocean-month-grid" style={{"--calendar-week-count":weekCount}}>
    {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div className="ocean-month-weekday" key={d}>{d}</div>)}
    {days.map(day=><div key={dateKey(day)} className={"ocean-month-day "+(day.getMonth()!==month.getMonth()?"outside":"")+(dateKey(day)===dateKey(new Date())?" today":"")}>
     <button className="ocean-month-day-number" onClick={()=>openForm(null,day)} title="Add event on this day"><span>{day.getDate()}</span><Plus size={13}/></button>
