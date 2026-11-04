@@ -18,8 +18,17 @@ const api=async(path,options={})=>{
 };
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 const blankBlock=(type="text")=>({id:uid(),type,text:""});
+const SLASH_COLORS=[
+ ["Gray","#7f8994","#f0f2f4"],["Red","#c64b4b","#fff0ef"],["Orange","#b86a28","#fff2e7"],
+ ["Yellow","#9b7b1e","#fff9e6"],["Green","#287a4c","#eaf7ef"],["Blue","#0878e8","#eaf4ff"],["Purple","#7956ae","#f3effb"]
+];
 const COMMANDS=[
-  ["Blue highlight","highlight-blue","Formatting","🖍"],["Text","text","Basic blocks","T"],["Heading 1","heading1","Basic blocks","H1"],["Heading 2","heading2","Basic blocks","H2"],["Heading 3","heading3","Basic blocks","H3"],["Heading 4","heading4","Basic blocks","H4"],
+  ["Blue highlight","highlight-blue","Formatting","🖍"],
+  ...SLASH_COLORS.flatMap(([name,text,bg])=>[
+   ["Text · "+name,"text-color-"+name.toLowerCase(),"Formatting","A",text],
+   ["Background · "+name,"background-color-"+name.toLowerCase(),"Formatting","▰",bg]
+  ]),
+  ["Reset text and background","color-reset","Formatting","↺"],["Text","text","Basic blocks","T"],["Heading 1","heading1","Basic blocks","H1"],["Heading 2","heading2","Basic blocks","H2"],["Heading 3","heading3","Basic blocks","H3"],["Heading 4","heading4","Basic blocks","H4"],
   ["Bulleted list","bullet","Basic blocks","•"],["Numbered list","numbered","Basic blocks","1."],["To-do list","todo","Basic blocks","☑"],["Toggle list","toggle","Basic blocks","›"],["Page","page","Basic blocks","▤"],["Callout","callout","Basic blocks","▣"],["Quote","quote","Basic blocks","❝"],["Table","table","Basic blocks","▦"],["Divider","divider","Basic blocks","—"],["Link to page","pageLink","Basic blocks","↗"],
   ["Image","image","Media","▧"],["Video","video","Media","▻"],["Audio","audio","Media","♫"],["Code","code","Media","</>"],["File","file","Media","↥"],["Web bookmark","bookmark","Media","♧"],
   ["Table view","database-table","Database","▦"],["Board view","database-board","Database","▤"],["Gallery view","database-gallery","Database","▦"],["List view","database-list","Database","☷"],["Feed view","database-feed","Database","▤"],["Dashboard view","database-dashboard","Database","▥"],["Calendar view","database-calendar","Database","▦"],["Timeline view","database-timeline","Database","▥"],["Map view","database-map","Database","⌖"],["Vertical bar chart","chart-vertical","Database","▥"],["Horizontal bar chart","chart-horizontal","Database","▤"],["Line chart","chart-line","Database","⌁"],["Donut chart","chart-donut","Database","◉"],["Number chart","chart-number","Database","#"],["Form","form","Database","☷"],["Database - Inline","database-inline","Database","▦"],["Database - Full page","database-full","Database","▦"],["Linked view of data source","database-linked","Database","↗"],
@@ -223,7 +232,7 @@ function OceanGoogleCalendarBlock(){
 function OceanApp(){
  const [user,setUser]=useState(null),[checking,setChecking]=useState(true),[authError,setAuthError]=useState("");
  const [pages,setPages]=useState([]),[page,setPage]=useState(null),[loading,setLoading]=useState(false),[saving,setSaving]=useState(false);
- const [collapsed,setCollapsed]=useState(false),[query,setQuery]=useState(""),[showSearch,setShowSearch]=useState(false),[showSlash,setShowSlash]=useState(false),[slashQuery,setSlashQuery]=useState(""),[slashBlock,setSlashBlock]=useState(null);
+ const [collapsed,setCollapsed]=useState(false),[query,setQuery]=useState(""),[showSearch,setShowSearch]=useState(false),[showSlash,setShowSlash]=useState(false),[slashQuery,setSlashQuery]=useState(""),[slashBlock,setSlashBlock]=useState(null),[activeSlashIndex,setActiveSlashIndex]=useState(0);
  const [showComments,setShowComments]=useState(false),[comments,setComments]=useState([]),[comment,setComment]=useState("");
  const [showAccount,setShowAccount]=useState(false),[showPageMenu,setShowPageMenu]=useState(false),[menuBlock,setMenuBlock]=useState(null),[colorMenu,setColorMenu]=useState(false);
  const [toast,setToast]=useState("");
@@ -255,7 +264,9 @@ function OceanApp(){
  const openPage=useCallback(async(id)=>{setActivePanel("page");setMobileNav(false);setLoading(true);setShowSlash(false);setShowPageMenu(false);try{const data=await api("/ocean/pages/"+id);const p=data.page;p.blocks=JSON.parse(p.blocks_json||"[]");setPage(p);setShowComments(false);}catch(e){setToast(e.message);}finally{setLoading(false);}},[]);
  useEffect(()=>{let alive=true;api("/auth/me").then(async d=>{if(!alive)return;if(!d.authenticated){setChecking(false);return;}setUser(d.user);if(d.user.role!=="admin"&&d.user.role!=="super_user")return;const list=await loadPages();if(alive&&list.length)await openPage(list[0].id);}).catch(e=>setAuthError(e.message)).finally(()=>{if(alive)setChecking(false);});return()=>{alive=false;};},[loadPages,openPage]);
  useEffect(()=>{if(!page)return;clearTimeout(saveTimer.current);setSaving(true);saveTimer.current=setTimeout(async()=>{try{await api("/ocean/pages/"+page.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:page.title,icon:page.icon,cover:page.cover,blocks:page.blocks,is_favorite:!!page.is_favorite})});setPages(old=>old.map(p=>p.id===page.id?{...p,title:page.title,icon:page.icon,cover:page.cover,is_favorite:page.is_favorite,updated_at:Math.floor(Date.now()/1000)}:p));setSaving(false);}catch(e){setSaving(false);setToast("Couldn't save: "+e.message);}},650);return()=>clearTimeout(saveTimer.current);},[page]);
- useEffect(()=>{if(showSlash){slashInput.current?.focus();}},[showSlash]);
+ useEffect(()=>{if(showSlash){setActiveSlashIndex(0);slashInput.current?.focus();}},[showSlash]);
+  useEffect(()=>{setActiveSlashIndex(0);},[slashQuery]);
+  useEffect(()=>{if(showSlash)document.querySelector(".ocean-slash-option.is-active")?.scrollIntoView({block:"nearest"});},[activeSlashIndex,showSlash]);
  useEffect(()=>{if(!showSlash)return;const closeOutside=e=>{const menu=document.querySelector(".ocean-slash-menu");if(menu&&!menu.contains(e.target)){setShowSlash(false);setSlashQuery("");setSlashBlock(null);}};document.addEventListener("pointerdown",closeOutside);return()=>document.removeEventListener("pointerdown",closeOutside);},[showSlash]);
  useEffect(()=>{const duplicate=e=>setPage(old=>old?{...old,blocks:[...old.blocks,e.detail]}:old);const remove=e=>setPage(old=>old?{...old,blocks:old.blocks.filter(b=>b.id!==e.detail)}:old);window.addEventListener("ocean-duplicate-block",duplicate);window.addEventListener("ocean-delete-block",remove);return()=>{window.removeEventListener("ocean-duplicate-block",duplicate);window.removeEventListener("ocean-delete-block",remove);};},[]);
  useEffect(()=>{if(activePanel==="access"&&user?.role==="admin"){setAdminLoading(true);api("/ocean/admin/users").then(d=>setAdminUsers(d.users||[])).catch(e=>setAdminError(e.message)).finally(()=>setAdminLoading(false));}},[activePanel,user?.role]);
@@ -304,7 +315,7 @@ function OceanApp(){
  };
   const insertBlock=(type,afterId=null,removeSlash=false)=>{
    const block=buildBlock(type);
-   const needsFollowingParagraph=block.type==="divider"||block.type==="database"||block.type==="chart";
+   const needsFollowingParagraph=block.type==="divider"||block.type==="database"||block.type==="chart"||block.type==="google-calendar";
    const following=needsFollowingParagraph?blankBlock("text"):null;
    setPage(old=>{
     if(!old)return old;
@@ -315,7 +326,26 @@ function OceanApp(){
    setShowSlash(false);setSlashQuery("");setSlashBlock(null);
    setTimeout(()=>focusContentEnd(blockRefs.current[following?.id||block.id]),80);
   };
- const chooseCommand=(type)=>{if(type==="highlight-blue"){const target=slashBlock||page.blocks.at(-1)?.id;updatePage({blocks:page.blocks.map(b=>b.id===target?{...b,text:"",html:"",background:"blue"}:b)});setShowSlash(false);setSlashQuery("");setSlashBlock(null);setTimeout(()=>focusContentEnd(blockRefs.current[target]),30);return;}insertBlock(type,slashBlock||page.blocks.at(-1)?.id,!!slashBlock);};
+ const chooseCommand=(type)=>{
+   const target=slashBlock||page.blocks.at(-1)?.id;
+   let field="",value="";
+   if(type==="highlight-blue"){field="bgColor";value="#eaf4ff";}
+   else if(type==="color-reset"){field="reset";value="";}
+   else if(type.startsWith("custom-text-color-")){field="textColor";value=type.slice("custom-text-color-".length);}
+   else if(type.startsWith("custom-background-color-")){field="bgColor";value=type.slice("custom-background-color-".length);}
+   else if(type.startsWith("text-color-")){field="textColor";value=SLASH_COLORS.find(c=>c[0].toLowerCase()===type.slice(11))?.[1]||"";}
+   else if(type.startsWith("background-color-")){field="bgColor";value=SLASH_COLORS.find(c=>c[0].toLowerCase()===type.slice(18))?.[2]||"";}
+   if(field){
+    const liveText=target?(blockRefs.current[target]?.innerText??page.blocks.find(b=>b.id===target)?.text??""):"";
+    const suffix="/"+slashQuery;
+    const cleaned=slashQuery&&liveText.toLowerCase().endsWith(suffix.toLowerCase())?liveText.slice(0,-suffix.length):liveText;
+    if(target)updatePage({blocks:page.blocks.map(b=>b.id===target?{...b,text:cleaned,html:formatInlineMarkdown(cleaned),...(field==="reset"?{textColor:"",bgColor:""}:{[field]:value})}:b)});
+    else{const block={...blankBlock("text"),...(field==="reset"?{textColor:"",bgColor:""}:{[field]:value})};setPage(old=>old?{...old,blocks:[...(old.blocks||[]),block]}:old);}
+    setShowSlash(false);setSlashQuery("");setSlashBlock(null);setActiveSlashIndex(0);
+    setTimeout(()=>focusContentEnd(blockRefs.current[target]||null),50);return;
+   }
+   insertBlock(type,target,!!slashBlock);
+  };
  const createPage=async(parentId=null)=>{try{const d=await api("/ocean/pages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:"Untitled",parent_id:parentId})});await loadPages();await openPage(d.page.id);setMobileNav(false);}catch(e){setToast(e.message);}};
  const deletePage=async()=>{if(!page||!confirm("Move this page to trash?"))return;try{await api("/ocean/pages/"+page.id,{method:"DELETE"});const list=await loadPages();setPage(null);if(list[0])openPage(list[0].id);setShowPageMenu(false);}catch(e){setToast(e.message);}};
  const addComment=async(e)=>{e.preventDefault();if(!comment.trim())return;try{await api("/ocean/pages/"+page.id+"/comments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({body:comment})});setComment("");const d=await api("/ocean/pages/"+page.id+"/comments");setComments(d.comments||[]);}catch(e){setToast(e.message);}};
@@ -341,8 +371,14 @@ function OceanApp(){
  const deleteCalendarEvent=async(id)=>{if(!confirm("Delete this event from Google Calendar?"))return;try{await api("/ocean/calendar/events/"+encodeURIComponent(id),{method:"DELETE"});await refreshCalendar();setToast("Calendar event deleted.");}catch(e){setCalendarError(e.message);}};
 
 
- const filteredCommands=COMMANDS.filter(c=>c[0].toLowerCase().includes(slashQuery.toLowerCase())||c[1].toLowerCase().includes(slashQuery.toLowerCase()));
- const commandGroups=[...new Set(filteredCommands.map(c=>c[2]))];
+ const normalizedSlashQuery=slashQuery.trim().toLowerCase();
+  const validHexColor=/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(slashQuery.trim())?slashQuery.trim().toLowerCase():"";
+  const customColorCommands=validHexColor?[
+   ["Text color · "+validHexColor,"custom-text-color-"+validHexColor,"Custom color","A",validHexColor],
+   ["Background · "+validHexColor,"custom-background-color-"+validHexColor,"Custom color","▰",validHexColor]
+  ]:[];
+  const filteredCommands=[...COMMANDS,...customColorCommands].filter(c=>c[0].toLowerCase().includes(normalizedSlashQuery)||c[1].toLowerCase().includes(normalizedSlashQuery));
+  const commandGroups=[...new Set(filteredCommands.map(c=>c[2]))];
 
  if(checking)return <div className="ocean-loading" role="status"><div className="ocean-loader-orbit"><div className="ocean-loader-mark"><OceanWaveMark/></div><i/><i/><i/></div><strong>OCEAN</strong><span>Opening your workspace</span><small>Getting your pages ready</small></div>;
  if(!user)return <OceanLogin onLogin={async()=>{try{const d=await api("/auth/me");setUser(d.user);if(d.user.role!=="admin"&&d.user.role!=="super_user")return;const list=await loadPages();if(list[0])await openPage(list[0].id);}catch(e){setAuthError(e.message);}}}/>;
@@ -418,7 +454,7 @@ function OceanApp(){
      <div className="ocean-blocks">{(page.blocks||[]).map(renderBlock)}
       {!(page.blocks||[]).some(b=>(b.text||"").trim())&&<div className="ocean-add-line"><button onClick={()=>{setSlashBlock(null);setSlashQuery("");setShowSlash(true);}}><Plus size={15}/> Type / for commands</button></div>}
      </div>
-     {showSlash&&<div className="ocean-slash-menu"><div className="ocean-slash-search"><span>/</span><input ref={slashInput} value={slashQuery} onChange={e=>setSlashQuery(e.target.value)} placeholder="Search for a block…" onKeyDown={e=>{if(e.key==="Escape"){e.preventDefault();setShowSlash(false);setTimeout(()=>focusContentEnd(blockRefs.current[slashBlock]),30);}if(e.key==="Enter"&&filteredCommands[0]){e.preventDefault();chooseCommand(filteredCommands[0][1]);}if(e.key==="Backspace"&&!slashQuery){e.preventDefault();setShowSlash(false);setTimeout(()=>focusContentEnd(blockRefs.current[slashBlock]),30);}}}/><kbd>ESC</kbd></div><div className="ocean-slash-results">{commandGroups.map(group=><section key={group}><small>{group}</small>{filteredCommands.filter(c=>c[2]===group).map(c=><button key={c[1]} onMouseDown={e=>e.preventDefault()} onClick={()=>chooseCommand(c[1])}><span className="ocean-command-icon">{c[3]}</span><span>{c[0]}</span></button>)}</section>)}{!filteredCommands.length&&<p>No matching blocks</p>}</div></div>}
+     {showSlash&&<div className="ocean-slash-menu"><div className="ocean-slash-search"><span>/</span><input ref={slashInput} value={slashQuery} onChange={e=>{setSlashQuery(e.target.value);setActiveSlashIndex(0);}} placeholder="Search blocks or enter a hex color (#4169E1)" onKeyDown={e=>{if(e.key==="ArrowDown"&&filteredCommands.length){e.preventDefault();setActiveSlashIndex(i=>(i+1)%filteredCommands.length);}else if(e.key==="ArrowUp"&&filteredCommands.length){e.preventDefault();setActiveSlashIndex(i=>(i-1+filteredCommands.length)%filteredCommands.length);}else if(e.key==="Home"&&filteredCommands.length){e.preventDefault();setActiveSlashIndex(0);}else if(e.key==="End"&&filteredCommands.length){e.preventDefault();setActiveSlashIndex(filteredCommands.length-1);}else if(e.key==="Escape"){e.preventDefault();setShowSlash(false);setTimeout(()=>focusContentEnd(blockRefs.current[slashBlock]),30);}else if(e.key==="Enter"&&filteredCommands[activeSlashIndex]){e.preventDefault();chooseCommand(filteredCommands[activeSlashIndex][1]);}else if(e.key==="Backspace"&&!slashQuery){e.preventDefault();setShowSlash(false);setTimeout(()=>focusContentEnd(blockRefs.current[slashBlock]),30);}}}/><kbd>ESC</kbd></div><div className="ocean-slash-results">{commandGroups.map(group=><section key={group}><small>{group}</small>{filteredCommands.filter(c=>c[2]===group).map(c=><button key={c[1]} className={"ocean-slash-option "+(filteredCommands.findIndex(x=>x[1]===c[1])===activeSlashIndex?"is-active":"")} aria-selected={filteredCommands.findIndex(x=>x[1]===c[1])===activeSlashIndex} onMouseDown={e=>e.preventDefault()} onMouseEnter={()=>setActiveSlashIndex(filteredCommands.findIndex(x=>x[1]===c[1]))} onClick={()=>chooseCommand(c[1])}><span className="ocean-command-icon" style={c[4]?{background:c[4],borderColor:c[4],color:"#fff"}:undefined}>{c[3]}</span><span>{c[0]}</span></button>)}</section>)}{!filteredCommands.length&&<p>No matching blocks</p>}</div></div>}
     </article>
    </div>:<div className="ocean-empty"><div className="ocean-mark">O</div><h2>Your space, your flow.</h2><p>Create a page to start writing.</p><button className="ocean-primary" onClick={()=>createPage()}>Create a page</button></div>}
   </main>
