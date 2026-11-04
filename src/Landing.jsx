@@ -106,7 +106,8 @@ function Landing() {
     revealElements.forEach((element) => observer.observe(element));
 
     const stage = document.querySelector(".hero-scroll-stage");
-    const scrollHeadphone = document.querySelector(".scroll-headphone");
+    const heroArt = stage?.querySelector(".hero-art");
+    const scrollHeadphone = stage?.querySelector(".scroll-headphone");
     let raf = 0;
 
     const updateHero = () => {
@@ -115,15 +116,17 @@ function Landing() {
       const viewportHeight = window.innerHeight;
       const rect = stage.getBoundingClientRect();
       const scrollable = Math.max(stage.offsetHeight - viewportHeight, 1);
-      // Progress is tied to the sticky interval: 0 at its entry and 1
-      // exactly when the sticky hero releases at the end of the stage.
+      // One continuous progress value drives the hero and the headphone.
+      // The headphone stays pinned to the artwork centre while later
+      // sections naturally scroll in front of it.
       const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
       stage.style.setProperty("--hero-progress", progress.toFixed(4));
-      stage.classList.toggle("hero-exiting", progress > 0.34);
 
-      if (scrollHeadphone) {
-        // The image lives inside the hero artwork, so it naturally passes
-        // behind the next sections as the sticky hero releases.
+      if (heroArt && scrollHeadphone) {
+        const artRect = heroArt.getBoundingClientRect();
+        scrollHeadphone.style.setProperty("--headphone-x", `${(artRect.left + artRect.width / 2).toFixed(2)}px`);
+        scrollHeadphone.style.setProperty("--headphone-y", `${(artRect.top + artRect.height / 2).toFixed(2)}px`);
+        scrollHeadphone.style.setProperty("--headphone-size", `${Math.min(artRect.width * 0.88, 620).toFixed(2)}px`);
         scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 360).toFixed(2)}deg`);
       }
     };
@@ -234,6 +237,7 @@ function Landing() {
 
     <section className="hero-scroll-stage" aria-label="TaalLab introduction">
       <div className="hero-sticky">
+        <img className="scroll-headphone" src="/headphones.webp" alt="" aria-hidden="true" />
         <div className="hero-section">
           <div className="hero-copy">
             <div className="eyebrow"><span className="dot" /> TAAL LAB • RECORDING &amp; MUSIC PRODUCTION</div>
@@ -245,7 +249,6 @@ function Landing() {
           </div>
 
           <div className="hero-art" aria-hidden="true">
-            <img className="scroll-headphone" src="/headphones.webp" alt="" />
             <div className="hero-art-glow" />
             <div className="hero-art-ring ring-one" />
             <div className="hero-art-ring ring-two" />
