@@ -967,6 +967,9 @@ html{scroll-behavior:smooth}
   filter:drop-shadow(0 35px 45px rgba(10,54,88,.18));
   will-change:transform;
 }
+.progressive-image.scroll-headphone{aspect-ratio:1/1;height:auto}
+.progressive-image.scroll-headphone .progressive-full{object-fit:contain}
+.progressive-image.scroll-headphone .progressive-preview{object-fit:contain;filter:blur(5px)}
 
 .landing > .landing-nav{
   position:fixed;
