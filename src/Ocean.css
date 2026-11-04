@@ -846,3 +846,11 @@
 .ocean-shell[data-theme="dark"] .ocean-db-option-list button:hover,.ocean-shell[data-theme="dark"] .ocean-db-option-create:hover,.ocean-shell[data-theme="dark"] .ocean-db-option-clear:hover,.ocean-shell[data-theme="dark"] .ocean-db-type-picker button:hover,.ocean-shell[data-theme="dark"] .ocean-db-type-picker button.selected{background:#343e49;color:#fff}
 .ocean-shell[data-theme="dark"] .ocean-db-property-create>label{color:#aab5c1}
 @media(max-width:520px){.ocean-db-type-picker{grid-template-columns:1fr}}
+
+.ocean-db-view-settings{left:auto;right:0;top:42px;max-height:min(72vh,600px);overflow:auto}
+.ocean-db-view-settings>label{display:flex;align-items:center;gap:8px}
+.ocean-db-view-settings>label select{margin-left:auto;max-width:130px;padding:5px 7px;border:1px solid #dce4ec;border-radius:6px;background:#fff;color:#435363;font-size:11px}
+.ocean-db-settings-divider{height:1px;margin:4px 0;background:#e6ebf0}
+.ocean-db-view-settings>button{width:100%}
+.ocean-shell[data-theme="dark"] .ocean-db-view-settings>label select{background:#20252c;border-color:#414c58;color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-db-settings-divider{background:#414c58}
