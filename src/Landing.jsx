@@ -275,7 +275,7 @@ function Landing() {
     </section>
     {typeof document !== "undefined" && createPortal(
       <img className="scroll-headphone" src="/headphones.webp" alt="" aria-hidden="true" />,
-      document.body
+      document.getElementById("root")
     )}
 
     <section className="site-section services-section reveal-on-scroll" id="services">
