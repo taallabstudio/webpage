@@ -1,0 +1,26 @@
+name: OCEAN branch validation
+
+on:
+  push:
+    branches:
+      - ocean-google-calendar
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout OCEAN development branch
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install
+      - name: Build frontend assets
+        run: npm run build
+      - name: Validate Worker without deploying
+        run: npx wrangler deploy --dry-run --outdir=/tmp/ocean-worker-dry-run
