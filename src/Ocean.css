@@ -680,3 +680,12 @@
 .ocean-shell[data-theme="dark"] .ocean-google-calendar-picker{border-color:#3c4651}
 .ocean-shell[data-theme="dark"] .ocean-google-calendar-picker select{background:#2b323b;border-color:#414c58;color:#e5eaf0}
 @media(max-width:640px){.ocean-google-event-form{padding:0 14px 15px;border-radius:13px}.ocean-google-event-dates{align-items:stretch}.ocean-google-event-dates label{flex:1;min-width:120px}.ocean-google-event-dates>span{display:none}.ocean-google-event-reminder{flex-wrap:wrap}.ocean-google-event-reminder>select{flex-basis:100%}.ocean-google-event-actions{flex-wrap:wrap}.ocean-google-event-actions>span{display:none}}
+
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd{background:#20252c;color:#e5eaf0;border-color:#414c58}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd-head strong{color:#e5eaf0}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd label{color:#b7c2cd}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd input,.ocean-shell[data-theme="dark"] .ocean-db-quickadd textarea{background:#2b323b;border-color:#414c58;color:#e5eaf0}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd-head>button{background:#303943!important;color:#c4ced8!important}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd-actions button{background:#2b323b!important;border-color:#414c58!important;color:#d5dee7!important}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd-actions button[type="submit"]{background:#0878e8!important;border-color:#0878e8!important;color:#fff!important}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd-error{background:#482f30;color:#f1aaaa}
