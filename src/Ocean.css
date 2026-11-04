@@ -898,3 +898,8 @@
 .ocean-shell[data-theme="dark"] .ocean-db-record-comments article,.ocean-shell[data-theme="dark"] .ocean-db-record-page>footer{border-color:#343d47}
 .ocean-shell[data-theme="dark"] .ocean-db-record-comments textarea,.ocean-shell[data-theme="dark"] .ocean-db-record-comments form button,.ocean-shell[data-theme="dark"] .ocean-db-record-page>footer button{background:#252c34;border-color:#414c58;color:#d6dfe8}
 @media(max-width:600px){.ocean-db-record-page{padding:18px 16px}.ocean-db-record-page>h2{font-size:24px}.ocean-db-record-property{grid-template-columns:110px 1fr}}
+
+.ocean-db-table .ocean-db-group-row td{height:34px;padding:7px 10px;background:#f7f8fa;color:#667482;border-bottom:1px solid #e5e9ee}
+.ocean-db-group-row td strong{font-size:11px;font-weight:650}
+.ocean-db-group-row td small{float:right;color:#97a2ad;font-size:10px}
+.ocean-shell[data-theme="dark"] .ocean-db-table .ocean-db-group-row td{background:#252b33;color:#c2ccd6;border-color:#3a424d}
