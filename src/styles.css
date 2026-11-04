@@ -951,17 +951,16 @@ html{scroll-behavior:smooth}
 
 /* The headphone sits above section backgrounds but below
    every actual piece of page content. */
-/* The headphone belongs to the hero artwork, not the document.
-   It shares the exact center of the animated rings and naturally scrolls
-   behind the following sections when the hero ends. */
-.hero-art .scroll-headphone{
-  position:absolute;
-  left:50%;
-  top:50%;
-  width:88%;
-  height:88%;
+/* Pin the headphone to the measured centre of the hero artwork.
+   The following sections (z-index:1) pass in front of it as the page scrolls. */
+.hero-sticky .scroll-headphone{
+  position:fixed;
+  left:var(--headphone-x,66%);
+  top:var(--headphone-y,50%);
+  width:var(--headphone-size,min(41vw,620px));
+  height:auto;
   max-width:620px;
-  max-height:620px;
+  max-height:82vh;
   margin:0;
   display:block;
   object-fit:contain;
@@ -992,6 +991,10 @@ html{scroll-behavior:smooth}
     right:auto;
     margin-left:calc(min(94vw,520px) / -2);
     transform:translate3d(calc(var(--hero-progress) * -2vw),calc(var(--hero-progress) * -35px),0);
+  }
+  .hero-sticky .scroll-headphone{
+    max-width:min(94vw,520px);
+    max-height:62vh;
   }
 }
 
