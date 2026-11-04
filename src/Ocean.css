@@ -624,3 +624,59 @@
 }
 
 /* Keep OCEAN editor theme fixes in the production build. */
+
+
+/* OCEAN Google Calendar event composer, inspired by the Google Calendar event editor. */
+.ocean-google-event-backdrop{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(12,18,25,.62);backdrop-filter:blur(4px);overflow:auto}
+.ocean-google-event-form{width:min(710px,100%);max-height:min(92vh,900px);overflow:auto;padding:0 24px 20px;border-radius:18px;background:#fff;color:#273444;box-shadow:0 24px 90px rgba(0,0,0,.35);display:grid;gap:16px}
+.ocean-google-event-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:16px;padding:16px 0 10px;background:#fff}
+.ocean-google-event-head>button{width:28px;height:28px;display:grid;place-items:center;color:#617080}
+.ocean-google-event-head>input{flex:1;min-width:0;padding:4px 0 9px;border:0;border-bottom:2px solid #9bbfe5;border-radius:0;background:transparent;color:#25384b;font-size:22px;outline:0}
+.ocean-google-event-dates{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ocean-google-event-dates label{display:grid;gap:5px;color:#6b7785;font-size:10px;font-weight:650}
+.ocean-google-event-dates input,.ocean-google-event-options select,.ocean-google-event-field select{min-width:0;padding:10px 11px;border:1px solid #e1e5e9;border-radius:7px;background:#f5f6f7;color:#293747;font:inherit;font-size:12px}
+.ocean-google-event-options{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.ocean-google-event-check{display:flex;align-items:center;gap:8px;color:#536171;font-size:12px}
+.ocean-google-event-check input,.ocean-google-event-reminder input{accent-color:#4285f4}
+.ocean-google-event-details{display:grid;gap:0;padding:14px 0 8px;border-radius:16px;background:#f7f8fa}
+.ocean-google-event-tab{padding:0 16px 12px;border-bottom:1px solid #dfe4e9;color:#4285f4;font-size:12px;font-weight:700}
+.ocean-google-event-field,.ocean-google-event-description{min-height:54px;display:flex;align-items:center;gap:14px;padding:10px 16px;color:#738091}
+.ocean-google-event-field>svg,.ocean-google-event-description>svg{flex:none}
+.ocean-google-event-field>input,.ocean-google-event-description textarea{flex:1;min-width:0;padding:10px 12px;border:1px solid #dfe4e9;border-radius:6px;background:#fff;color:#293747;font:inherit;font-size:12px;outline:0}
+.ocean-google-event-reminder>label{display:flex;align-items:center;gap:8px;min-width:115px;color:#475666;font-size:12px}
+.ocean-google-event-reminder>select{flex:1}
+.ocean-google-event-calendar>label{color:#455567;font-size:12px;min-width:95px}
+.ocean-google-event-calendar>select{flex:1;min-width:0}
+.ocean-google-event-calendar>span{width:14px;height:14px;border-radius:50%;flex:none}
+.ocean-google-event-description{align-items:flex-start}
+.ocean-google-event-description textarea{min-height:130px;resize:vertical}
+.ocean-google-event-actions{display:flex;align-items:center;gap:10px;padding-top:2px}
+.ocean-google-event-actions>span{flex:1}
+.ocean-google-event-actions button{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border:1px solid #dfe5eb;border-radius:8px;background:#fff;color:#566575;font-size:12px;font-weight:650}
+.ocean-google-event-actions button[type="submit"]{border-color:#4285f4;background:#4285f4;color:#fff}
+.ocean-google-event-actions button.danger{color:#c33d45}
+.ocean-google-calendar-picker{display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid #e8edf2}
+.ocean-google-calendar-picker label{display:flex;align-items:center;gap:9px;color:#69798a;font-size:11px}
+.ocean-google-calendar-picker select{max-width:280px;padding:6px 9px;border:1px solid #e1e6ec;border-radius:7px;background:#fff;color:#334253;font-size:11px}
+.ocean-google-calendar-picker>span{width:10px;height:10px;border-radius:50%}
+.ocean-db-quickadd{max-height:90vh;overflow:auto}
+.ocean-db-quickadd textarea{width:100%;padding:10px;border:1px solid #dce4ec;border-radius:7px;background:#fff;color:#243444;font:inherit;font-size:13px;resize:vertical}
+.ocean-db-quickadd-time{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ocean-db-quickadd-check{display:flex!important;align-items:center;gap:8px!important}
+.ocean-db-quickadd-check input{width:15px;height:15px;accent-color:#0878e8}
+.ocean-db-quickadd-error{margin:0;padding:9px;border-radius:7px;background:#fff0ef;color:#b53c3c;font-size:11px}
+.ocean-db-quickadd-error button{color:#0878e8;text-decoration:underline}
+.ocean-db-calendar-toolbar>div:last-child{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.ocean-db-calendar-toolbar>div:last-child>button:disabled{opacity:.55}
+.ocean-db-calendar-toolbar>div:last-child>button:not(.ocean-db-new){padding:7px 9px;border:1px solid #dce4ec;border-radius:7px;background:#fff;color:#5d6d7e;font-size:11px}
+.ocean-shell[data-theme="dark"] .ocean-google-event-form{background:#20252c;color:#e5eaf0}
+.ocean-shell[data-theme="dark"] .ocean-google-event-head{background:#20252c}
+.ocean-shell[data-theme="dark"] .ocean-google-event-head>input{color:#e5eaf0;border-color:#4c86bd}
+.ocean-shell[data-theme="dark"] .ocean-google-event-dates label,.ocean-shell[data-theme="dark"] .ocean-google-event-check,.ocean-shell[data-theme="dark"] .ocean-google-event-field,.ocean-shell[data-theme="dark"] .ocean-google-event-description{color:#b6c1cc}
+.ocean-shell[data-theme="dark"] .ocean-google-event-dates input,.ocean-shell[data-theme="dark"] .ocean-google-event-options select,.ocean-shell[data-theme="dark"] .ocean-google-event-field select,.ocean-shell[data-theme="dark"] .ocean-google-event-field>input,.ocean-shell[data-theme="dark"] .ocean-google-event-description textarea{background:#2b323b;border-color:#414c58;color:#e5eaf0}
+.ocean-shell[data-theme="dark"] .ocean-google-event-details{background:#252c34}
+.ocean-shell[data-theme="dark"] .ocean-google-event-tab{border-color:#414c58}
+.ocean-shell[data-theme="dark"] .ocean-google-event-actions button{background:#2b323b;border-color:#414c58;color:#d5dee7}
+.ocean-shell[data-theme="dark"] .ocean-google-calendar-picker{border-color:#3c4651}
+.ocean-shell[data-theme="dark"] .ocean-google-calendar-picker select{background:#2b323b;border-color:#414c58;color:#e5eaf0}
+@media(max-width:640px){.ocean-google-event-form{padding:0 14px 15px;border-radius:13px}.ocean-google-event-dates{align-items:stretch}.ocean-google-event-dates label{flex:1;min-width:120px}.ocean-google-event-dates>span{display:none}.ocean-google-event-reminder{flex-wrap:wrap}.ocean-google-event-reminder>select{flex-basis:100%}.ocean-google-event-actions{flex-wrap:wrap}.ocean-google-event-actions>span{display:none}}
