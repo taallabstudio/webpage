@@ -75,6 +75,14 @@ const focusContentEnd=(element)=>{
  selection.removeAllRanges();
  selection.addRange(range);
 };
+const isCaretAtStart=(element)=>{
+ const selection=window.getSelection();
+ if(!selection?.isCollapsed||!element.contains(selection.anchorNode))return false;
+ const range=document.createRange();
+ range.selectNodeContents(element);
+ range.setEnd(selection.anchorNode,selection.anchorOffset);
+ return range.toString()==="";
+};
 function OceanWaveMark({className=""}){return <svg className={className} viewBox="0 0 48 32" aria-hidden="true" fill="none"><path d="M3 11.5C8 5.5 13 5.5 18 11.5S28 17.5 33 11.5 43 5.5 47 11.5" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round"/><path d="M3 20C8 14 13 14 18 20s10 6 15 0 10-6 14-0" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round"/><path d="M3 28C8 22 13 22 18 28s10 6 15 0 10-6 14 0" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round"/></svg>}
 function OceanLogin({onLogin}){
  const [email,setEmail]=useState("");const [password,setPassword]=useState("");const [code,setCode]=useState("");const [challenge,setChallenge]=useState("");const [error,setError]=useState("");const [busy,setBusy]=useState(false);
@@ -832,6 +840,64 @@ function OceanApp(){
   updateBlock(toolbar.blockId,{text,html:editable.innerHTML});
   setTextFormatToolbar(null);
  };
+ const handleEditorKeyDown=(e,block,index)=>{
+ const element=e.currentTarget;
+ if(pageLinkSuggestion?.blockId===block.id){
+  const matches=getPageLinkMatches(pageLinkSuggestion.query);
+  if(e.key==="ArrowDown"&&matches.length){e.preventDefault();setPageLinkSuggestion(s=>({...s,activeIndex:((s.activeIndex||0)+1)%matches.length}));return;}
+  if(e.key==="ArrowUp"&&matches.length){e.preventDefault();setPageLinkSuggestion(s=>({...s,activeIndex:((s.activeIndex||0)-1+matches.length)%matches.length}));return;}
+  if(e.key==="Enter"&&matches.length){e.preventDefault();e.stopPropagation();insertPageLink(block.id,matches[Math.min(pageLinkSuggestion.activeIndex||0,matches.length-1)]);return;}
+  if(e.key==="Escape"){e.preventDefault();setPageLinkSuggestion(null);return;}
+ }
+ if(e.key==="Escape"&&showSlash){setShowSlash(false);setSlashFromTyping(false);return;}
+ if((e.key===" "||e.key==="Enter")&&!e.ctrlKey&&!e.metaKey){
+  const raw=element.innerText.trim();
+  const shortcuts={"#":"heading1","##":"heading2","###":"heading3","-":"bullet","*":"bullet","1.":"numbered","[]":"todo",">":"quote","---":"divider"};
+  const target=shortcuts[raw];
+  if(!target&&e.key===" "){
+   const current=element.innerText;
+   const formatted=formatInlineMarkdown(current);
+   const plain=escapeHtml(current).replace(/\n/g,"<br>");
+   if(formatted!==plain){e.preventDefault();updateBlock(block.id,{text:current,html:formatted});setTimeout(()=>focusContentEnd(blockRefs.current[block.id]),30);return;}
+  }
+  if(target){
+   e.preventDefault();
+   if(target==="divider"){updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,type:"divider",text:"",html:""}:b)});insertBlock("text",block.id);return;}
+   updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,type:target,text:"",html:""}:b)});
+   setTimeout(()=>focusContentEnd(blockRefs.current[block.id]),50);
+   return;
+  }
+  if(raw==="/blue"){e.preventDefault();updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,text:"",html:"",background:"blue"}:b)});setTimeout(()=>focusContentEnd(blockRefs.current[block.id]),30);return;}
+ }
+ if(e.key==="Enter"&&!e.shiftKey&&!showSlash){
+  e.preventDefault();
+  const currentText=element.innerText;
+  const isList=["bullet","numbered","todo"].includes(block.type);
+  if(isList&&!currentText.trim()){
+   updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,type:"text",text:"",html:""}:b)});
+   setTimeout(()=>focusContentEnd(blockRefs.current[block.id]),30);
+  }else{
+   updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,text:currentText,html:formatPageLinks(currentText)}:b)});
+   insertBlock(isList?block.type:"text",block.id);
+  }
+  return;
+ }
+ if(e.key==="Backspace"&&["bullet","numbered","todo"].includes(block.type)&&isCaretAtStart(element)){
+  const text=readEditorText(element);
+  e.preventDefault();
+  updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,type:"text",text,html:formatInlineMarkdown(text)}:b)});
+  setTimeout(()=>focusContentEnd(blockRefs.current[block.id]),30);
+  return;
+ }
+ // contentEditable can report an empty line as a newline or a <br>.
+ // Treat all visually empty content as an empty paragraph and join it upward.
+ if(e.key==="Backspace"&&index>0&&!readEditorText(element).replace(/[\u200b\u00a0]/g,"").trim()){
+  e.preventDefault();
+  const previousBlockId=page.blocks[index-1]?.id;
+  updatePage({blocks:page.blocks.filter(b=>b.id!==block.id)});
+  setTimeout(()=>focusContentEnd(blockRefs.current[previousBlockId]),30);
+ }
+};
  const renderBlock=(block,index)=>{
   const isText=["text","heading1","heading2","heading3","heading4","bullet","numbered","todo","quote","callout","toggle","code","mermaid","equation","inline-equation","toc","page","pageLink","form","meeting","button","breadcrumb","tabs","synced","toggle-heading1","toggle-heading2","toggle-heading3","mention","mention-page","date","emoji"].includes(block.type);
   if(block.type==="divider")return <div className="ocean-divider" key={block.id} onMouseEnter={()=>setMenuBlock(block.id)}><div/></div>;
@@ -852,7 +918,7 @@ function OceanApp(){
     {block.type==="todo"&&<input className="ocean-check" type="checkbox" checked={!!block.checked} onChange={e=>updateBlock(block.id,{checked:e.target.checked})}/>}
     {block.type==="bullet"&&<span className="ocean-list-marker">•</span>}{block.type==="numbered"&&<span className="ocean-list-marker">{index+1}.</span>}
     {block.type==="toggle"&&<details className="ocean-toggle"><summary></summary><div className="ocean-toggle-body">{block.children||"Add details…"}</div></details>}
-    {React.createElement(tag,{ref:el=>blockRefs.current[block.id]=el,contentEditable:true,suppressContentEditableWarning:true,"data-placeholder":placeholder,className:className,style:{color:block.textColor||undefined,"--ocean-block-highlight":block.bgColor||undefined},"data-highlight":block.bgColor?"true":undefined,dangerouslySetInnerHTML:{__html:block.html||formatPageLinks(block.text||"")},"data-ocean-block-id":block.id,onClick:async e=>{const link=e.target.closest("a[data-ocean-page-id]");if(link){e.preventDefault();const id=link.getAttribute("data-ocean-page-id");const text=readEditorText(e.currentTarget);const blocks=(page?.blocks||[]).map(b=>b.id===block.id?{...b,text,html:formatPageLinks(text)}:b);try{if(page)await api("/ocean/pages/"+page.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({blocks})});}catch(err){setToast("Could not save this page before opening the link: "+err.message);return;}openPage(id);setMobileNav(false);return;}const external=e.target.closest("a[href]");if(external){e.preventDefault();const url=safeLinkUrl(external.getAttribute("href")||"");if(url)window.open(url,"_blank","noopener,noreferrer");}},onInput:e=>{const text=e.currentTarget.innerText;const openAt=text.lastIndexOf("[[");const closeAt=text.lastIndexOf("]]");if(openAt>=0&&openAt>closeAt){setPageLinkSuggestion({blockId:block.id,query:text.slice(openAt+2),activeIndex:0});}else if(pageLinkSuggestion?.blockId===block.id){setPageLinkSuggestion(null);}const slashAt=text.lastIndexOf("/");if(slashAt>=0&&slashAt===text.length-1){setSlashBlock(block.id);setSlashFromTyping(true);setSlashQuery("");setShowSlash(true);}else if(showSlash&&slashBlock===block.id){const queryText=slashAt>=0?text.slice(slashAt+1):"";setSlashQuery(queryText);if(slashAt<0)setShowSlash(false);}},onBlur:e=>{const text=readEditorText(e.currentTarget);updateBlock(block.id,{text,html:editorHtml(e.currentTarget)});},onMouseUp:()=>{const selection=window.getSelection();if(!selection||selection.isCollapsed)setTextFormatToolbar(null);},onKeyUp:()=>{const selection=window.getSelection();if(!selection||selection.isCollapsed)setTextFormatToolbar(null);},onKeyDown:e=>{if(pageLinkSuggestion?.blockId===block.id){const matches=getPageLinkMatches(pageLinkSuggestion.query);if(e.key==="ArrowDown"&&matches.length){e.preventDefault();setPageLinkSuggestion(s=>({...s,activeIndex:((s.activeIndex||0)+1)%matches.length}));return;}if(e.key==="ArrowUp"&&matches.length){e.preventDefault();setPageLinkSuggestion(s=>({...s,activeIndex:((s.activeIndex||0)-1+matches.length)%matches.length}));return;}if(e.key==="Enter"&&matches.length){e.preventDefault();e.stopPropagation();insertPageLink(block.id,matches[Math.min(pageLinkSuggestion.activeIndex||0,matches.length-1)]);return;}if(e.key==="Escape"){e.preventDefault();setPageLinkSuggestion(null);return;}}if(e.key==="Escape"&&showSlash){setShowSlash(false);setSlashFromTyping(false);return;}if((e.key===" "||e.key==="Enter")&&!e.ctrlKey&&!e.metaKey){const raw=e.currentTarget.innerText.trim();const shortcuts={"#":"heading1","##":"heading2","###":"heading3","-":"bullet","*":"bullet","1.":"numbered","[]":"todo",">":"quote","---":"divider"};const target=shortcuts[raw];if(!target&&e.key===" "){const current=e.currentTarget.innerText;const formatted=formatInlineMarkdown(current);const plain=escapeHtml(current).replace(/\n/g,"<br>");if(formatted!==plain){e.preventDefault();updateBlock(block.id,{text:current,html:formatted});setTimeout(()=>focusContentEnd(blockRefs.current[block.id]),30);return;}}if(target){e.preventDefault();if(target==="divider"){updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,type:"divider",text:"",html:""}:b)});insertBlock("text",block.id);return;}updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,type:target,text:"",html:""}:b)});setTimeout(()=>focusContentEnd(blockRefs.current[block.id]),50);return;}if(raw==="/blue"){e.preventDefault();updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,text:"",html:"",background:"blue"}:b)});setTimeout(()=>focusContentEnd(blockRefs.current[block.id]),30);return;}}if(e.key==="Enter"&&!e.shiftKey&&!showSlash){e.preventDefault();const currentText=e.currentTarget.innerText;const isList=["bullet","numbered","todo"].includes(block.type);const html=formatPageLinks(currentText);if(isList&&!currentText.trim()){updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,type:"text",text:"",html:""}:b)});setTimeout(()=>focusContentEnd(blockRefs.current[block.id]),30);}else{updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,text:currentText,html}:b)});insertBlock(isList?block.type:"text",block.id);}}if(e.key==="Backspace"&&["bullet","numbered","todo"].includes(block.type)){const selection=window.getSelection();let beforeCaret="";if(selection&&selection.isCollapsed){const range=document.createRange();range.selectNodeContents(e.currentTarget);try{range.setEnd(selection.anchorNode,selection.anchorOffset);beforeCaret=range.toString();}catch{beforeCaret="x";}}if(selection&&selection.isCollapsed&&beforeCaret===""){e.preventDefault();const text=e.currentTarget.innerText;updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,type:"text",text,html:formatInlineMarkdown(text)}:b)});setTimeout(()=>focusContentEnd(blockRefs.current[block.id]),30);return;}}if(e.key==="Backspace"&&!e.currentTarget.innerText&&page.blocks.length>1){e.preventDefault();const arr=page.blocks.filter(b=>b.id!==block.id);updatePage({blocks:arr});setTimeout(()=>focusContentEnd(blockRefs.current[arr[Math.max(0,index-1)]?.id]),30);}}})}
+    {React.createElement(tag,{ref:el=>blockRefs.current[block.id]=el,contentEditable:true,suppressContentEditableWarning:true,"data-placeholder":placeholder,className:className,style:{color:block.textColor||undefined,"--ocean-block-highlight":block.bgColor||undefined},"data-highlight":block.bgColor?"true":undefined,dangerouslySetInnerHTML:{__html:block.html||formatPageLinks(block.text||"")},"data-ocean-block-id":block.id,onClick:async e=>{const link=e.target.closest("a[data-ocean-page-id]");if(link){e.preventDefault();const id=link.getAttribute("data-ocean-page-id");const text=readEditorText(e.currentTarget);const blocks=(page?.blocks||[]).map(b=>b.id===block.id?{...b,text,html:formatPageLinks(text)}:b);try{if(page)await api("/ocean/pages/"+page.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({blocks})});}catch(err){setToast("Could not save this page before opening the link: "+err.message);return;}openPage(id);setMobileNav(false);return;}const external=e.target.closest("a[href]");if(external){e.preventDefault();const url=safeLinkUrl(external.getAttribute("href")||"");if(url)window.open(url,"_blank","noopener,noreferrer");}},onInput:e=>{const text=e.currentTarget.innerText;const openAt=text.lastIndexOf("[[");const closeAt=text.lastIndexOf("]]");if(openAt>=0&&openAt>closeAt){setPageLinkSuggestion({blockId:block.id,query:text.slice(openAt+2),activeIndex:0});}else if(pageLinkSuggestion?.blockId===block.id){setPageLinkSuggestion(null);}const slashAt=text.lastIndexOf("/");if(slashAt>=0&&slashAt===text.length-1){setSlashBlock(block.id);setSlashFromTyping(true);setSlashQuery("");setShowSlash(true);}else if(showSlash&&slashBlock===block.id){const queryText=slashAt>=0?text.slice(slashAt+1):"";setSlashQuery(queryText);if(slashAt<0)setShowSlash(false);}},onBlur:e=>{const text=readEditorText(e.currentTarget);updateBlock(block.id,{text,html:editorHtml(e.currentTarget)});},onMouseUp:()=>{const selection=window.getSelection();if(!selection||selection.isCollapsed)setTextFormatToolbar(null);},onKeyUp:()=>{const selection=window.getSelection();if(!selection||selection.isCollapsed)setTextFormatToolbar(null);},onKeyDown:e=>handleEditorKeyDown(e,block,index)})}
     {pageLinkSuggestion?.blockId===block.id&&<div className="ocean-page-link-suggestions" role="listbox" aria-label="Matching pages" onMouseDown={e=>e.preventDefault()}>{getPageLinkMatches(pageLinkSuggestion.query).map((p,i)=><button type="button" role="option" aria-selected={i===(pageLinkSuggestion.activeIndex||0)} className={i===(pageLinkSuggestion.activeIndex||0)?"is-active":""} key={p.id} onMouseEnter={()=>setPageLinkSuggestion(s=>s?.blockId===block.id?({...s,activeIndex:i}):s)} onClick={()=>insertPageLink(block.id,p)}><span>↗</span>{p.title}</button>)}{!getPageLinkMatches(pageLinkSuggestion.query).length&&<small>No matching pages</small>}<small className="ocean-page-link-hint">↑↓ Navigate · Enter Select · Esc Close</small></div>}
     {menuBlock===block.id&&<div className="ocean-block-actions"><button title="Block options" onClick={()=>setColorMenu(v=>!v)}><MoreHorizontal size={15}/></button>{colorMenu&&<div className="ocean-color-menu"><strong>Text color</strong>{COLORS.map(([name,value])=><button key={name} onClick={()=>{updateBlock(block.id,{color:value});setColorMenu(false);}}>{name}</button>)}<strong>Background color</strong>{COLORS.map(([name,value])=><button key={name} onClick={()=>{updateBlock(block.id,{background:value});setColorMenu(false);}}>{name} background</button>)}<button onClick={()=>{updatePage({blocks:page.blocks.filter(b=>b.id!==block.id)});setColorMenu(false);}}>Delete block</button></div>}</div>}
   </div>;
