@@ -198,7 +198,6 @@ function Landing() {
 
   return <main className="landing" id="home">
     <div className="landing-glow" />
-    <img className="scroll-headphone" src="/headphones.webp" alt="" aria-hidden="true" />
     <header className="landing-nav">
       <a className="studio-brand" href="#home" aria-label="TaalLab home"><Logo studioOnly /></a>
 
@@ -273,6 +272,7 @@ function Landing() {
         <div className="hero-scroll-hint"><span>SCROLL TO EXPLORE</span><i /></div>
       </div>
     </section>
+    <img className="scroll-headphone" src="/headphones.webp" alt="" aria-hidden="true" />
 
     <section className="site-section services-section reveal-on-scroll" id="services">
       <div className="section-heading reveal">
