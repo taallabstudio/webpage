@@ -877,7 +877,7 @@ function OceanApp(){
    updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,type:"text",text:"",html:""}:b)});
    setTimeout(()=>focusContentEnd(blockRefs.current[block.id]),30);
   }else{
-   updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,text:currentText,html:formatPageLinks(currentText)}:b)});
+   updatePage({blocks:page.blocks.map(b=>b.id===block.id?{...b,text:readEditorText(element),html:editorHtml(element)}:b)});
    insertBlock(isList?block.type:"text",block.id);
   }
   return;
