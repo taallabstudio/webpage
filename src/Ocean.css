@@ -859,3 +859,42 @@
 .ocean-db-calc-result{margin-left:7px;padding-left:7px;border-left:1px solid #dce3e9;color:#667788}
 .ocean-shell[data-theme="dark"] .ocean-db-option-manage select{background:#20252c;border-color:#414c58;color:#d1dae3}
 .ocean-shell[data-theme="dark"] .ocean-db-calc-result{border-color:#414c58;color:#aebbc8}
+
+.ocean-db-title-cell{display:flex;align-items:center;min-width:0}
+.ocean-db-title-cell>button{width:25px;height:30px;flex:none;color:#8995a1;opacity:0}
+.ocean-db-table tr:hover .ocean-db-title-cell>button,.ocean-db-title-cell>button:focus-visible{opacity:1}
+.ocean-db-title-cell>input{flex:1;min-width:0}
+.ocean-db-record-backdrop{position:fixed;inset:0;z-index:11000;display:flex;justify-content:center;align-items:flex-start;padding:5vh 18px;background:rgba(16,22,29,.48);backdrop-filter:blur(3px);overflow:auto}
+.ocean-db-record-page{width:min(760px,100%);min-height:70vh;padding:22px 34px 24px;border:1px solid #e2e7ec;border-radius:13px;background:#fff;color:#263747;box-shadow:0 24px 80px rgba(0,0,0,.25)}
+.ocean-db-record-page>header{display:flex;align-items:center;justify-content:space-between;color:#8793a0;font-size:11px}
+.ocean-db-record-page>header button{width:29px;height:29px;border-radius:6px;background:#f2f4f6;color:#647383;font-size:19px}
+.ocean-db-record-page>h2{margin:20px 0 24px;font:700 30px "Space Grotesk",sans-serif;color:#273746;overflow-wrap:anywhere}
+.ocean-db-record-properties{display:grid;gap:0;max-width:560px}
+.ocean-db-record-property{display:grid;grid-template-columns:minmax(125px,175px) 1fr;align-items:center;min-height:42px;border-bottom:1px solid #edf0f3}
+.ocean-db-record-property>label{color:#8793a0;font-size:12px}
+.ocean-db-record-property>div{min-width:0}
+.ocean-db-record-property input:not([type=checkbox]){width:100%;padding:8px;border:0;border-radius:5px;background:transparent;color:#344454;font-size:12px;outline:0}
+.ocean-db-record-property input:focus{background:#f4f7fa}
+.ocean-db-record-comments{max-width:560px;margin-top:28px}
+.ocean-db-record-comments>strong{font-size:13px;color:#354657}
+.ocean-db-record-comments article{padding:10px 0;border-bottom:1px solid #edf0f3}
+.ocean-db-record-comments article small{color:#8b97a2;font-size:10px}
+.ocean-db-record-comments article p{margin:5px 0 0;color:#465665;font-size:12px;white-space:pre-wrap}
+.ocean-db-record-comments form{display:grid;justify-items:end;gap:8px;margin-top:12px}
+.ocean-db-record-comments textarea{width:100%;min-height:68px;padding:10px;border:1px solid #e0e6ec;border-radius:7px;color:#344454;font:inherit;font-size:12px;resize:vertical}
+.ocean-db-record-comments form button,.ocean-db-record-page>footer button{padding:7px 11px;border:1px solid #dce4eb;border-radius:6px;background:#fff;color:#536373;font-size:11px}
+.ocean-db-record-comments form button:disabled{opacity:.45}
+.ocean-db-record-page>footer{display:flex;align-items:center;gap:8px;margin-top:26px;padding-top:14px;border-top:1px solid #edf0f3}
+.ocean-db-record-page>footer span{flex:1}
+.ocean-db-record-page>footer button.danger{color:#c33d49}
+.ocean-shell[data-theme="dark"] .ocean-db-record-page{background:#20252c;border-color:#3a424d;color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-db-record-page>h2{color:#edf2f7}
+.ocean-shell[data-theme="dark"] .ocean-db-record-page>header button{background:#303943;color:#c4ced8}
+.ocean-shell[data-theme="dark"] .ocean-db-record-property{border-color:#343d47}
+.ocean-shell[data-theme="dark"] .ocean-db-record-property>label,.ocean-shell[data-theme="dark"] .ocean-db-record-comments article small{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-db-record-property input:not([type=checkbox]){color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-db-record-property input:focus{background:#29323b}
+.ocean-shell[data-theme="dark"] .ocean-db-record-comments>strong,.ocean-shell[data-theme="dark"] .ocean-db-record-comments article p{color:#d4dde6}
+.ocean-shell[data-theme="dark"] .ocean-db-record-comments article,.ocean-shell[data-theme="dark"] .ocean-db-record-page>footer{border-color:#343d47}
+.ocean-shell[data-theme="dark"] .ocean-db-record-comments textarea,.ocean-shell[data-theme="dark"] .ocean-db-record-comments form button,.ocean-shell[data-theme="dark"] .ocean-db-record-page>footer button{background:#252c34;border-color:#414c58;color:#d6dfe8}
+@media(max-width:600px){.ocean-db-record-page{padding:18px 16px}.ocean-db-record-page>h2{font-size:24px}.ocean-db-record-property{grid-template-columns:110px 1fr}}
