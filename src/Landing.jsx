@@ -44,7 +44,7 @@ function SiteAccountMenu({user,onLogout}) {
 function ProgressiveImage({src, previewSrc, alt, className="", priority=false}) {
   const [previewReady, setPreviewReady] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const avifSrc = src.replace(/\\.webp$/i, ".avif");
+  const avifSrc = src.replace(/\.webp$/i, ".avif");
   return <span className={`progressive-image ${className}`} aria-busy={!loaded}>
     <span className={`image-skeleton${previewReady ? " is-hidden" : ""}`} aria-hidden="true" />
     <img className="progressive-preview" src={previewSrc} alt="" aria-hidden="true"
