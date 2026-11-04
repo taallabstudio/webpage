@@ -954,6 +954,8 @@ html{scroll-behavior:smooth}
    every actual piece of page content. */
 /* Pin the headphone to the measured centre of the hero artwork.
    The following sections (z-index:1) pass in front of it as the page scrolls. */
+#root{isolation:isolate}
+
 .scroll-headphone{
   position:fixed;
   left:var(--headphone-x,66%);
@@ -972,7 +974,7 @@ html{scroll-behavior:smooth}
   user-select:none;
   filter:drop-shadow(0 35px 45px rgba(10,54,88,.18));
   will-change:transform;
-  /* Paint after the hero stage but below all following content sections. */
+  /* Share one stacking context with the page: above the hero, below sections. */
   z-index:0;
 }
 .landing > .landing-nav{
