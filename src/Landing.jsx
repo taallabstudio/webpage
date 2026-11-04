@@ -123,10 +123,17 @@ function Landing() {
       stage.style.setProperty("--hero-progress", progress.toFixed(4));
 
       if (heroArt && scrollHeadphone) {
-        const artRect = heroArt.getBoundingClientRect();
-        scrollHeadphone.style.setProperty("--headphone-x", `${(artRect.left + artRect.width / 2).toFixed(2)}px`);
-        scrollHeadphone.style.setProperty("--headphone-y", `${(artRect.top + artRect.height / 2).toFixed(2)}px`);
-        scrollHeadphone.style.setProperty("--headphone-size", `${Math.min(artRect.width * 0.88, 620).toFixed(2)}px`);
+        // While the sticky hero is active, keep the headphone aligned with
+        // the artwork. Once the hero reaches its release point, freeze those
+        // viewport coordinates so the next sections can scroll over it.
+        // On upward scrolling the hero re-enters the sticky interval and the
+        // coordinates are measured again.
+        if (rect.bottom >= viewportHeight - 1) {
+          const artRect = heroArt.getBoundingClientRect();
+          scrollHeadphone.style.setProperty("--headphone-x", `${(artRect.left + artRect.width / 2).toFixed(2)}px`);
+          scrollHeadphone.style.setProperty("--headphone-y", `${(artRect.top + artRect.height / 2).toFixed(2)}px`);
+          scrollHeadphone.style.setProperty("--headphone-size", `${Math.min(artRect.width * 0.88, 620).toFixed(2)}px`);
+        }
         scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 360).toFixed(2)}deg`);
       }
     };
