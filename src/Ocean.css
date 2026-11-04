@@ -854,3 +854,8 @@
 .ocean-db-view-settings>button{width:100%}
 .ocean-shell[data-theme="dark"] .ocean-db-view-settings>label select{background:#20252c;border-color:#414c58;color:#e1e8ef}
 .ocean-shell[data-theme="dark"] .ocean-db-settings-divider{background:#414c58}
+
+.ocean-db-option-manage select{max-width:82px;padding:5px 4px;border:1px solid #e0e6ec;border-radius:5px;background:#fff;color:#657382;font-size:10px}
+.ocean-db-calc-result{margin-left:7px;padding-left:7px;border-left:1px solid #dce3e9;color:#667788}
+.ocean-shell[data-theme="dark"] .ocean-db-option-manage select{background:#20252c;border-color:#414c58;color:#d1dae3}
+.ocean-shell[data-theme="dark"] .ocean-db-calc-result{border-color:#414c58;color:#aebbc8}
