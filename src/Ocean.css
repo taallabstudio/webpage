@@ -729,3 +729,8 @@
 .ocean-shell[data-theme="dark"] .ocean-google-event-color>div:first-child{color:#b6c1cc}
 .ocean-shell[data-theme="dark"] .ocean-google-event-reminder>input[type="number"]{background:#2b323b;border-color:#414c58;color:#e5eaf0}
 @media(max-width:520px){.ocean-google-event-detail{padding:18px 16px}.ocean-google-detail-actions{flex-wrap:wrap}.ocean-google-detail-actions>span{display:none}.ocean-google-detail-actions button{flex:1;justify-content:center}}
+
+.ocean-db-quickadd-reminder{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ocean-db-quickadd-reminder select{max-width:190px;padding:8px 10px;border:1px solid #dce4ec;border-radius:7px;background:#fff;color:#34475a;font-size:11px}
+.ocean-db-quickadd-reminder select:disabled{opacity:.5}
+.ocean-shell[data-theme="dark"] .ocean-db-quickadd-reminder select{background:#2b323b;border-color:#414c58;color:#e5eaf0}
