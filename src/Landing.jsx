@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowDownToLine, ArrowLeft, Check, ChevronRight, Clock3, Copy, Download,
   Eye, File, FileAudio, FileImage, FileText, FileVideo, FolderOpen, Gauge,
@@ -109,7 +110,7 @@ function Landing() {
     const heroArt = stage?.querySelector(".hero-art");
     // Keep the fixed image outside the sticky hero so its viewport position
     // survives the sticky container releasing at the end of the scroll track.
-    const scrollHeadphone = document.querySelector(".landing > .scroll-headphone");
+    const scrollHeadphone = document.querySelector(".scroll-headphone");
     let raf = 0;
 
     const updateHero = () => {
@@ -272,7 +273,10 @@ function Landing() {
         <div className="hero-scroll-hint"><span>SCROLL TO EXPLORE</span><i /></div>
       </div>
     </section>
-    <img className="scroll-headphone" src="/headphones.webp" alt="" aria-hidden="true" />
+    {typeof document !== "undefined" && createPortal(
+      <img className="scroll-headphone" src="/headphones.webp" alt="" aria-hidden="true" />,
+      document.body
+    )}
 
     <section className="site-section services-section reveal-on-scroll" id="services">
       <div className="section-heading reveal">
