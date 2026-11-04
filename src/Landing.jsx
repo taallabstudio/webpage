@@ -131,7 +131,10 @@ function Landing() {
       const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
       stage.style.setProperty("--hero-progress", progress.toFixed(4));
 
-      // Keep the headphone at its original angle; only the page scrolls.
+      // Rotate exactly two full turns over the complete hero scroll distance.
+      if (scrollHeadphone) {
+        scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 720).toFixed(2)}deg`);
+      }
     };
 
     const onScroll = () => {
