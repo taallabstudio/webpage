@@ -24,7 +24,7 @@ const COMMANDS=[
   ["Image","image","Media","▧"],["Video","video","Media","▻"],["Audio","audio","Media","♫"],["Code","code","Media","</>"],["File","file","Media","↥"],["Web bookmark","bookmark","Media","♧"],
   ["Table view","database-table","Database","▦"],["Board view","database-board","Database","▤"],["Gallery view","database-gallery","Database","▦"],["List view","database-list","Database","☷"],["Feed view","database-feed","Database","▤"],["Dashboard view","database-dashboard","Database","▥"],["Calendar view","database-calendar","Database","▦"],["Timeline view","database-timeline","Database","▥"],["Map view","database-map","Database","⌖"],["Vertical bar chart","chart-vertical","Database","▥"],["Horizontal bar chart","chart-horizontal","Database","▤"],["Line chart","chart-line","Database","⌁"],["Donut chart","chart-donut","Database","◉"],["Number chart","chart-number","Database","#"],["Form","form","Database","☷"],["Database - Inline","database-inline","Database","▦"],["Database - Full page","database-full","Database","▦"],["Linked view of data source","database-linked","Database","↗"],
   ["Table of contents","toc","Advanced blocks","☷"],["Block equation","equation","Advanced blocks","∑"],["Button","button","Advanced blocks","▣"],["Breadcrumb","breadcrumb","Advanced blocks","⌂"],["Tabs","tabs","Advanced blocks","▥"],["Synced block","synced","Advanced blocks","⧉"],["Toggle heading 1","toggle-heading1","Advanced blocks","H1›"],["Toggle heading 2","toggle-heading2","Advanced blocks","H2›"],["Toggle heading 3","toggle-heading3","Advanced blocks","H3›"],["2 columns","columns2","Advanced blocks","Ⅱ"],["3 columns","columns3","Advanced blocks","Ⅲ"],["4 columns","columns4","Advanced blocks","Ⅳ"],["5 columns","columns5","Advanced blocks","Ⅴ"],["AI Meeting Notes","meeting","Advanced blocks","✧"],["Code - Mermaid","mermaid","Advanced blocks","◇"],
-  ["Mention a person","mention","Inline","@"],["Mention a page or data source","mention-page","Inline","↗"],["Date or reminder","date","Inline","◷"],["Emoji","emoji","Inline","☺"],["Inline equation","inline-equation","Inline","√"],["Embed","embed","Embeds","↗"],["HTML","html","Embeds","</>"],["Google Drive","google-drive","Embeds","▣"],["Tweet","tweet","Embeds","𝕏"],["GitHub Gist","gist","Embeds","⌘"],["Google Maps","maps","Embeds","⌖"],["Figma","figma","Embeds","◈"],["Excalidraw","excalidraw","Embeds","◇"],["PDF","pdf","Embeds","▧"],["Loom","loom","Embeds","◉"],["Typeform","typeform","Embeds","▤"],["CodePen","codepen","Embeds","◇"],["Replit","replit","Embeds","⌘"],["Deepnote","deepnote","Embeds","▧"],["Trello","trello","Embeds","▦"],["Slack","slack","Embeds","▧"],["Pitch","pitch","Embeds","▣"],["OneDrive","onedrive","Embeds","☁"],["Dropbox","dropbox","Embeds","◈"]
+  ["Mention a person","mention","Inline","@"],["Mention a page or data source","mention-page","Inline","↗"],["Date or reminder","date","Inline","◷"],["Emoji","emoji","Inline","☺"],["Inline equation","inline-equation","Inline","√"],["Embed","embed","Embeds","↗"],["HTML","html","Embeds","</>"],["Google Drive","google-drive","Embeds","▣"],["Tweet","tweet","Embeds","𝕏"],["GitHub Gist","gist","Embeds","⌘"],["Google Maps","maps","Embeds","⌖"],["Figma","figma","Embeds","◈"],["Excalidraw","excalidraw","Embeds","◇"],["PDF","pdf","Embeds","▧"],["Loom","loom","Embeds","◉"],["Typeform","typeform","Embeds","▤"],["CodePen","codepen","Embeds","◇"],["Replit","replit","Embeds","⌘"],["Deepnote","deepnote","Embeds","▧"],["Trello","trello","Embeds","▦"],["Slack","slack","Embeds","▧"],["Pitch","pitch","Embeds","▣"],["OneDrive","onedrive","Embeds","☁"],["Dropbox","dropbox","Embeds","◈"],["Google Calendar","google-calendar","Integrations","▦"]
 ];
 const EMOJIS=["🌊","📝","📚","🎧","🎵","🎹","🎬","💡","⭐","🔥","🎯","🧠","📌","🗂️","🪄","🌱","🚀","❤️","🎨","📷","💻","🧪","🛠️","🗓️","☕","🌙"];
 const COLORS=[["Default",""],["Gray","gray"],["Brown","brown"],["Orange","orange"],["Yellow","yellow"],["Green","green"],["Blue","blue"],["Purple","purple"],["Pink","pink"],["Red","red"]];
@@ -109,6 +109,84 @@ function OceanDatabaseBlock({block,updateBlock}){
  </div>;
 }
 
+
+function OceanGoogleCalendarBlock(){
+ const [connection,setConnection]=useState({connected:false,email:""});
+ const [events,setEvents]=useState([]);
+ const [loading,setLoading]=useState(true);
+ const [error,setError]=useState("");
+ const [month,setMonth]=useState(()=>new Date(new Date().getFullYear(),new Date().getMonth(),1));
+ const [editingId,setEditingId]=useState(null);
+ const [draft,setDraft]=useState(null);
+ const [saving,setSaving]=useState(false);
+ const monthStart=new Date(month.getFullYear(),month.getMonth(),1);
+ const gridStart=new Date(month.getFullYear(),month.getMonth(),1-monthStart.getDay());
+ const gridEnd=new Date(gridStart.getFullYear(),gridStart.getMonth(),gridStart.getDate()+42);
+ const load=useCallback(async()=>{
+  setLoading(true);setError("");
+  try{
+   const c=await api("/ocean/calendar/connection");setConnection(c);
+   if(c.connected){
+    const q=new URLSearchParams({timeMin:gridStart.toISOString(),timeMax:gridEnd.toISOString()});
+    const data=await api("/ocean/calendar/events?"+q.toString());setEvents(data.items||[]);
+   }else setEvents([]);
+  }catch(e){setError(e.message);}
+  finally{setLoading(false);}
+ },[month.getFullYear(),month.getMonth()]);
+ useEffect(()=>{load();},[load]);
+ const localInput=d=>{const value=new Date(d);return new Date(value.getTime()-value.getTimezoneOffset()*60000).toISOString().slice(0,16);};
+ const eventDate=e=>e.start?.dateTime?new Date(e.start.dateTime):new Date((e.start?.date||"")+"T09:00:00");
+ const dateKey=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
+ const openForm=(event=null,day=new Date())=>{
+  const start=event?eventDate(event):new Date(day.getFullYear(),day.getMonth(),day.getDate(),10,0);
+  const end=event?.end?.dateTime?new Date(event.end.dateTime):new Date(start.getTime()+3600000);
+  setEditingId(event?.id||"new");
+  setDraft({summary:event?.summary||"",start:localInput(start),end:localInput(end),description:event?.description||"",location:event?.location||""});
+ };
+ const save=async e=>{
+  e.preventDefault();if(!draft)return;
+  if(new Date(draft.end)<=new Date(draft.start)){setError("The event end must be after its start.");return;}
+  setSaving(true);setError("");
+  try{
+   const payload={...draft,start:new Date(draft.start).toISOString(),end:new Date(draft.end).toISOString()};
+   if(editingId==="new")await api("/ocean/calendar/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+   else await api("/ocean/calendar/events/"+encodeURIComponent(editingId),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+   setDraft(null);setEditingId(null);await load();
+  }catch(e){setError(e.message);}
+  finally{setSaving(false);}
+ };
+ const remove=async id=>{
+  if(!confirm("Delete this event from Google Calendar?"))return;
+  setError("");
+  try{await api("/ocean/calendar/events/"+encodeURIComponent(id),{method:"DELETE"});await load();}
+  catch(e){setError(e.message);}
+ };
+ const days=Array.from({length:42},(_,i)=>new Date(gridStart.getFullYear(),gridStart.getMonth(),gridStart.getDate()+i));
+ const byDay=day=>events.filter(e=>dateKey(eventDate(e))===dateKey(day));
+ const timeLabel=e=>e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}):"All day";
+ return <section className="ocean-note-calendar">
+  <header className="ocean-note-calendar-head"><div><span><Calendar size={15}/> GOOGLE CALENDAR</span><h3>{month.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</h3></div><div className="ocean-note-calendar-controls"><button onClick={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))} aria-label="Previous month"><ChevronRight className="calendar-prev" size={17}/></button><button onClick={()=>setMonth(new Date(new Date().getFullYear(),new Date().getMonth(),1))}>Today</button><button onClick={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))} aria-label="Next month"><ChevronRight size={17}/></button><button className="ocean-primary" onClick={()=>openForm(null,new Date())}><Plus size={14}/> New event</button></div></header>
+  {!connection.connected&&!loading?<div className="ocean-note-calendar-connect"><p>Connect Google Calendar to add and manage events from this note.</p><button className="ocean-primary" onClick={()=>{window.location.href="/api/ocean/calendar/connect";}}>Connect Google Calendar</button></div>:null}
+  {error&&<div className="ocean-admin-error">{error}</div>}
+  {loading?<div className="ocean-note-calendar-loading"><span className="ocean-mini-spinner"/> Loading your calendar…</div>:connection.connected?<div className="ocean-month-grid">
+   {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div className="ocean-month-weekday" key={d}>{d}</div>)}
+   {days.map(day=><div key={dateKey(day)} className={"ocean-month-day "+(day.getMonth()!==month.getMonth()?"outside":"")+(dateKey(day)===dateKey(new Date())?" today":"")}>
+    <button className="ocean-month-day-number" onClick={()=>openForm(null,day)} title="Add event on this day">{day.getDate()} <Plus size={11}/></button>
+    <div className="ocean-month-day-events">{byDay(day).slice(0,3).map(event=><button key={event.id} className="ocean-month-event" title={event.summary||"Untitled event"} onClick={()=>openForm(event)}><span>{timeLabel(event)}</span>{event.summary||"(No title)"}</button>)}{byDay(day).length>3&&<small>+{byDay(day).length-3} more</small>}</div>
+   </div>)}
+  </div>:null}
+  {draft&&<form className="ocean-calendar-form ocean-note-calendar-form" onSubmit={save}>
+   <div className="ocean-access-card-head"><div><strong>{editingId==="new"?"Create event":"Edit event"}</strong><span>Changes sync with your connected Google Calendar.</span></div><button type="button" onClick={()=>{setDraft(null);setEditingId(null);}}><X size={16}/></button></div>
+   <label>Event title<input required maxLength={500} value={draft.summary} onChange={e=>setDraft(v=>({...v,summary:e.target.value}))}/></label>
+   <div className="ocean-calendar-form-grid"><label>Starts<input type="datetime-local" required value={draft.start} onChange={e=>setDraft(v=>({...v,start:e.target.value}))}/></label><label>Ends<input type="datetime-local" required value={draft.end} onChange={e=>setDraft(v=>({...v,end:e.target.value}))}/></label></div>
+   <label>Location<input value={draft.location} onChange={e=>setDraft(v=>({...v,location:e.target.value}))}/></label>
+   <label>Description<textarea rows={2} value={draft.description} onChange={e=>setDraft(v=>({...v,description:e.target.value}))}/></label>
+   <div className="ocean-calendar-actions"><button className="ocean-primary" disabled={saving}>{saving?"Saving…":"Save event"}</button>{editingId!=="new"&&<button type="button" className="ocean-calendar-danger" onClick={()=>remove(editingId)}><Trash2 size={14}/> Delete event</button>}<button type="button" onClick={()=>{setDraft(null);setEditingId(null);}}>Cancel</button></div>
+  </form>}
+  {connection.connected&&<footer className="ocean-note-calendar-foot"><ShieldCheck size={14}/> Events are synced directly with {connection.email||"your Google account"}.</footer>}
+ </section>;
+}
+
 function OceanApp(){
  const [user,setUser]=useState(null),[checking,setChecking]=useState(true),[authError,setAuthError]=useState("");
  const [pages,setPages]=useState([]),[page,setPage]=useState(null),[loading,setLoading]=useState(false),[saving,setSaving]=useState(false);
@@ -129,7 +207,7 @@ function OceanApp(){
  const [calendarSaving,setCalendarSaving]=useState(false);
 
  const loadPages=useCallback(async()=>{const data=await api("/ocean/pages");setPages(data.pages||[]);return data.pages||[];},[]);
- const openPage=useCallback(async(id)=>{setLoading(true);setShowSlash(false);setShowPageMenu(false);try{const data=await api("/ocean/pages/"+id);const p=data.page;p.blocks=JSON.parse(p.blocks_json||"[]");setPage(p);setShowComments(false);}catch(e){setToast(e.message);}finally{setLoading(false);}},[]);
+ const openPage=useCallback(async(id)=>{setActivePanel("page");setMobileNav(false);setLoading(true);setShowSlash(false);setShowPageMenu(false);try{const data=await api("/ocean/pages/"+id);const p=data.page;p.blocks=JSON.parse(p.blocks_json||"[]");setPage(p);setShowComments(false);}catch(e){setToast(e.message);}finally{setLoading(false);}},[]);
  useEffect(()=>{let alive=true;api("/auth/me").then(async d=>{if(!alive)return;if(!d.authenticated){setChecking(false);return;}setUser(d.user);if(d.user.role!=="admin"&&d.user.role!=="super_user")return;const list=await loadPages();if(alive&&list.length)await openPage(list[0].id);}).catch(e=>setAuthError(e.message)).finally(()=>{if(alive)setChecking(false);});return()=>{alive=false;};},[loadPages,openPage]);
  useEffect(()=>{if(!page)return;clearTimeout(saveTimer.current);setSaving(true);saveTimer.current=setTimeout(async()=>{try{await api("/ocean/pages/"+page.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:page.title,icon:page.icon,cover:page.cover,blocks:page.blocks,is_favorite:!!page.is_favorite})});setPages(old=>old.map(p=>p.id===page.id?{...p,title:page.title,icon:page.icon,cover:page.cover,is_favorite:page.is_favorite,updated_at:Math.floor(Date.now()/1000)}:p));setSaving(false);}catch(e){setSaving(false);setToast("Couldn't save: "+e.message);}},650);return()=>clearTimeout(saveTimer.current);},[page]);
  useEffect(()=>{if(showSlash){slashInput.current?.focus();}},[showSlash]);
@@ -172,7 +250,7 @@ function OceanApp(){
  const updateBlock=(id,patch)=>setPage(old=>old?{...old,blocks:(old.blocks||[]).map(b=>b.id===id?{...b,...patch}:b)}:old);
  const buildBlock=(type)=>{
   let block=blankBlock(type);
-  if(type.startsWith("database-")){block={...block,type:"database",view:type.replace("database-",""),text:"New database",rows:[["Name","Status","Date"],["First item","In progress",""],["Second item","Not started",""]]};}
+  if(type.startsWith("database-")){block={...block,type:"database",view:type.replace("database-",""),text:"New database",rows:[["Name","Status","Date"],["First item","In progress",""],["Second item","Not started",""]]};}if(type==="google-calendar"){block={...block,type:"google-calendar",text:"Google Calendar"};}
   if(type.startsWith("chart-")){block={...block,type:"chart",view:type.replace("chart-",""),text:"New chart",rows:[["Category","Value"],["A","8"],["B","5"],["C","3"]]};}
   if(type==="table")block={...block,rows:[["","",""],["","",""],["","",""]]};
   if(type.startsWith("columns"))block={...block,type:"columns",count:Number(type.slice(-1)),text:"Add content in each column"};
@@ -221,7 +299,7 @@ function OceanApp(){
  const filteredCommands=COMMANDS.filter(c=>c[0].toLowerCase().includes(slashQuery.toLowerCase())||c[1].toLowerCase().includes(slashQuery.toLowerCase()));
  const commandGroups=[...new Set(filteredCommands.map(c=>c[2]))];
 
- if(checking)return <div className="ocean-loading"><div className="ocean-mark">O</div><span>Opening your workspace…</span></div>;
+ if(checking)return <div className="ocean-loading" role="status"><div className="ocean-loader-orbit"><div className="ocean-loader-mark"><OceanWaveMark/></div><i/><i/><i/></div><strong>OCEAN</strong><span>Opening your workspace</span><small>Getting your pages ready</small></div>;
  if(!user)return <OceanLogin onLogin={async()=>{try{const d=await api("/auth/me");setUser(d.user);if(d.user.role!=="admin"&&d.user.role!=="super_user")return;const list=await loadPages();if(list[0])await openPage(list[0].id);}catch(e){setAuthError(e.message);}}}/>;
  if(user.role!=="admin"&&user.role!=="super_user")return <div className="ocean-access-denied"><div className="ocean-auth-card"><div className="ocean-mark"><OceanWaveMark/></div><div className="ocean-wordmark">OCEAN</div><h1>Access not enabled</h1><p>Your TaalLab account is signed in, but it does not have OCEAN access. Ask an administrator to assign you the Super User role.</p><button className="ocean-primary" onClick={signOut}>Sign out</button></div></div>;
 
@@ -230,7 +308,7 @@ function OceanApp(){
   if(block.type==="divider")return <div className="ocean-divider" key={block.id} onMouseEnter={()=>setMenuBlock(block.id)}><div/></div>;
   if(block.type==="table")return <div className="ocean-table-wrap ocean-simple-table-wrap" key={block.id}><div className="ocean-simple-table-actions"><button onClick={()=>{const rows=block.rows||[];const cols=Math.max(1,...rows.map(r=>r.length));updateBlock(block.id,{rows:[...rows,Array(cols).fill("")]});}}><Plus size={13}/> Add row</button><button onClick={()=>{const rows=block.rows||[];if(rows.length<=1){alert("A table must have at least one row.");return;}updateBlock(block.id,{rows:rows.slice(0,-1)});}}>− Remove row</button><button onClick={()=>{const rows=block.rows||[];updateBlock(block.id,{rows:rows.map(r=>[...r,""])});}}><Plus size={13}/> Add column</button><button onClick={()=>{const rows=block.rows||[];if(Math.max(1,...rows.map(r=>r.length))<=1){alert("A table must have at least one column.");return;}updateBlock(block.id,{rows:rows.map(r=>r.slice(0,-1))});}}>− Remove column</button><button className="ocean-table-delete" onClick={()=>{if(confirm("Delete this entire table?"))window.dispatchEvent(new CustomEvent("ocean-delete-block",{detail:block.id}));}}><Trash2 size={13}/> Delete table</button></div><table className="ocean-table"><tbody>{(block.rows||[]).map((row,ri)=><tr key={ri}>{row.map((cell,ci)=><td key={ci}><input value={cell} onChange={e=>updateTableCell(block.id,ri,ci,e.target.value)} placeholder=" " /></td>)}</tr>)}</tbody></table></div>;
   if(block.type==="columns")return <div className="ocean-columns" style={{gridTemplateColumns:"repeat("+block.count+",minmax(0,1fr))"}} key={block.id}>{Array.from({length:block.count},(_,i)=><div key={i}><textarea placeholder={"Column "+(i+1)} value={(block.columns||Array(block.count).fill(""))[i]||""} onChange={e=>{const cols=[...(block.columns||Array(block.count).fill(""))];cols[i]=e.target.value;updateBlock(block.id,{columns:cols});}} /></div>)}</div>;
-  if(block.type==="database"||block.type==="chart")return <OceanDatabaseBlock key={block.id} block={block} updateBlock={updateBlock}/>;
+  if(block.type==="database"||block.type==="chart")return <OceanDatabaseBlock key={block.id} block={block} updateBlock={updateBlock}/>;if(block.type==="google-calendar")return <OceanGoogleCalendarBlock key={block.id}/>;
   if(["image","video","audio","file"].includes(block.type))return <div className="ocean-asset-block" key={block.id}>
    {block.asset_url?<div className="ocean-asset-preview">{block.mime_type?.startsWith("image/")?<img src={block.asset_url} alt={block.file_name}/>:block.mime_type?.startsWith("video/")?<video controls src={block.asset_url}/>:block.mime_type?.startsWith("audio/")?<audio controls src={block.asset_url}/>:<a href={block.asset_url} target="_blank" rel="noreferrer"><FileText size={18}/>{block.file_name}</a>}</div>:<div className="ocean-asset-empty"><div className="ocean-embed-icon">{block.type==="image"?<ImageIcon/>:block.type==="video"?<Video/>:block.type==="audio"?<AudioLines/>:<File/>}</div><div className="ocean-embed-content"><strong>{block.type[0].toUpperCase()+block.type.slice(1)}</strong><span>Upload a file to private Backblaze B2 storage.</span></div></div>}
    <label className="ocean-upload-button"><Upload size={14}/>{block.asset_url?"Replace file":"Upload file"}<input type="file" accept={block.type==="image"?"image/*":block.type==="video"?"video/*":block.type==="audio"?"audio/*":undefined} onChange={e=>uploadAsset(block.id,e.target.files?.[0])}/></label>
