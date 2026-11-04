@@ -734,3 +734,15 @@
 .ocean-db-quickadd-reminder select{max-width:190px;padding:8px 10px;border:1px solid #dce4ec;border-radius:7px;background:#fff;color:#34475a;font-size:11px}
 .ocean-db-quickadd-reminder select:disabled{opacity:.5}
 .ocean-shell[data-theme="dark"] .ocean-db-quickadd-reminder select{background:#2b323b;border-color:#414c58;color:#e5eaf0}
+
+
+/* Clarify reminder timing and separate destructive page action. */
+.ocean-reminder-context{color:#778596;font-size:10px;line-height:1.35;white-space:nowrap}
+.ocean-google-event-reminder .ocean-reminder-context{flex-basis:100%;margin-left:30px;margin-top:-5px}
+.ocean-db-quickadd-reminder .ocean-reminder-context{flex-basis:100%;margin-left:25px;margin-top:-5px}
+.ocean-db-rename-actions .ocean-db-delete-page{margin-right:auto;border-color:#f0d4d7;background:#fff7f7;color:#c33e4b}
+.ocean-db-rename-actions .ocean-db-delete-page:hover{background:#ffeded;border-color:#e7b9bf}
+.ocean-db-rename-actions>span{flex:1}
+.ocean-shell[data-theme="dark"] .ocean-reminder-context{color:#aab6c3}
+.ocean-shell[data-theme="dark"] .ocean-db-rename-actions .ocean-db-delete-page{background:#3a292d;border-color:#70424a;color:#ff9ba5}
+@media(max-width:480px){.ocean-db-rename-actions{flex-wrap:wrap}.ocean-db-rename-actions>span{display:none}.ocean-db-rename-actions .ocean-db-delete-page{margin-right:auto}}
