@@ -951,26 +951,22 @@ html{scroll-behavior:smooth}
 .scroll-headphone{
   position:fixed;
   left:70%;
-  top:47%;
-  width:min(30vw,440px);
+  top:53%;
+  width:min(34vw,500px);
   height:auto;
   z-index:15;
   margin:0;
-  margin-left:calc(min(30vw,440px) / -2);
-  margin-top:calc(min(30vw,440px) / -2);
+  margin-left:calc(min(34vw,500px) / -2);
+  margin-top:calc(min(34vw,500px) / -2);
   display:block;
   object-fit:contain;
-  transform:rotate(var(--headphone-rotation,0deg));
+  transform:none;
   transform-origin:50% 50%;
   pointer-events:none;
   user-select:none;
   filter:drop-shadow(0 35px 45px rgba(10,54,88,.18));
-  will-change:transform;
+  will-change:transform,opacity;
 }
-.progressive-image.scroll-headphone{aspect-ratio:1/1;height:auto}
-.progressive-image.scroll-headphone .progressive-full{object-fit:contain}
-.progressive-image.scroll-headphone .progressive-preview{object-fit:contain;filter:blur(5px)}
-
 .landing > .landing-nav{
   position:fixed;
   top:0;
