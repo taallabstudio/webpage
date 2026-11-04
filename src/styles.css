@@ -90,7 +90,8 @@ html{scroll-behavior:smooth}
 .hero-scroll-stage{
   --hero-progress:0;
   position:relative;
-  height:190vh;
+  /* Give the scroll-scrubbed headphone enough travel to rotate visibly. */
+  height:260vh;
   background:
     radial-gradient(circle at 72% 42%,rgba(8,120,232,.12),transparent 28%),
     radial-gradient(circle at 22% 32%,rgba(207,218,228,.42),transparent 30%),
@@ -242,7 +243,7 @@ html{scroll-behavior:smooth}
   transform:rotate(45deg);
 }
 @media(max-width:1050px){
-  .hero-scroll-stage{height:170vh}
+  .hero-scroll-stage{height:220vh}
   .hero-scroll-stage .hero-section{
     grid-template-columns:1fr 1fr;
     padding-left:5vw;
@@ -252,7 +253,7 @@ html{scroll-behavior:smooth}
   .hero-art{width:min(48vw,560px)}
 }
 @media(max-width:760px){
-  .hero-scroll-stage{height:155vh}
+  .hero-scroll-stage{height:190vh}
   .hero-sticky{min-height:620px}
   .hero-scroll-stage .hero-section{
     display:block;
