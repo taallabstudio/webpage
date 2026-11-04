@@ -746,3 +746,26 @@
 .ocean-shell[data-theme="dark"] .ocean-reminder-context{color:#aab6c3}
 .ocean-shell[data-theme="dark"] .ocean-db-rename-actions .ocean-db-delete-page{background:#3a292d;border-color:#70424a;color:#ff9ba5}
 @media(max-width:480px){.ocean-db-rename-actions{flex-wrap:wrap}.ocean-db-rename-actions>span{display:none}.ocean-db-rename-actions .ocean-db-delete-page{margin-right:auto}}
+
+
+/* OCEAN folders, shared workspace and wiki-style page links. */
+.ocean-side-tools{display:flex;align-items:center;gap:3px}
+.ocean-side-label .ocean-side-tools button{opacity:.75}
+.ocean-side-label .ocean-side-tools button:hover{opacity:1;background:#373737;color:#fff}
+.ocean-shared-label{margin-top:13px;padding-top:13px;border-top:1px solid #343434}
+.ocean-shared-label>span:first-child{display:flex;align-items:center;gap:7px}
+.ocean-page-row{display:flex;align-items:center;min-width:0;border-radius:6px}
+.ocean-page-row>.ocean-page-link{flex:1;min-width:0}
+.ocean-page-row>.ocean-page-add{width:25px;height:27px;flex:none;display:grid;place-items:center;border-radius:5px;color:#8e969f;opacity:0}
+.ocean-page-row:hover>.ocean-page-add{opacity:1}
+.ocean-page-row>.ocean-page-add:hover{background:#373737;color:#fff}
+.ocean-folder-row>.ocean-page-link{gap:7px}
+.ocean-folder-row .ocean-folder-expanded{transform:rotate(90deg)}
+.ocean-folder-row .ocean-page-link>span:last-child{font-weight:600}
+.ocean-page-inline-link{color:var(--ocean-accent,#3987ce);text-decoration:underline;text-decoration-color:color-mix(in srgb,currentColor 45%,transparent);text-underline-offset:2px;cursor:pointer;font-weight:500}
+.ocean-page-inline-link:hover{color:#1976d2;text-decoration-color:currentColor}
+.ocean-page-inline-missing{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-decoration-color:#d28a43;text-underline-offset:3px}
+.ocean-shell[data-theme="light"] .ocean-page-inline-link{color:#1769aa}
+.ocean-shell[data-theme="light"] .ocean-page-inline-missing{color:#8a6a43}
+.ocean-shell[data-theme="dark"] .ocean-page-inline-link{color:#8fc5ff}
+.ocean-shell[data-theme="dark"] .ocean-page-inline-missing{color:#e2b77e}
