@@ -96,6 +96,13 @@ function OceanDatabaseBlock({block,updateBlock}){
  const [renamePageTitle,setRenamePageTitle]=useState("");
  const [syncBusy,setSyncBusy]=useState(false);
  const [syncMessage,setSyncMessage]=useState("");
+ const [propertyMenu,setPropertyMenu]=useState(null);
+ const [propertyTypeMenu,setPropertyTypeMenu]=useState(false);
+ const [propertyVisibility,setPropertyVisibility]=useState(()=>block.hiddenProperties||[]);
+ const [frozenProperties,setFrozenProperties]=useState(()=>block.frozenProperties||[]);
+ const propertyTypes=[
+  ["Text","text"],["Number","number"],["Select","select"],["Multi-select","multi_select"],["Status","status"],["Date","date"],["Person","person"],["Files & media","files"],["Checkbox","checkbox"],["URL","url"],["Email","email"],["Phone","phone"],["Relation","relation"],["Rollup","rollup"],["Formula","formula"],["Button","button"],["ID","id"],["Place","place"],["Created time","created_time"],["Last edited time","edited_time"],["Created by","created_by"],["Last edited by","edited_by"]
+ ];
  const root=useRef(null);
  const view=block.view||"table";
  const views=[["Table","table"],["Board","board"],["Gallery","gallery"],["List","list"],["Calendar","calendar"],["Timeline","timeline"]];
@@ -103,7 +110,56 @@ function OceanDatabaseBlock({block,updateBlock}){
  const width=Math.max(1,...sourceRows.map(r=>r.length));
  const rows=sourceRows.map(r=>Array.from({length:width},(_,i)=>r[i]??""));
  const headers=rows[0]||["Name","Status","Date"];
- const visible=headers.map((h,i)=>i).filter(i=>!hidden.includes(i));
+ const properties=headers.map((name,i)=>({
+  name,type:block.properties?.[i]?.type||(i===0?"title":/status/i.test(name)?"status":/date|due/i.test(name)?"date":"text"),
+  options:block.properties?.[i]?.options||( /status/i.test(name)?["Not started","In progress","Done"]:[]),
+  ...block.properties?.[i],name
+ }));
+ const saveProperties=next=>updateBlock(block.id,{properties:next});
+ const updateProperty=(index,patch)=>saveProperties(properties.map((p,i)=>i===index?{...p,...patch}:p));
+ const changePropertyType=(index,type)=>{
+  const defaults=type==="status"?["Not started","In progress","Done"]:type==="select"?["Option 1","Option 2"]:type==="multi_select"?["Option 1","Option 2"]:[];
+  updateProperty(index,{type,options:defaults});
+  setPropertyMenu(null);setPropertyTypeMenu(false);
+ };
+ const addPropertyOption=index=>{
+  const current=properties[index]?.options||[];
+  const value=prompt("New option name","New option");
+  if(value?.trim())updateProperty(index,{options:[...current,value.trim()]});
+ };
+ const removePropertyOption=(index,option)=>updateProperty(index,{options:(properties[index]?.options||[]).filter(x=>x!==option)});
+ const insertProperty=(index,side)=>{
+  const at=index+(side==="right"?1:0);
+  const next=rows.map((row,ri)=>{const copy=[...row];copy.splice(at,1,ri===0?"New property":"");return copy;});
+  saveRows(next);
+  const meta=[...properties];meta.splice(at,0,{name:"New property",type:"text",options:[]});saveProperties(meta);
+  setPropertyMenu(null);
+ };
+ const duplicateProperty=index=>{
+  const at=index+1;saveRows(rows.map(row=>{const copy=[...row];copy.splice(at,0,row[index]||"");return copy;}));
+  const meta=[...properties];meta.splice(at,0,{...properties[index],name:(properties[index].name||"Property")+" (copy)",options:[...(properties[index].options||[])]});saveProperties(meta);setPropertyMenu(null);
+ };
+ const deleteProperty=index=>{
+  if(headers.length<=1){alert("A database needs at least one property.");return;}
+  if(!confirm("Delete the "+headers[index]+" property and all its values?"))return;
+  saveRows(rows.map(row=>row.filter((_,i)=>i!==index)));
+  saveProperties(properties.filter((_,i)=>i!==index));
+  setPropertyVisibility(old=>old.filter(i=>i!==index).map(i=>i>index?i-1:i));
+  setFrozenProperties(old=>old.filter(i=>i!==index).map(i=>i>index?i-1:i));
+  setPropertyMenu(null);
+ };
+ const renderPropertyCell=(rowIndex,col)=>{
+  const meta=properties[col]||{type:"text",options:[]};
+  const value=rows[rowIndex]?.[col]??"";
+  const onChange=next=>editCell(rowIndex,col,next);
+  if(meta.type==="checkbox")return <input aria-label={meta.name} type="checkbox" checked={value==="true"||value==="✓"||value==="1"} onChange={e=>onChange(e.target.checked?"true":"false")}/>;
+  if(meta.type==="select"||meta.type==="status")return <select className={"ocean-db-cell-select type-"+meta.type} value={value} onChange={e=>onChange(e.target.value)}><option value="">Empty</option>{(meta.options||[]).map(option=><option key={option} value={option}>{option}</option>)}</select>;
+  if(meta.type==="multi_select")return <select className="ocean-db-cell-select" multiple value={(()=>{try{return JSON.parse(value||"[]")}catch{return value?value.split(",").map(x=>x.trim()):[]}})()} onChange={e=>onChange(JSON.stringify(Array.from(e.target.selectedOptions,o=>o.value)))}>{(meta.options||[]).map(option=><option key={option} value={option}>{option}</option>)}</select>;
+  if(["formula","rollup","created_time","edited_time","created_by","edited_by","id"].includes(meta.type))return <span className="ocean-db-computed-value">{meta.type==="id"?(value||""):value||"—"}</span>;
+  const inputType=({number:"number",date:"date",url:"url",email:"email",phone:"tel"})[meta.type]||"text";
+  return <input type={inputType} value={value} onChange={e=>onChange(e.target.value)} placeholder={meta.type==="title"?"Untitled":""}/>;
+ };
+ const visible=headers.map((h,i)=>i).filter(i=>!hidden.includes(i)&&!propertyVisibility.includes(i));
  let data=rows.slice(1).map((r,i)=>({r,i})).filter(x=>!filter||x.r.some(v=>String(v).toLowerCase().includes(filter.toLowerCase()))).filter(x=>!search||x.r.some(v=>String(v).toLowerCase().includes(search.toLowerCase())));
  if(sort){const [col,dir]=sort.split(":");data.sort((a,b)=>String(a.r[Number(col)]||"").localeCompare(String(b.r[Number(col)]||""),undefined,{numeric:true})*(dir==="desc"?-1:1));}
  const saveRows=next=>updateBlock(block.id,{rows:next});
@@ -208,7 +264,7 @@ function OceanDatabaseBlock({block,updateBlock}){
   }catch(e){setSyncMessage(e.message||"Could not sync existing items.");}
   finally{setSyncBusy(false);}
  };
- const addProperty=()=>{const name=prompt("Property name","New property");if(!name?.trim())return;saveRows(rows.map((r,i)=>i===0?[...r,name.trim()]:[...r,""]));};
+ const addProperty=()=>{const name=prompt("Property name","New property");if(!name?.trim())return;saveRows(rows.map((r,i)=>i===0?[...r,name.trim()]:[...r,""]));saveProperties([...properties,{name:name.trim(),type:"text",options:[]}]);};
  const renameProperty=i=>{const name=prompt("Rename property",headers[i]);if(name?.trim())editCell(0,i,name.trim());};
  const addView=v=>{updateBlock(block.id,{view:v});setMenu("");};
  const detectedDateCol=headers.findIndex(h=>/date|due|start/i.test(String(h)));
@@ -234,10 +290,10 @@ function OceanDatabaseBlock({block,updateBlock}){
    {menu==="sort"&&<div className="ocean-db-popover"><strong>Sort by</strong>{headers.map((h,i)=><button key={i} onClick={()=>{setSort(i+":asc");setMenu("");}}>{h} ↑</button>)}<button onClick={()=>{setSort("");setMenu("");}}>Clear sort</button></div>}
    {menu==="group"&&<div className="ocean-db-popover"><strong>Group by</strong>{headers.map((h,i)=><button key={i} onClick={()=>{setGroupBy(i);setMenu("");}}>{h}{groupBy===i?" ✓":""}</button>)}</div>}
    {menu==="search"&&<div className="ocean-db-popover"><strong>Search database</strong><input autoFocus placeholder="Search…" value={search} onChange={e=>setSearch(e.target.value)}/><button onClick={()=>{setSearch("");setMenu("");}}>Done</button></div>}
-   {menu==="properties"&&<div className="ocean-db-popover"><strong>Properties</strong>{headers.map((h,i)=><label key={i}><input type="checkbox" checked={!hidden.includes(i)} onChange={e=>setHidden(old=>e.target.checked?old.filter(x=>x!==i):[...old,i])}/>{h}</label>)}<button onClick={addProperty}><Plus size={14}/> Add a property</button></div>}
+   {menu==="properties"&&<div className="ocean-db-popover"><strong>Properties</strong>{headers.map((h,i)=><label key={i}><input type="checkbox" checked={!hidden.includes(i)} onChange={e=>setHidden(old=>e.target.checked?old.filter(x=>x!==i):[...old,i])}/>{h}</label>)}<button onClick={addProperty}><Plus size={14}/> Add a property</button>{propertyVisibility.length>0&&<button onClick={()=>{setPropertyVisibility([]);setPropertyMenu(null);}}>Show all properties</button>}</div>}
    {menu==="more"&&<div className="ocean-db-popover"><strong>Database options</strong><button onClick={()=>{const name=prompt("Rename database",block.text||"New database");if(name)updateBlock(block.id,{text:name});setMenu("");}}>Rename</button><button onClick={()=>{const copy={...block,id:uid(),text:(block.text||"New database")+" (copy)"};window.dispatchEvent(new CustomEvent("ocean-duplicate-block",{detail:copy}));setMenu("");}}>Duplicate database</button><button onClick={()=>{if(confirm("Delete this database block?"))window.dispatchEvent(new CustomEvent("ocean-delete-block",{detail:block.id}));setMenu("");}}>Delete database</button></div>}
   </div>
-  {view==="table"&&<div className="ocean-db-table-scroll"><table className="ocean-db-table"><thead><tr>{visible.map(i=><th key={i}><button onClick={()=>renameProperty(i)}>{i===0?<Text size={13}/>:i===1?<CheckSquare size={13}/>:<Calendar size={13}/>} {headers[i]||"Property"}</button></th>)}<th><button onClick={addProperty}><Plus size={14}/> Add property</button></th></tr></thead><tbody>{data.map(({r,i})=><tr key={i}>{visible.map(c=><td key={c}><input value={r[c]||""} onChange={e=>editCell(i+1,c,e.target.value)} placeholder={c===0?"Untitled":""}/></td>)}<td/></tr>)}</tbody></table><button className="ocean-db-add-row" onClick={addRow}><Plus size={14}/> New page</button></div>}
+  {view==="table"&&<div className="ocean-db-table-scroll"><table className="ocean-db-table"><thead><tr>{visible.map(i=><th key={i} className={frozenProperties.includes(i)?"is-frozen":""}><div className="ocean-db-property-head"><button onClick={()=>setPropertyMenu(propertyMenu===i?null:i)}><span className="ocean-db-property-type-icon">{properties[i]?.type==="checkbox"?"☑":properties[i]?.type==="date"?"▦":properties[i]?.type==="number"?"#":properties[i]?.type==="status"?"◉":properties[i]?.type==="title"?"Aa":"☰"}</span>{headers[i]||"Property"}<MoreHorizontal size={13}/></button>{propertyMenu===i&&<div className="ocean-db-property-menu"><strong>{headers[i]}</strong><button onClick={()=>{renameProperty(i);setPropertyMenu(null);}}>Edit property name</button><button onClick={()=>setPropertyTypeMenu(v=>!v)}>Change type <span>›</span></button>{propertyTypeMenu&&<div className="ocean-db-type-list">{propertyTypes.map(([label,type])=><button key={type} onClick={()=>changePropertyType(i,type)}>{label}{properties[i]?.type===type?" ✓":""}</button>)}</div>}{["select","multi_select","status"].includes(properties[i]?.type)&&<><button onClick={()=>addPropertyOption(i)}>＋ Add option</button>{(properties[i]?.options||[]).map(option=><button key={option} onClick={()=>{if(confirm("Remove option "+option+"?"))removePropertyOption(i,option);}}>× {option}</button>)}</>}<hr/><button onClick={()=>{setPropertyVisibility(old=>old.includes(i)?old.filter(x=>x!==i):[...old,i]);setPropertyMenu(null);}}>Hide property</button><button onClick={()=>{setFrozenProperties(old=>old.includes(i)?old.filter(x=>x!==i):[...old,i]);setPropertyMenu(null);}}> {frozenProperties.includes(i)?"Unfreeze":"Freeze"} column</button><button onClick={()=>insertProperty(i,"left")}>Insert left</button><button onClick={()=>insertProperty(i,"right")}>Insert right</button><button onClick={()=>duplicateProperty(i)}>Duplicate property</button><button className="danger" onClick={()=>deleteProperty(i)}>Delete property</button></div>}</div></th>)}<th><button onClick={addProperty}><Plus size={14}/> Add property</button></th></tr></thead><tbody>{data.map(({r,i})=><tr key={i}>{visible.map(c=><td key={c} className={frozenProperties.includes(c)?"is-frozen":""}>{renderPropertyCell(i+1,c)}</td>)}<td/></tr>)}</tbody></table><button className="ocean-db-add-row" onClick={addRow}><Plus size={14}/> New page</button></div>}
   {view==="board"&&<div className="ocean-db-board">{[...new Set(data.map(x=>x.r[groupBy]||"No status"))].map((group,gi)=><section key={group}><header><span className={"ocean-db-status status-"+gi%4}/><strong>{group}</strong><small>{data.filter(x=>(x.r[groupBy]||"No status")===group).length}</small></header>{data.filter(x=>(x.r[groupBy]||"No status")===group).map(({r,i})=><article key={i}>{visible.filter(c=>c!==groupBy).map(c=><input key={c} value={r[c]||""} onChange={e=>editCell(i+1,c,e.target.value)} placeholder={headers[c]}/>)}</article>)}<button onClick={()=>addRow(group==="No status"?"":group)}><Plus size={14}/> New page</button></section>)}<button className="ocean-db-add-group" onClick={()=>{const name=prompt("New group name","New status");if(name)saveRows([...rows,[...Array(width).fill("").map((v,i)=>i===groupBy?name:v)]]);}}>+ New group</button></div>}
   {view==="calendar"&&<div className="ocean-db-calendar">
    <div className="ocean-db-calendar-toolbar"><div><strong>{calendarMonth.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</strong><small>{data.filter(x=>parseDate(x.r[dateCol])).length} dated pages</small></div><div><button onClick={()=>setCalendarMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))} aria-label="Previous month"><ChevronRight className="calendar-prev" size={16}/></button><button onClick={()=>setCalendarMonth(new Date(new Date().getFullYear(),new Date().getMonth(),1))}>Today</button><button onClick={()=>setCalendarMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))} aria-label="Next month"><ChevronRight size={16}/></button><button onClick={syncExistingRows} disabled={syncBusy}>{syncBusy?"Syncing…":"Sync Google"}</button><button className="ocean-db-new" onClick={()=>addRowOnDate(new Date())}><Plus size={13}/> New page</button></div></div>
