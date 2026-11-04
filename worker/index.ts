@@ -18,6 +18,7 @@ export interface Env {
   GOOGLE_CLIENT_SECRET: string;
   GOOGLE_LOGIN_CLIENT_ID?: string;
   GOOGLE_LOGIN_CLIENT_SECRET?: string;
+  OCEAN_PREVIEW_MODE?: string;
   RESEND_API_KEY: string;
 }
 
@@ -41,8 +42,10 @@ function origin(env: Env) {
   return env.APP_ORIGIN.replace(/\/$/, "");
 }
 
-function cookie(name: string, value: string, maxAge: number) {
-  return `${name}=${value}; Max-Age=${maxAge}; Domain=.taallab.work; Path=/; HttpOnly; Secure; SameSite=Lax`;
+function cookie(name: string, value: string, maxAge: number, req?: Request) {
+  const host = req ? new URL(req.url).hostname : "";
+  const domain = host === "taallab.work" || host.endsWith(".taallab.work") ? "Domain=.taallab.work; " : "";
+  return `${name}=${value}; Max-Age=${maxAge}; ${domain}Path=/; HttpOnly; Secure; SameSite=Lax`;
 }
 
 function fileKind(mime: string, name: string) {
@@ -344,7 +347,7 @@ async function authLogin(req: Request, env: Env) {
   const sid = await createUserSession(env, user.id);
   return json(
     { ok: true, user: { id: user.id, email: user.email, role: user.role } },
-    { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400) } },
+    { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400, req) } },
   );
 }
 
@@ -466,7 +469,7 @@ async function verifyTwoFactor(req: Request, env: Env) {
   const sid = await createUserSession(env, challenge.user_id);
   return json(
     { ok: true, user: { id: challenge.user_id, email: challenge.email, role: challenge.role } },
-    { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400) } },
+    { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400, req) } },
   );
 }
 
@@ -525,7 +528,7 @@ async function authLogout(req: Request, env: Env) {
     await env.DB.prepare("DELETE FROM sessions WHERE id=?").bind(sid).run();
     await env.DB.prepare("DELETE FROM admin_sessions WHERE id=?").bind(sid).run().catch(() => {});
   }
-  return json({ ok: true }, { headers: { "set-cookie": cookie("taallab_session", "", 0) } });
+  return json({ ok: true }, { headers: { "set-cookie": cookie("taallab_session", "", 0, req) } });
 }
 
 async function authSignup(req: Request, env: Env) {
@@ -641,7 +644,7 @@ async function changeOwnPassword(req: Request, env: Env) {
   await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(user.id).run();
 
   const sid = await createUserSession(env, user.id);
-  return json({ ok: true }, { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400) } });
+  return json({ ok: true }, { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400, req) } });
 }
 
 async function listUsers(env: Env) {
@@ -775,7 +778,7 @@ function googleLoginRedirect(env: Env, params: Record<string, string> = {}) {
   return url;
 }
 
-async function googleAuthStart(_req: Request, env: Env) {
+async function googleAuthStart(req: Request, env: Env) {
   if (!env.GOOGLE_LOGIN_CLIENT_ID || !env.GOOGLE_LOGIN_CLIENT_SECRET) {
     return new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: "Google sign-in is not configured yet." }).toString() } });
   }
@@ -790,7 +793,7 @@ async function googleAuthStart(_req: Request, env: Env) {
   url.searchParams.set("include_granted_scopes", "true");
   return new Response(null, {
     status: 302,
-    headers: { location: url.toString(), "set-cookie": cookie("google_login_state", state, 600) },
+    headers: { location: url.toString(), "set-cookie": cookie("google_login_state", state, 600, req) },
   });
 }
 
@@ -900,7 +903,7 @@ async function googleAuthCallback(req: Request, env: Env) {
   const sid = await createUserSession(env, user.id);
   const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env).toString() } });
   response.headers.append("set-cookie", clearStateCookie);
-  response.headers.append("set-cookie", cookie("taallab_session", sid, 7 * 86400));
+  response.headers.append("set-cookie", cookie("taallab_session", sid, 7 * 86400, req));
   return response;
 }
 
@@ -972,7 +975,7 @@ async function googleCallback(req: Request, env: Env) {
     status: 302,
     headers: { location: `${origin(env)}/admin?google=connected` },
   });
-  response.headers.append("set-cookie", cookie("google_oauth_state", "", 0));
+  response.headers.append("set-cookie", cookie("google_oauth_state", "", 0, req));
   return response;
 }
 
@@ -1866,7 +1869,7 @@ export default {
     const url = new URL(req.url);
     try {
       if (url.pathname === "/" && req.method === "GET") {
-        const assetPath = url.hostname === "app.taallab.work" ? "/ocean.html" : "/index.html";
+        const assetPath = url.hostname === "app.taallab.work" || env.OCEAN_PREVIEW_MODE === "true" ? "/ocean.html" : "/index.html";
         return env.ASSETS.fetch(new Request(new URL(assetPath, req.url), { headers: req.headers }));
       }
       const sharedTransfer = url.pathname.match(/^\/d\/([a-f0-9]+)$/i);
