@@ -622,3 +622,5 @@
   background:color-mix(in srgb,var(--ocean-block-highlight) 22%,#20252c);
   outline:1px solid color-mix(in srgb,var(--ocean-block-highlight) 38%,#414b57);
 }
+
+/* Keep OCEAN editor theme fixes in the production build. */
