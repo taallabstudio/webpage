@@ -22,6 +22,7 @@ const SLASH_COLORS=[
  ["Gray","#7f8994","#f0f2f4"],["Red","#c64b4b","#fff0ef"],["Orange","#b86a28","#fff2e7"],
  ["Yellow","#9b7b1e","#fff9e6"],["Green","#287a4c","#eaf7ef"],["Blue","#0878e8","#eaf4ff"],["Purple","#7956ae","#f3effb"]
 ];
+const OCEAN_EVENT_COLORS=[{id:"1",name:"Lavender",hex:"#7986cb"},{id:"2",name:"Sage",hex:"#33b679"},{id:"3",name:"Grape",hex:"#8e24aa"},{id:"4",name:"Flamingo",hex:"#e67c73"},{id:"5",name:"Banana",hex:"#f6bf26"},{id:"6",name:"Tangerine",hex:"#f4511e"},{id:"7",name:"Peacock",hex:"#039be5"},{id:"8",name:"Graphite",hex:"#616161"},{id:"9",name:"Blueberry",hex:"#3f51b5"},{id:"10",name:"Basil",hex:"#0b8043"},{id:"11",name:"Tomato",hex:"#d50000"}];
 const COMMANDS=[
   ["Blue highlight","highlight-blue","Formatting","🖍"],
   ...SLASH_COLORS.flatMap(([name,text,bg])=>[
@@ -88,6 +89,7 @@ function OceanDatabaseBlock({block,updateBlock}){
  const [quickAddLocation,setQuickAddLocation]=useState("");
  const [quickAddDescription,setQuickAddDescription]=useState("");
  const [quickAddReminder,setQuickAddReminder]=useState(true);
+ const [quickAddColorId,setQuickAddColorId]=useState("");
  const [quickAddError,setQuickAddError]=useState("");
  const [renamePageTarget,setRenamePageTarget]=useState(null);
  const [renamePageTitle,setRenamePageTitle]=useState("");
@@ -107,7 +109,7 @@ function OceanDatabaseBlock({block,updateBlock}){
  const editCell=(row,col,value)=>{const next=rows.map(r=>[...r]);next[row][col]=value;saveRows(next);};
  const addRow=(groupValue="")=>{const row=Array(width).fill("");if(groupValue&&groupBy<width)row[groupBy]=groupValue;saveRows([...rows,row]);};
  const addRowOnDate=day=>{const baseRows=detectedDateCol<0?rows.map((r,i)=>i===0?[...r,"Date"]:[...r,""]):rows;const targetDateCol=detectedDateCol<0?width:dateCol;const row=Array(Math.max(width,targetDateCol+1)).fill("");row[targetDateCol]=dateKey(day);saveRows([...baseRows,row]);};
- const resetQuickAdd=()=>{setQuickAddDate("");setQuickAddTitle("");setQuickAddAllDay(true);setQuickAddStart("10:00");setQuickAddEnd("11:00");setQuickAddLocation("");setQuickAddDescription("");setQuickAddReminder(true);setQuickAddError("");};
+ const resetQuickAdd=()=>{setQuickAddDate("");setQuickAddTitle("");setQuickAddAllDay(true);setQuickAddStart("10:00");setQuickAddEnd("11:00");setQuickAddLocation("");setQuickAddDescription("");setQuickAddReminder(true);setQuickAddColorId("");setQuickAddError("");};
  const openQuickAdd=day=>{setQuickAddDate(dateKey(day));setQuickAddTitle("");setQuickAddError("");};
  const createQuickAdd=async()=>{
   const title=quickAddTitle.trim();if(!title||!quickAddDate)return;
@@ -115,7 +117,7 @@ function OceanDatabaseBlock({block,updateBlock}){
   try{
    const connection=await api("/ocean/calendar/connection");
    if(!connection.connected){setQuickAddError("Connect Google Calendar first to sync this item.");return;}
-   const payload={summary:title,calendarId:"primary",allDay:quickAddAllDay,startDate:quickAddDate,endDate:quickAddDate,location:quickAddLocation,description:quickAddDescription,reminderEnabled:quickAddReminder,reminderMinutes:10};
+   const payload={summary:title,calendarId:"primary",allDay:quickAddAllDay,startDate:quickAddDate,endDate:quickAddDate,location:quickAddLocation,description:quickAddDescription,reminderEnabled:quickAddReminder,reminderMinutes:10,colorId:quickAddColorId};
    if(!quickAddAllDay){
     const start=new Date(quickAddDate+"T"+quickAddStart),end=new Date(quickAddDate+"T"+quickAddEnd);
     if(end<=start){setQuickAddError("The end time must be after the start time.");return;}
@@ -197,6 +199,7 @@ function OceanDatabaseBlock({block,updateBlock}){
     <label>Location<input value={quickAddLocation} onChange={e=>setQuickAddLocation(e.target.value)} placeholder="Add location"/></label>
     <label>Description<textarea rows={3} value={quickAddDescription} onChange={e=>setQuickAddDescription(e.target.value)} placeholder="Add description"/></label>
     <label className="ocean-db-quickadd-check"><input type="checkbox" checked={quickAddReminder} onChange={e=>setQuickAddReminder(e.target.checked)}/> Notification (10 minutes before)</label>
+    <div className="ocean-google-event-color"><div><Palette size={16}/> Event colour</div><div className="ocean-google-event-swatches"><button type="button" title="Default colour" className={!quickAddColorId?"selected default":""} onClick={()=>setQuickAddColorId("")}><span/></button>{OCEAN_EVENT_COLORS.map(c=><button type="button" key={c.id} title={c.name} aria-label={c.name} className={quickAddColorId===c.id?"selected":""} style={{"--swatch":c.hex}} onClick={()=>setQuickAddColorId(c.id)}/>)}</div></div>
     {quickAddError&&<p className="ocean-db-quickadd-error">{quickAddError} {quickAddError.includes("Connect Google")&&<button type="button" onClick={()=>{window.location.href="/api/ocean/calendar/connect";}}>Connect Google Calendar</button>}</p>}
     <div className="ocean-db-quickadd-actions"><button type="button" onClick={resetQuickAdd}>Cancel</button><button type="submit" disabled={!quickAddTitle.trim()||!quickAddDate}>Create event</button></div>
    </form></div>}
@@ -228,7 +231,7 @@ function OceanGoogleCalendarBlock(){
  const dateKey=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
  const localInput=d=>{const value=new Date(d);return new Date(value.getTime()-value.getTimezoneOffset()*60000).toISOString().slice(0,16);};
  const eventDate=e=>e.start?.dateTime?new Date(e.start.dateTime):new Date((e.start?.date||"")+"T09:00:00");
- const eventColors=[{id:"1",name:"Lavender",hex:"#7986cb"},{id:"2",name:"Sage",hex:"#33b679"},{id:"3",name:"Grape",hex:"#8e24aa"},{id:"4",name:"Flamingo",hex:"#e67c73"},{id:"5",name:"Banana",hex:"#f6bf26"},{id:"6",name:"Tangerine",hex:"#f4511e"},{id:"7",name:"Peacock",hex:"#039be5"},{id:"8",name:"Graphite",hex:"#616161"},{id:"9",name:"Blueberry",hex:"#3f51b5"},{id:"10",name:"Basil",hex:"#0b8043"},{id:"11",name:"Tomato",hex:"#d50000"}];
+ const eventColors=OCEAN_EVENT_COLORS;
  const load=useCallback(async()=>{
   setLoading(true);setError("");
   try{
