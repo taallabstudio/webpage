@@ -1823,7 +1823,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     const title = String(body.title || "Untitled").trim().slice(0,160) || "Untitled";
     const parentId = String(body.parent_id || "").trim() || null;
     const parent = parentId ? await oceanPageForUser(env,user.id,parentId) : null;
-    if (parentId && (!parent || !parent.is_folder)) return json({error:"Choose an existing folder."},{status:404});
+    if (parentId && !parent) return json({error:"Parent page not found."},{status:404});
     const isFolder = body.is_folder ? 1 : 0;
     const isShared = body.is_shared || parent?.is_shared ? 1 : 0;
     const id = oceanId(), created = now();
@@ -1905,7 +1905,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     await env.DB.batch([
       env.DB.prepare("DELETE FROM ocean_comments WHERE page_id=?").bind(pageId),
       env.DB.prepare("UPDATE ocean_pages SET is_archived=1,updated_at=? WHERE id=? AND user_id=?").bind(now(),pageId,user.id),
-      env.DB.prepare("UPDATE ocean_pages SET parent_id=NULL WHERE parent_id=? AND user_id=?").bind(pageId,user.id)
+      env.DB.prepare("UPDATE ocean_pages SET parent_id=NULL WHERE parent_id=? AND (user_id=? OR is_shared=1)").bind(pageId,user.id)
     ]);
     return json({ok:true});
   }
