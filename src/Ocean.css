@@ -415,3 +415,46 @@
  .ocean-month-event{min-height:0;padding:4px 3px!important;display:block;font-size:8px;white-space:normal}
  .ocean-month-event span{display:block;font-size:7px;margin-bottom:1px}
 }
+
+
+/* Slash command keyboard focus and color swatches */
+.ocean-slash-results section button.is-active,
+.ocean-slash-results section button[aria-selected="true"]{background:#eaf4ff;color:#0878e8;outline:1px solid #cfe4fa}
+.ocean-slash-results section button.is-active .ocean-command-icon{border-color:#b9d8f5}
+.ocean-slash-results section button:focus-visible{outline:2px solid #0878e8;outline-offset:1px}
+.ocean-slash-results{overscroll-behavior:contain;scrollbar-width:thin}
+.ocean-command-icon{flex:none}
+
+/* Real monthly calendar layout for a database Calendar view */
+.ocean-db-calendar{padding:8px 0 4px}
+.ocean-db-calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 2px 14px}
+.ocean-db-calendar-toolbar>div:first-child{display:grid;gap:4px}
+.ocean-db-calendar-toolbar>div:first-child strong{font:700 15px "Space Grotesk",sans-serif;color:#273746}
+.ocean-db-calendar-toolbar>div:first-child small{font-size:10px;color:#8794a0}
+.ocean-db-calendar-toolbar>div:last-child{display:flex;align-items:center;gap:5px}
+.ocean-db-calendar-toolbar>div:last-child>button{height:30px;min-width:30px;padding:0 9px;display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid #e0e6ed!important;border-radius:6px!important;background:#fff!important;color:#596979!important;font-size:11px;font-weight:600}
+.ocean-db-calendar-toolbar>div:last-child>button:hover{background:#f2f7fc!important;color:#0878e8!important}
+.ocean-db-calendar-toolbar>div:last-child>button.ocean-db-new{background:#0878e8!important;border-color:#0878e8!important;color:#fff!important}
+.ocean-db-calendar-toolbar .calendar-prev{transform:rotate(180deg)}
+.ocean-db-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:34px repeat(var(--db-calendar-weeks),minmax(105px,1fr));border-top:1px solid #e3e9ef;border-left:1px solid #e3e9ef;border-radius:8px;overflow:hidden}
+.ocean-db-calendar-weekday{padding:9px 5px;text-align:center;background:#fafbfd;border-right:1px solid #e3e9ef;border-bottom:1px solid #e3e9ef;color:#8995a0;font-size:10px;font-weight:650}
+.ocean-db-calendar-day{min-width:0;min-height:105px;padding:6px;border-right:1px solid #e3e9ef;border-bottom:1px solid #e3e9ef;background:#fff}
+.ocean-db-calendar-day.outside{background:#fbfcfd}
+.ocean-db-calendar-day.today{background:#f5f9ff}
+.ocean-db-calendar-date{width:100%;display:flex;align-items:center;justify-content:flex-end;gap:5px;padding:0 2px 5px;color:#4d5a67;font-size:11px;font-weight:650}
+.ocean-db-calendar-date svg{opacity:0;color:#0878e8}
+.ocean-db-calendar-day:hover .ocean-db-calendar-date svg{opacity:1}
+.ocean-db-calendar-day.outside .ocean-db-calendar-date{color:#b1bbc4}
+.ocean-db-calendar-day.today .ocean-db-calendar-date span{width:22px;height:22px;display:grid;place-items:center;border-radius:50%;background:#0878e8;color:white}
+.ocean-db-calendar-items{display:grid;gap:4px;align-content:start}
+.ocean-db-calendar-items button{min-width:0;padding:5px 7px;border:0!important;border-left:3px solid #2685df!important;border-radius:4px!important;background:#eaf4ff!important;color:#28577e!important;text-align:left;font-size:10px;line-height:1.35;overflow-wrap:anywhere}
+.ocean-db-calendar-items button:hover{background:#dceeff!important}
+.ocean-db-calendar-hint{margin:9px 2px;color:#8b97a2;font-size:10px;line-height:1.5}
+@media(max-width:760px){
+ .ocean-db-calendar-toolbar{align-items:flex-start;flex-direction:column}
+ .ocean-db-calendar-toolbar>div:last-child{width:100%;flex-wrap:wrap}
+ .ocean-db-calendar-grid{grid-template-rows:30px repeat(var(--db-calendar-weeks),minmax(76px,1fr))}
+ .ocean-db-calendar-day{min-height:76px;padding:4px 2px}
+ .ocean-db-calendar-weekday{padding:8px 1px;font-size:9px}
+ .ocean-db-calendar-items button{padding:4px 3px;font-size:8px}
+}
