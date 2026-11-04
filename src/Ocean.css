@@ -903,3 +903,8 @@
 .ocean-db-group-row td strong{font-size:11px;font-weight:650}
 .ocean-db-group-row td small{float:right;color:#97a2ad;font-size:10px}
 .ocean-shell[data-theme="dark"] .ocean-db-table .ocean-db-group-row td{background:#252b33;color:#c2ccd6;border-color:#3a424d}
+
+.ocean-db-notion.is-locked .ocean-db-table th .ocean-db-property-head,.ocean-db-notion.is-locked .ocean-db-table tbody,.ocean-db-notion.is-locked .ocean-db-add-row,.ocean-db-notion.is-locked .ocean-db-board,.ocean-db-notion.is-locked .ocean-db-cards,.ocean-db-notion.is-locked .ocean-db-calendar{pointer-events:none;opacity:.62}
+.ocean-db-notion.is-locked .ocean-db-control-right>.ocean-db-new{pointer-events:none;opacity:.45}
+.ocean-db-notion.is-locked:after{content:"Database locked";display:inline-block;margin-top:5px;padding:3px 7px;border-radius:5px;background:#f0f2f4;color:#687786;font-size:10px}
+.ocean-shell[data-theme="dark"] .ocean-db-notion.is-locked:after{background:#2b323b;color:#b7c2cd}
