@@ -79,7 +79,7 @@ function OceanLogin({onLogin}){
 }
 
 function OceanDatabaseBlock({block,updateBlock}){
- const [menu,setMenu]=useState(""),[search,setSearch]=useState(""),[filter,setFilter]=useState(""),[sort,setSort]=useState(""),[hidden,setHidden]=useState([]),[groupBy,setGroupBy]=useState(1);
+ const [menu,setMenu]=useState(""),[search,setSearch]=useState(""),[filter,setFilter]=useState(""),[filterColumn,setFilterColumn]=useState(null),[sort,setSort]=useState(""),[hidden,setHidden]=useState([]),[groupBy,setGroupBy]=useState(1),[calculations,setCalculations]=useState(()=>block.calculations||{}),[calculationMenu,setCalculationMenu]=useState(null);
  const [calendarMonth,setCalendarMonth]=useState(()=>new Date(new Date().getFullYear(),new Date().getMonth(),1));
  const [quickAddDate,setQuickAddDate]=useState("");
  const [quickAddTitle,setQuickAddTitle]=useState("");
@@ -177,7 +177,7 @@ function OceanDatabaseBlock({block,updateBlock}){
   return <input type={inputType} value={value} onChange={e=>onChange(e.target.value)} placeholder={meta.type==="title"?"Untitled":""}/>;
  };
  const visible=headers.map((h,i)=>i).filter(i=>!hidden.includes(i)&&!propertyVisibility.includes(i));
- let data=rows.slice(1).map((r,i)=>({r,i})).filter(x=>!filter||x.r.some(v=>String(v).toLowerCase().includes(filter.toLowerCase()))).filter(x=>!search||x.r.some(v=>String(v).toLowerCase().includes(search.toLowerCase())));
+ let data=rows.slice(1).map((r,i)=>({r,i})).filter(x=>!filter||(filterColumn===null?x.r.some(v=>String(v).toLowerCase().includes(filter.toLowerCase())):String(x.r[filterColumn]||"").toLowerCase().includes(filter.toLowerCase()))).filter(x=>!search||x.r.some(v=>String(v).toLowerCase().includes(search.toLowerCase())));
  if(sort){const [col,dir]=sort.split(":");data.sort((a,b)=>String(a.r[Number(col)]||"").localeCompare(String(b.r[Number(col)]||""),undefined,{numeric:true})*(dir==="desc"?-1:1));}
  const saveRows=next=>updateBlock(block.id,{rows:next});
  const editCell=(row,col,value)=>{const next=rows.map(r=>[...r]);next[row][col]=value;saveRows(next);};
@@ -305,7 +305,7 @@ function OceanDatabaseBlock({block,updateBlock}){
    <div className="ocean-db-control-right"><button className="ocean-db-new" onClick={()=>setMenu(menu==="new"?"":"new")}>New <ChevronDown size={14}/></button></div>
    {menu==="new"&&newMenu}
     {viewSettingsOpen&&<div className="ocean-db-popover ocean-db-view-settings"><strong>View settings</strong><label>Layout<select value={view} onChange={e=>addView(e.target.value)}>{views.map(([label,key])=><option key={key} value={key}>{label}</option>)}</select></label><div className="ocean-db-settings-divider"/><strong>Property visibility</strong>{headers.map((h,i)=><label key={i}><input type="checkbox" checked={!propertyVisibility.includes(i)} onChange={e=>{const next=e.target.checked?propertyVisibility.filter(x=>x!==i):[...propertyVisibility,i];setPropertyVisibility(next);updateBlock(block.id,{hiddenProperties:next});}}/>{h}</label>)}<button onClick={()=>{setViewSettingsOpen(false);setMenu("filter");}}>＋ Add filter</button><button onClick={()=>{setViewSettingsOpen(false);setMenu("sort");}}>↕ Add sort</button><button onClick={()=>{setViewSettingsOpen(false);setMenu("group");}}>▦ Group by</button><button onClick={()=>{const url=window.location.href+"#database-"+block.id;if(navigator.clipboard?.writeText)navigator.clipboard.writeText(url).then(()=>window.alert("View link copied"));else window.prompt("Copy view link",url);}}>Copy link to view</button></div>
-   {menu==="filter"&&<div className="ocean-db-popover"><strong>Filter</strong><input autoFocus placeholder="Filter rows…" value={filter} onChange={e=>setFilter(e.target.value)}/><button onClick={()=>{setFilter("");setMenu("");}}>Clear filter</button></div>}
+   {menu==="filter"&&<div className="ocean-db-popover"><strong>Filter</strong><input autoFocus placeholder="Filter rows…" value={filter} onChange={e=>setFilter(e.target.value)}/><button onClick={()=>{setFilter("");setFilterColumn(null);setMenu("");}}>Clear filter</button></div>}
    {menu==="sort"&&<div className="ocean-db-popover"><strong>Sort by</strong>{headers.map((h,i)=><button key={i} onClick={()=>{setSort(i+":asc");setMenu("");}}>{h} ↑</button>)}<button onClick={()=>{setSort("");setMenu("");}}>Clear sort</button></div>}
    {menu==="group"&&<div className="ocean-db-popover"><strong>Group by</strong>{headers.map((h,i)=><button key={i} onClick={()=>{setGroupBy(i);setMenu("");}}>{h}{groupBy===i?" ✓":""}</button>)}</div>}
    {menu==="search"&&<div className="ocean-db-popover"><strong>Search database</strong><input autoFocus placeholder="Search…" value={search} onChange={e=>setSearch(e.target.value)}/><button onClick={()=>{setSearch("");setMenu("");}}>Done</button></div>}
