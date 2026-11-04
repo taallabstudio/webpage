@@ -6,7 +6,7 @@ import {
   CircleHelp,Code,Columns3,Command,Copy,Database,File,FileAudio,FileImage,FilePlus,
   FileText,Film,Folder,FolderPlus,GalleryHorizontal,Globe,Grid2X2,Hash,Heart,
   Image as ImageIcon,Inbox,Link,LogOut,Map,Menu,MessageCircle,MoreHorizontal,
-  PanelLeftClose,PanelLeftOpen,Plus,Search,Settings,Share2,ShieldCheck,SlidersHorizontal,
+  PanelLeftClose,PanelLeftOpen,Plus,Palette,Search,Settings,Share2,ShieldCheck,SlidersHorizontal,
   Smile,Table2,Text,Trash2,Upload,User,Users,Video,X,Moon,Sun
 } from "lucide-react";
 
@@ -89,6 +89,8 @@ function OceanDatabaseBlock({block,updateBlock}){
  const [quickAddDescription,setQuickAddDescription]=useState("");
  const [quickAddReminder,setQuickAddReminder]=useState(true);
  const [quickAddError,setQuickAddError]=useState("");
+ const [renamePageTarget,setRenamePageTarget]=useState(null);
+ const [renamePageTitle,setRenamePageTitle]=useState("");
  const [syncBusy,setSyncBusy]=useState(false);
  const [syncMessage,setSyncMessage]=useState("");
  const root=useRef(null);
@@ -183,7 +185,7 @@ function OceanDatabaseBlock({block,updateBlock}){
   {view==="calendar"&&<div className="ocean-db-calendar">
    <div className="ocean-db-calendar-toolbar"><div><strong>{calendarMonth.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</strong><small>{data.filter(x=>parseDate(x.r[dateCol])).length} dated pages</small></div><div><button onClick={()=>setCalendarMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))} aria-label="Previous month"><ChevronRight className="calendar-prev" size={16}/></button><button onClick={()=>setCalendarMonth(new Date(new Date().getFullYear(),new Date().getMonth(),1))}>Today</button><button onClick={()=>setCalendarMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))} aria-label="Next month"><ChevronRight size={16}/></button><button onClick={syncExistingRows} disabled={syncBusy}>{syncBusy?"Syncing…":"Sync Google"}</button><button className="ocean-db-new" onClick={()=>addRowOnDate(new Date())}><Plus size={13}/> New page</button></div></div>
    {detectedDateCol<0&&<p className="ocean-db-calendar-hint">No Date property was found. The calendar is using column {dateCol+1} ({headers[dateCol]||"Property"}). Add or rename a Date property to make this clearer.</p>}
-   <div className="ocean-db-calendar-grid" style={{"--db-calendar-weeks":weekCount}}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div className="ocean-db-calendar-weekday" key={d}>{d}</div>)}{calendarDays.map(day=><div key={dateKey(day)} className={"ocean-db-calendar-day "+(day.getMonth()!==calendarMonth.getMonth()?"outside":"")+(dateKey(day)===dateKey(new Date())?" today":"")}><div className="ocean-db-calendar-day-head"><button className="ocean-db-calendar-add" onClick={()=>openQuickAdd(day)} title={"Add an item on "+day.toLocaleDateString()} aria-label={"Add an item on "+dateKey(day)}><Plus size={13}/></button><button className="ocean-db-calendar-date" onClick={()=>openQuickAdd(day)} title="Add an item on this date"><span>{day.getDate()}</span></button></div><div className="ocean-db-calendar-items">{rowsForDay(day).map(({r,i})=><button key={i} title="Edit page title" onClick={()=>{const title=prompt("Page title",r[0]||"Untitled");if(title!==null)editCell(i+1,0,title);}}>{r[0]||"Untitled"}</button>)}</div></div>)}</div>
+   <div className="ocean-db-calendar-grid" style={{"--db-calendar-weeks":weekCount}}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div className="ocean-db-calendar-weekday" key={d}>{d}</div>)}{calendarDays.map(day=><div key={dateKey(day)} className={"ocean-db-calendar-day "+(day.getMonth()!==calendarMonth.getMonth()?"outside":"")+(dateKey(day)===dateKey(new Date())?" today":"")}><div className="ocean-db-calendar-day-head"><button className="ocean-db-calendar-add" onClick={()=>openQuickAdd(day)} title={"Add an item on "+day.toLocaleDateString()} aria-label={"Add an item on "+dateKey(day)}><Plus size={13}/></button><button className="ocean-db-calendar-date" onClick={()=>openQuickAdd(day)} title="Add an item on this date"><span>{day.getDate()}</span></button></div><div className="ocean-db-calendar-items">{rowsForDay(day).map(({r,i})=><button key={i} title="Edit page title" onClick={()=>{setRenamePageTarget(i+1);setRenamePageTitle(r[0]||"Untitled");}}>{r[0]||"Untitled"}</button>)}</div></div>)}</div>
    <p className="ocean-db-calendar-hint">Select + on a date to add an item. New items sync to Google Calendar. Select an existing item to rename it.</p>
    {syncMessage&&<p className="ocean-db-calendar-hint">{syncMessage}</p>}
    {quickAddDate&&<div className="ocean-db-quickadd-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)resetQuickAdd();}}><form className="ocean-db-quickadd" onSubmit={e=>{e.preventDefault();createQuickAdd();}}>
@@ -198,6 +200,7 @@ function OceanDatabaseBlock({block,updateBlock}){
     {quickAddError&&<p className="ocean-db-quickadd-error">{quickAddError} {quickAddError.includes("Connect Google")&&<button type="button" onClick={()=>{window.location.href="/api/ocean/calendar/connect";}}>Connect Google Calendar</button>}</p>}
     <div className="ocean-db-quickadd-actions"><button type="button" onClick={resetQuickAdd}>Cancel</button><button type="submit" disabled={!quickAddTitle.trim()||!quickAddDate}>Create event</button></div>
    </form></div>}
+   {renamePageTarget!==null&&<div className="ocean-db-quickadd-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setRenamePageTarget(null);}}><form className="ocean-db-quickadd" onSubmit={e=>{e.preventDefault();editCell(renamePageTarget,0,renamePageTitle);setRenamePageTarget(null);}}><div className="ocean-db-quickadd-head"><strong>Rename page</strong><button type="button" aria-label="Close" onClick={()=>setRenamePageTarget(null)}>×</button></div><label>Page title<input autoFocus value={renamePageTitle} onChange={e=>setRenamePageTitle(e.target.value)} placeholder="Page title"/></label><div className="ocean-db-quickadd-actions"><button type="button" onClick={()=>setRenamePageTarget(null)}>Cancel</button><button type="submit" disabled={!renamePageTitle.trim()}>Save</button></div></form></div>}
   </div>}
   {["list","gallery","timeline"].includes(view)&&<div className={"ocean-db-cards "+view}>{data.map(({r,i})=><article key={i}>{visible.map(c=><label key={c}><small>{headers[c]}</small><input value={r[c]||""} onChange={e=>editCell(i+1,c,e.target.value)}/></label>)}</article>)}<button onClick={addRow}><Plus size={14}/> New page</button></div>}
   <div className="ocean-db-footer">{data.length} {data.length===1?"page":"pages"} <span>·</span> {headers.length} properties</div>
@@ -215,6 +218,8 @@ function OceanGoogleCalendarBlock(){
  const [editingId,setEditingId]=useState(null);
  const [draft,setDraft]=useState(null);
  const [saving,setSaving]=useState(false);
+ const [eventDetails,setEventDetails]=useState(null);
+ const [reminderCustom,setReminderCustom]=useState(false);
  const firstWeekday=new Date(month.getFullYear(),month.getMonth(),1).getDay();
  const daysInMonth=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
  const weekCount=Math.ceil((firstWeekday+daysInMonth)/7);
@@ -223,6 +228,7 @@ function OceanGoogleCalendarBlock(){
  const dateKey=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
  const localInput=d=>{const value=new Date(d);return new Date(value.getTime()-value.getTimezoneOffset()*60000).toISOString().slice(0,16);};
  const eventDate=e=>e.start?.dateTime?new Date(e.start.dateTime):new Date((e.start?.date||"")+"T09:00:00");
+ const eventColors=[{id:"1",name:"Lavender",hex:"#7986cb"},{id:"2",name:"Sage",hex:"#33b679"},{id:"3",name:"Grape",hex:"#8e24aa"},{id:"4",name:"Flamingo",hex:"#e67c73"},{id:"5",name:"Banana",hex:"#f6bf26"},{id:"6",name:"Tangerine",hex:"#f4511e"},{id:"7",name:"Peacock",hex:"#039be5"},{id:"8",name:"Graphite",hex:"#616161"},{id:"9",name:"Blueberry",hex:"#3f51b5"},{id:"10",name:"Basil",hex:"#0b8043"},{id:"11",name:"Tomato",hex:"#d50000"}];
  const load=useCallback(async()=>{
   setLoading(true);setError("");
   try{
@@ -246,14 +252,17 @@ function OceanGoogleCalendarBlock(){
   if(event?.end?.date){const d=new Date(event.end.date+"T12:00:00");d.setDate(d.getDate()-1);endDate=dateKey(d);}
   const freq=event?.recurrence?.[0]?.match(/FREQ=([^;]+)/)?.[1]||"";
   const override=event?.reminders?.overrides?.[0];
+  const reminderValue=override?.minutes??10;
+  setReminderCustom(![0,5,10,15,30,60,120,1440,2880,10080].includes(reminderValue));
   setEditingId(event?.id||"new");
   setDraft({
    summary:event?.summary||"",allDay,startDate,endDate,
    start:localInput(start),end:localInput(end),
    description:event?.description||"",location:event?.location||"",
    repeat:({DAILY:"daily",WEEKLY:"weekly",MONTHLY:"monthly",YEARLY:"yearly"})[freq]||"none",
-   reminderEnabled:event?.reminders?.useDefault===false?!!override:true,
-   reminderMinutes:override?.minutes??1440
+   reminderEnabled:event?event.reminders?.useDefault===false?!!override:true:true,
+   reminderMinutes:reminderValue,
+   colorId:event?.colorId||""
   });
  };
  const save=async e=>{
@@ -269,7 +278,8 @@ function OceanGoogleCalendarBlock(){
     ...(draft.allDay?{startDate:draft.startDate,endDate:draft.endDate}:{start:new Date(draft.start).toISOString(),end:new Date(draft.end).toISOString()}),
     description:draft.description,location:draft.location,
     recurrence:draft.repeat==="none"?"":"RRULE:FREQ="+({daily:"DAILY",weekly:"WEEKLY",monthly:"MONTHLY",yearly:"YEARLY"}[draft.repeat]||""),
-    reminderEnabled:draft.reminderEnabled,reminderMinutes:Number(draft.reminderMinutes)||10
+    reminderEnabled:draft.reminderEnabled,reminderMinutes:Number(draft.reminderMinutes)||0,
+    colorId:draft.colorId||""
    };
    if(editingId==="new")await api("/ocean/calendar/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
    else await api("/ocean/calendar/events/"+encodeURIComponent(editingId),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
@@ -283,6 +293,10 @@ function OceanGoogleCalendarBlock(){
   try{await api("/ocean/calendar/events/"+encodeURIComponent(id)+"?calendarId="+encodeURIComponent(calendarId),{method:"DELETE"});setDraft(null);setEditingId(null);await load();}
   catch(e){setError(e.message);}
  };
+ const deleteFromDetails=async()=>{if(!eventDetails)return;await remove(eventDetails.id);setEventDetails(null);};
+ const editFromDetails=()=>{if(!eventDetails)return;const event=eventDetails;setEventDetails(null);openForm(event);};
+ const displayDate=e=>{const start=eventDate(e);if(e.start?.date){const end=e.end?.date?new Date(e.end.date+"T12:00:00"):start;end.setDate(end.getDate()-1);return start.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"})+(dateKey(start)!==dateKey(end)?" – "+end.toLocaleDateString(undefined,{month:"long",day:"numeric",year:"numeric"}):"");}return start.toLocaleString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"})+" – "+new Date(e.end?.dateTime||start).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});};
+ const eventColor=e=>eventColors.find(c=>c.id===e.colorId)?.hex||"";
  const days=Array.from({length:weekCount*7},(_,i)=>new Date(gridStart.getFullYear(),gridStart.getMonth(),gridStart.getDate()+i));
  const byDay=day=>events.filter(e=>dateKey(eventDate(e))===dateKey(day));
  const timeLabel=e=>e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}):"All day";
@@ -310,9 +324,10 @@ function OceanGoogleCalendarBlock(){
    {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div className="ocean-month-weekday" key={d}>{d}</div>)}
    {days.map(day=><div key={dateKey(day)} className={"ocean-month-day "+(day.getMonth()!==month.getMonth()?"outside":"")+(dateKey(day)===dateKey(new Date())?" today":"")}>
     <button className="ocean-month-day-number" onClick={()=>openForm(null,day)} title="Add event on this day"><span>{day.getDate()}</span><Plus size={13}/></button>
-    <div className="ocean-month-day-events">{byDay(day).slice(0,4).map(event=><button key={event.id} className="ocean-month-event" title={event.summary||"Untitled event"} onClick={()=>openForm(event)}><span>{timeLabel(event)}</span>{event.summary||"(No title)"}</button>)}{byDay(day).length>4&&<small>+{byDay(day).length-4} more</small>}</div>
+    <div className="ocean-month-day-events">{byDay(day).slice(0,4).map(event=><button key={event.id} className="ocean-month-event" style={eventColor(event)?{"--event-color":eventColor(event)}:{}} title={event.summary||"Untitled event"} onClick={()=>setEventDetails(event)}><span>{timeLabel(event)}</span>{event.summary||"(No title)"}</button>)}{byDay(day).length>4&&<small>+{byDay(day).length-4} more</small>}</div>
    </div>)}
   </div>:null}
+  {eventDetails&&<div className="ocean-google-event-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setEventDetails(null);}}><section className="ocean-google-event-detail"><div className="ocean-google-detail-top"><span style={{background:eventColor(eventDetails)||"#4285f4"}}/><button type="button" aria-label="Close" onClick={()=>setEventDetails(null)}><X size={19}/></button></div><h3>{eventDetails.summary||"(No title)"}</h3><p className="ocean-google-detail-date"><Calendar size={17}/>{displayDate(eventDetails)}</p>{eventDetails.location&&<p><MapPin size={17}/>{eventDetails.location}</p>}{eventDetails.description&&<p className="ocean-google-detail-description"><AlignLeft size={17}/>{eventDetails.description}</p>}<p><Calendar size={17}/>{selectedCalendar?.summary||"Google Calendar"}</p><p><Bell size={17}/>{eventDetails.reminders?.useDefault===false?(eventDetails.reminders?.overrides?.length?eventDetails.reminders.overrides.map(x=>x.minutes===0?"At event time":x.minutes<60?x.minutes+" minutes before":x.minutes%1440===0?x.minutes/1440+" days before":x.minutes/60+" hours before").join(", "):"No notification"):"Default notifications"}</p><div className="ocean-google-detail-actions"><button type="button" className="danger" onClick={deleteFromDetails}><Trash2 size={15}/> Delete event</button><span/><button type="button" onClick={()=>setEventDetails(null)}>Close</button><button type="button" className="primary" onClick={editFromDetails}><Settings size={15}/> Edit event</button></div></section></div>}
   {draft&&<div className="ocean-google-event-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget){setDraft(null);setEditingId(null);}}}>
    <form className="ocean-google-event-form" onSubmit={save}>
     <div className="ocean-google-event-head"><button type="button" aria-label="Close" onClick={()=>{setDraft(null);setEditingId(null);}}><X size={21}/></button><input autoFocus required maxLength={500} placeholder="Add title" value={draft.summary} onChange={e=>setDraft(v=>({...v,summary:e.target.value}))}/></div>
@@ -323,7 +338,8 @@ function OceanGoogleCalendarBlock(){
     <div className="ocean-google-event-details">
      <div className="ocean-google-event-tab">Event details</div>
      <label className="ocean-google-event-field"><MapPin size={17}/><input placeholder="Add location" value={draft.location} onChange={e=>setDraft(v=>({...v,location:e.target.value}))}/></label>
-     <div className="ocean-google-event-field ocean-google-event-reminder"><Bell size={17}/><label><input type="checkbox" checked={draft.reminderEnabled} onChange={e=>setDraft(v=>({...v,reminderEnabled:e.target.checked}))}/> Notification</label><select disabled={!draft.reminderEnabled} value={String(draft.reminderMinutes)} onChange={e=>setDraft(v=>({...v,reminderMinutes:e.target.value}))}><option value="0">At event time</option><option value="5">5 minutes before</option><option value="10">10 minutes before</option><option value="30">30 minutes before</option><option value="60">1 hour before</option><option value="1440">1 day before</option><option value="10080">1 week before</option></select></div>
+     <div className="ocean-google-event-field ocean-google-event-reminder"><Bell size={17}/><label><input type="checkbox" checked={draft.reminderEnabled} onChange={e=>setDraft(v=>({...v,reminderEnabled:e.target.checked}))}/> Notify me</label><select disabled={!draft.reminderEnabled} value={reminderCustom?"custom":String(draft.reminderMinutes)} onChange={e=>{if(e.target.value==="custom"){setReminderCustom(true);setDraft(v=>({...v,reminderMinutes:v.reminderMinutes||10}));}else{setReminderCustom(false);setDraft(v=>({...v,reminderMinutes:Number(e.target.value)}));}}}><option value="0">At event time</option><option value="5">5 minutes before</option><option value="10">10 minutes before</option><option value="15">15 minutes before</option><option value="30">30 minutes before</option><option value="60">1 hour before</option><option value="120">2 hours before</option><option value="1440">1 day before</option><option value="2880">2 days before</option><option value="10080">1 week before</option><option value="custom">Custom…</option></select>{reminderCustom&&<input aria-label="Custom reminder minutes" type="number" min="0" max="40320" disabled={!draft.reminderEnabled} value={draft.reminderMinutes} onChange={e=>setDraft(v=>({...v,reminderMinutes:e.target.value}))}/>}</div>
+     <div className="ocean-google-event-color"><div><Palette size={17}/> Event colour</div><div className="ocean-google-event-swatches"><button type="button" title="Default colour" className={!draft.colorId?"selected default":""} onClick={()=>setDraft(v=>({...v,colorId:""}))}><span/></button>{eventColors.map(c=><button type="button" key={c.id} title={c.name} aria-label={c.name} className={draft.colorId===c.id?"selected":""} style={{"--swatch":c.hex}} onClick={()=>setDraft(v=>({...v,colorId:c.id}))}/>)}</div></div>
      <div className="ocean-google-event-field ocean-google-event-calendar"><Calendar size={17}/><label>{selectedCalendar?.summary||"Calendar"}</label><select value={calendarId} onChange={e=>setCalendarId(e.target.value)}>{calendars.map(c=><option key={c.id} value={c.primary?"primary":c.id}>{c.summary}</option>)}</select><span style={{background:selectedCalendar?.backgroundColor||"#4285f4"}}/></div>
      <label className="ocean-google-event-description"><AlignLeft size={17}/><textarea rows={5} placeholder="Add description" value={draft.description} onChange={e=>setDraft(v=>({...v,description:e.target.value}))}/></label>
     </div>
