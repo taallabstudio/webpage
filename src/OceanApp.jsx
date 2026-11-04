@@ -206,6 +206,18 @@ function OceanApp(){
  const [calendarDraft,setCalendarDraft]=useState({summary:"",start:"",end:"",description:"",location:""});
  const [calendarSaving,setCalendarSaving]=useState(false);
 
+ useEffect(()=>{
+  const oldTitle=document.title;
+  let icon=document.querySelector('link[rel~="icon"]');
+  const madeIcon=!icon;
+  if(!icon){icon=document.createElement("link");icon.rel="icon";document.head.appendChild(icon);}
+  const oldHref=icon.href;
+  const waveSvg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 32"><g fill="none" stroke="#0878e8" stroke-width="3.2" stroke-linecap="round"><path d="M3 11.5C8 5.5 13 5.5 18 11.5S28 17.5 33 11.5 43 5.5 47 11.5"/><path d="M3 20C8 14 13 14 18 20s10 6 15 0 10-6 14 0"/><path d="M3 28C8 22 13 22 18 28s10 6 15 0 10-6 14 0"/></g></svg>';
+  document.title="OCEAN — Your workspace";
+  icon.href="data:image/svg+xml,"+encodeURIComponent(waveSvg);
+  return()=>{document.title=oldTitle;if(madeIcon)icon.remove();else icon.href=oldHref;};
+ },[]);
+
  const loadPages=useCallback(async()=>{const data=await api("/ocean/pages");setPages(data.pages||[]);return data.pages||[];},[]);
  const openPage=useCallback(async(id)=>{setActivePanel("page");setMobileNav(false);setLoading(true);setShowSlash(false);setShowPageMenu(false);try{const data=await api("/ocean/pages/"+id);const p=data.page;p.blocks=JSON.parse(p.blocks_json||"[]");setPage(p);setShowComments(false);}catch(e){setToast(e.message);}finally{setLoading(false);}},[]);
  useEffect(()=>{let alive=true;api("/auth/me").then(async d=>{if(!alive)return;if(!d.authenticated){setChecking(false);return;}setUser(d.user);if(d.user.role!=="admin"&&d.user.role!=="super_user")return;const list=await loadPages();if(alive&&list.length)await openPage(list[0].id);}).catch(e=>setAuthError(e.message)).finally(()=>{if(alive)setChecking(false);});return()=>{alive=false;};},[loadPages,openPage]);
