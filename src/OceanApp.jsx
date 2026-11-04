@@ -62,8 +62,9 @@ const formatInlineMarkdown=(value="")=>{
 const editorHtml=(element)=>{
  const raw=element.innerText;
  const formatted=formatInlineMarkdown(raw);
- const escaped=escapeHtml(raw).replace(/\n/g,"<br>");
- return formatted!==escaped?formatted:element.innerHTML;
+ const probe=document.createElement("div");
+ probe.innerHTML=formatted;
+ return probe.textContent===raw?element.innerHTML:formatted;
 };
 const focusContentEnd=(element)=>{
  if(!element)return;
