@@ -142,6 +142,8 @@ function OceanDatabaseBlock({block,updateBlock}){
 
 function OceanGoogleCalendarBlock(){
  const [connection,setConnection]=useState({connected:false,email:""});
+ const [calendars,setCalendars]=useState([]);
+ const [calendarId,setCalendarId]=useState("primary");
  const [events,setEvents]=useState([]);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
@@ -154,33 +156,57 @@ function OceanGoogleCalendarBlock(){
  const weekCount=Math.ceil((firstWeekday+daysInMonth)/7);
  const gridStart=new Date(month.getFullYear(),month.getMonth(),1-firstWeekday);
  const gridEnd=new Date(gridStart.getFullYear(),gridStart.getMonth(),gridStart.getDate()+weekCount*7);
+ const dateKey=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
+ const localInput=d=>{const value=new Date(d);return new Date(value.getTime()-value.getTimezoneOffset()*60000).toISOString().slice(0,16);};
+ const eventDate=e=>e.start?.dateTime?new Date(e.start.dateTime):new Date((e.start?.date||"")+"T09:00:00");
  const load=useCallback(async()=>{
   setLoading(true);setError("");
   try{
    const c=await api("/ocean/calendar/connection");setConnection(c);
    if(c.connected){
-    const q=new URLSearchParams({timeMin:gridStart.toISOString(),timeMax:gridEnd.toISOString()});
+    const list=await api("/ocean/calendar/calendars");
+    setCalendars(list.items||[]);
+    const q=new URLSearchParams({timeMin:gridStart.toISOString(),timeMax:gridEnd.toISOString(),calendarId});
     const data=await api("/ocean/calendar/events?"+q.toString());setEvents(data.items||[]);
-   }else setEvents([]);
+   }else{setCalendars([]);setEvents([]);}
   }catch(e){setError(e.message);}
   finally{setLoading(false);}
- },[month.getFullYear(),month.getMonth()]);
+ },[month.getFullYear(),month.getMonth(),calendarId]);
  useEffect(()=>{load();},[load]);
- const localInput=d=>{const value=new Date(d);return new Date(value.getTime()-value.getTimezoneOffset()*60000).toISOString().slice(0,16);};
- const eventDate=e=>e.start?.dateTime?new Date(e.start.dateTime):new Date((e.start?.date||"")+"T09:00:00");
- const dateKey=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
  const openForm=(event=null,day=new Date())=>{
   const start=event?eventDate(event):new Date(day.getFullYear(),day.getMonth(),day.getDate(),10,0);
   const end=event?.end?.dateTime?new Date(event.end.dateTime):new Date(start.getTime()+3600000);
+  const allDay=!!event?.start?.date;
+  const startDate=event?.start?.date||dateKey(start);
+  let endDate=startDate;
+  if(event?.end?.date){const d=new Date(event.end.date+"T12:00:00");d.setDate(d.getDate()-1);endDate=dateKey(d);}
+  const freq=event?.recurrence?.[0]?.match(/FREQ=([^;]+)/)?.[1]||"";
+  const override=event?.reminders?.overrides?.[0];
   setEditingId(event?.id||"new");
-  setDraft({summary:event?.summary||"",start:localInput(start),end:localInput(end),description:event?.description||"",location:event?.location||""});
+  setDraft({
+   summary:event?.summary||"",allDay,startDate,endDate,
+   start:localInput(start),end:localInput(end),
+   description:event?.description||"",location:event?.location||"",
+   repeat:({DAILY:"daily",WEEKLY:"weekly",MONTHLY:"monthly",YEARLY:"yearly"})[freq]||"none",
+   reminderEnabled:event?.reminders?.useDefault===false?!!override:true,
+   reminderMinutes:override?.minutes??1440
+  });
  };
  const save=async e=>{
   e.preventDefault();if(!draft)return;
-  if(new Date(draft.end)<=new Date(draft.start)){setError("The event end must be after its start.");return;}
+  if(!draft.summary.trim()){setError("Add an event title.");return;}
+  if(draft.allDay){
+   if(!draft.startDate||!draft.endDate||draft.endDate<draft.startDate){setError("Choose a valid event date range.");return;}
+  }else if(new Date(draft.end)<=new Date(draft.start)){setError("The event end must be after its start.");return;}
   setSaving(true);setError("");
   try{
-   const payload={...draft,start:new Date(draft.start).toISOString(),end:new Date(draft.end).toISOString()};
+   const payload={
+    summary:draft.summary.trim(),calendarId,allDay:draft.allDay,
+    ...(draft.allDay?{startDate:draft.startDate,endDate:draft.endDate}:{start:new Date(draft.start).toISOString(),end:new Date(draft.end).toISOString()}),
+    description:draft.description,location:draft.location,
+    recurrence:draft.repeat==="none"?"":"RRULE:FREQ="+({daily:"DAILY",weekly:"WEEKLY",monthly:"MONTHLY",yearly:"YEARLY"}[draft.repeat]||""),
+    reminderEnabled:draft.reminderEnabled,reminderMinutes:Number(draft.reminderMinutes)||10
+   };
    if(editingId==="new")await api("/ocean/calendar/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
    else await api("/ocean/calendar/events/"+encodeURIComponent(editingId),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
    setDraft(null);setEditingId(null);await load();
@@ -190,17 +216,18 @@ function OceanGoogleCalendarBlock(){
  const remove=async id=>{
   if(!confirm("Delete this event from Google Calendar?"))return;
   setError("");
-  try{await api("/ocean/calendar/events/"+encodeURIComponent(id),{method:"DELETE"});setDraft(null);setEditingId(null);await load();}
+  try{await api("/ocean/calendar/events/"+encodeURIComponent(id)+"?calendarId="+encodeURIComponent(calendarId),{method:"DELETE"});setDraft(null);setEditingId(null);await load();}
   catch(e){setError(e.message);}
  };
  const days=Array.from({length:weekCount*7},(_,i)=>new Date(gridStart.getFullYear(),gridStart.getMonth(),gridStart.getDate()+i));
  const byDay=day=>events.filter(e=>dateKey(eventDate(e))===dateKey(day));
  const timeLabel=e=>e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}):"All day";
  const goToday=()=>setMonth(new Date(new Date().getFullYear(),new Date().getMonth(),1));
+ const selectedCalendar=calendars.find(c=>c.id===calendarId)||calendars.find(c=>c.primary);
  return <section className="ocean-note-calendar">
   <div className="ocean-calendar-titlebar"><h3>Calendar View</h3><span><span className="ocean-calendar-live-dot"/> Google Calendar connected</span></div>
   <div className="ocean-calendar-toolbar">
-   <div className="ocean-calendar-filter"><Calendar size={15}/> All events</div>
+   <div className="ocean-calendar-filter"><Calendar size={15}/> {selectedCalendar?.summary||"All events"}</div>
    <div className="ocean-calendar-toolbar-actions">
     <a className="ocean-calendar-manage" href="https://calendar.google.com/calendar/u/0/r/month" target="_blank" rel="noreferrer">↗ <span>Manage in Calendar</span></a>
     <div className="ocean-calendar-month-controls">
@@ -211,6 +238,7 @@ function OceanGoogleCalendarBlock(){
     <button className="ocean-primary ocean-calendar-new" onClick={()=>openForm(null,new Date())}><Plus size={14}/> New event</button>
    </div>
   </div>
+  {connection.connected&&calendars.length>0&&<div className="ocean-google-calendar-picker"><label>Calendar<select value={calendarId} onChange={e=>setCalendarId(e.target.value)}>{calendars.map(c=><option key={c.id} value={c.id}>{c.summary}{c.primary?" (Primary)":""}</option>)}</select></label><span style={{background:selectedCalendar?.backgroundColor||"#4285f4"}}/></div>}
   <div className="ocean-calendar-month-heading"><h4>{month.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</h4><span>Click a day to add an event</span></div>
   {!connection.connected&&!loading?<div className="ocean-note-calendar-connect"><p>Connect Google Calendar to add and manage events from this note.</p><button className="ocean-primary" onClick={()=>{window.location.href="/api/ocean/calendar/connect";}}>Connect Google Calendar</button></div>:null}
   {error&&<div className="ocean-admin-error">{error}</div>}
@@ -221,14 +249,23 @@ function OceanGoogleCalendarBlock(){
     <div className="ocean-month-day-events">{byDay(day).slice(0,4).map(event=><button key={event.id} className="ocean-month-event" title={event.summary||"Untitled event"} onClick={()=>openForm(event)}><span>{timeLabel(event)}</span>{event.summary||"(No title)"}</button>)}{byDay(day).length>4&&<small>+{byDay(day).length-4} more</small>}</div>
    </div>)}
   </div>:null}
-  {draft&&<form className="ocean-calendar-form ocean-note-calendar-form" onSubmit={save}>
-   <div className="ocean-access-card-head"><div><strong>{editingId==="new"?"Create event":"Edit event"}</strong><span>Changes sync with your connected Google Calendar.</span></div><button type="button" onClick={()=>{setDraft(null);setEditingId(null);}}><X size={16}/></button></div>
-   <label>Event title<input required maxLength={500} value={draft.summary} onChange={e=>setDraft(v=>({...v,summary:e.target.value}))}/></label>
-   <div className="ocean-calendar-form-grid"><label>Starts<input type="datetime-local" required value={draft.start} onChange={e=>setDraft(v=>({...v,start:e.target.value}))}/></label><label>Ends<input type="datetime-local" required value={draft.end} onChange={e=>setDraft(v=>({...v,end:e.target.value}))}/></label></div>
-   <label>Location<input value={draft.location} onChange={e=>setDraft(v=>({...v,location:e.target.value}))}/></label>
-   <label>Description<textarea rows={2} value={draft.description} onChange={e=>setDraft(v=>({...v,description:e.target.value}))}/></label>
-   <div className="ocean-calendar-actions"><button className="ocean-primary" disabled={saving}>{saving?"Saving…":"Save event"}</button>{editingId!=="new"&&<button type="button" className="ocean-calendar-danger" onClick={()=>remove(editingId)}><Trash2 size={14}/> Delete event</button>}<button type="button" onClick={()=>{setDraft(null);setEditingId(null);}}>Cancel</button></div>
-  </form>}
+  {draft&&<div className="ocean-google-event-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget){setDraft(null);setEditingId(null);}}}>
+   <form className="ocean-google-event-form" onSubmit={save}>
+    <div className="ocean-google-event-head"><button type="button" aria-label="Close" onClick={()=>{setDraft(null);setEditingId(null);}}><X size={21}/></button><input autoFocus required maxLength={500} placeholder="Add title" value={draft.summary} onChange={e=>setDraft(v=>({...v,summary:e.target.value}))}/></div>
+    <div className="ocean-google-event-dates">
+     {draft.allDay?<><label>Starts<input type="date" required value={draft.startDate} onChange={e=>setDraft(v=>({...v,startDate:e.target.value,endDate:v.endDate<e.target.value?e.target.value:v.endDate}))}/></label><span>to</span><label>Ends<input type="date" required value={draft.endDate} min={draft.startDate} onChange={e=>setDraft(v=>({...v,endDate:e.target.value}))}/></label></>:<><label>Starts<input type="datetime-local" required value={draft.start} onChange={e=>setDraft(v=>({...v,start:e.target.value}))}/></label><span>to</span><label>Ends<input type="datetime-local" required value={draft.end} onChange={e=>setDraft(v=>({...v,end:e.target.value}))}/></label></>}
+    </div>
+    <div className="ocean-google-event-options"><label className="ocean-google-event-check"><input type="checkbox" checked={draft.allDay} onChange={e=>setDraft(v=>({...v,allDay:e.target.checked}))}/> All day</label><label className="ocean-google-event-repeat"><select value={draft.repeat} onChange={e=>setDraft(v=>({...v,repeat:e.target.value}))}><option value="none">Does not repeat</option><option value="daily">Every day</option><option value="weekly">Every week</option><option value="monthly">Every month</option><option value="yearly">Every year</option></select></label></div>
+    <div className="ocean-google-event-details">
+     <div className="ocean-google-event-tab">Event details</div>
+     <label className="ocean-google-event-field"><MapPin size={17}/><input placeholder="Add location" value={draft.location} onChange={e=>setDraft(v=>({...v,location:e.target.value}))}/></label>
+     <div className="ocean-google-event-field ocean-google-event-reminder"><Bell size={17}/><label><input type="checkbox" checked={draft.reminderEnabled} onChange={e=>setDraft(v=>({...v,reminderEnabled:e.target.checked}))}/> Notification</label><select disabled={!draft.reminderEnabled} value={String(draft.reminderMinutes)} onChange={e=>setDraft(v=>({...v,reminderMinutes:e.target.value}))}><option value="0">At event time</option><option value="5">5 minutes before</option><option value="10">10 minutes before</option><option value="30">30 minutes before</option><option value="60">1 hour before</option><option value="1440">1 day before</option><option value="10080">1 week before</option></select></div>
+     <div className="ocean-google-event-field ocean-google-event-calendar"><Calendar size={17}/><label>{selectedCalendar?.summary||"Calendar"}</label><select value={calendarId} onChange={e=>setCalendarId(e.target.value)}>{calendars.map(c=><option key={c.id} value={c.id}>{c.summary}</option>)}</select><span style={{background:selectedCalendar?.backgroundColor||"#4285f4"}}/></div>
+     <label className="ocean-google-event-description"><AlignLeft size={17}/><textarea rows={5} placeholder="Add description" value={draft.description} onChange={e=>setDraft(v=>({...v,description:e.target.value}))}/></label>
+    </div>
+    <div className="ocean-google-event-actions">{editingId!=="new"&&<button type="button" className="danger" onClick={()=>remove(editingId)}><Trash2 size={15}/> Delete</button>}<span/><button type="button" onClick={()=>{setDraft(null);setEditingId(null);}}>Cancel</button><button type="submit" disabled={saving}>{saving?"Saving…":"Save"}</button></div>
+   </form>
+  </div>}
   {connection.connected&&<footer className="ocean-note-calendar-foot"><ShieldCheck size={14}/> Events are synced directly with {connection.email||"your Google account"}.</footer>}
  </section>;
 }
