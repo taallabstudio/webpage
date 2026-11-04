@@ -96,7 +96,7 @@ function OceanDatabaseBlock({block,updateBlock}){
  const [renamePageTitle,setRenamePageTitle]=useState("");
  const [syncBusy,setSyncBusy]=useState(false);
  const [syncMessage,setSyncMessage]=useState("");
- const [propertyMenu,setPropertyMenu]=useState(null);const [cellPicker,setCellPicker]=useState(null);const [cellSearch,setCellSearch]=useState("");const [viewSettingsOpen,setViewSettingsOpen]=useState(false);const [addingProperty,setAddingProperty]=useState(false);const [newPropertyName,setNewPropertyName]=useState("");const [newPropertyType,setNewPropertyType]=useState("text");const [propertyTypeSearch,setPropertyTypeSearch]=useState("");const [cellPicker,setCellPicker]=useState(null);const [cellSearch,setCellSearch]=useState("");const [viewSettingsOpen,setViewSettingsOpen]=useState(false);
+ const [propertyMenu,setPropertyMenu]=useState(null);const [cellPicker,setCellPicker]=useState(null);const [cellSearch,setCellSearch]=useState("");const [viewSettingsOpen,setViewSettingsOpen]=useState(false);const [addingProperty,setAddingProperty]=useState(false);const [newPropertyName,setNewPropertyName]=useState("");const [newPropertyType,setNewPropertyType]=useState("text");const [propertyTypeSearch,setPropertyTypeSearch]=useState("");
  const [propertyTypeMenu,setPropertyTypeMenu]=useState(false);
  const [propertyVisibility,setPropertyVisibility]=useState(()=>block.hiddenProperties||[]);
  const [frozenProperties,setFrozenProperties]=useState(()=>block.frozenProperties||[]);
