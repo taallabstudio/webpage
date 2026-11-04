@@ -1752,7 +1752,7 @@ async function handleOceanCalendar(req: Request,env: Env,user: any,pathname: str
     if(Object.prototype.hasOwnProperty.call(body,"summary"))event.summary=String(body.summary).slice(0,500);
     if(Object.prototype.hasOwnProperty.call(body,"description"))event.description=String(body.description).slice(0,8000);
     if(Object.prototype.hasOwnProperty.call(body,"location"))event.location=String(body.location).slice(0,1000);
-    if(Object.prototype.hasOwnProperty.call(body,"colorId"))event.colorId=String(body.colorId||"").slice(0,2);
+    if(Object.prototype.hasOwnProperty.call(body,"colorId"))event.colorId=body.colorId?String(body.colorId).slice(0,2):null;
     if(body.allDay){
       const startDate=String(body.startDate||"").slice(0,10),endDate=String(body.endDate||startDate).slice(0,10);
       const exclusiveEnd=new Date(endDate+"T12:00:00");exclusiveEnd.setDate(exclusiveEnd.getDate()+1);
