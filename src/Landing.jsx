@@ -116,17 +116,19 @@ function Landing() {
       const viewportHeight = window.innerHeight;
       const rect = stage.getBoundingClientRect();
       const scrollable = Math.max(stage.offsetHeight - viewportHeight, 1);
+      // Progress is tied to the sticky interval: 0 at its entry and 1
+      // exactly when the sticky hero releases at the end of the stage.
       const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
+      const heroActive = rect.top <= 0 && rect.bottom >= viewportHeight;
 
       stage.style.setProperty("--hero-progress", progress.toFixed(4));
       stage.classList.toggle("hero-exiting", progress > 0.34);
 
       if (scrollHeadphone) {
-        // Keep the headphone centered in the viewport while the hero is active.
-        // Hide it completely as soon as the hero stage has scrolled out.
-        const heroStillVisible = rect.bottom > 0 && rect.top < viewportHeight;
+        // Keep the image visible for the entire sticky interval and scrub
+        // two full turns from the same normalized progress value.
         scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 720).toFixed(2)}deg`);
-        scrollHeadphone.style.opacity = heroStillVisible ? "1" : "0";
+        scrollHeadphone.style.opacity = heroActive ? "1" : "0";
       }
     };
 
