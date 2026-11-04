@@ -332,7 +332,8 @@ function OceanDatabaseBlock({block,updateBlock}){
     nextRows=nextRows.map((row,ri)=>ri===0?row:row.map((value,ci)=>ci===i?(value?JSON.stringify([String(value)]):"[]"):value));
    }else if(type!=="multi_select"&&previous==="multi_select"){
     nextRows=nextRows.map((row,ri)=>ri===0?row:row.map((value,ci)=>{if(ci!==i)return value;try{return JSON.parse(value||"[]")[0]||""}catch{return String(value||"").split(",")[0].trim()}}));
-   }else if(type==="number"){
+   }
+   if(type==="number"){
     const numericValue=value=>{
      let raw=String(value??"").replace(/[^0-9.\\-]/g,"");
      const negative=raw.startsWith("-");
