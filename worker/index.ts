@@ -1708,37 +1708,65 @@ async function handleOceanCalendar(req: Request,env: Env,user: any,pathname: str
     await env.DB.prepare("DELETE FROM ocean_google_calendar WHERE user_id=?").bind(user.id).run();
     return json({ok:true});
   }
+  if(pathname==="/api/ocean/calendar/calendars"&&req.method==="GET"){
+    const data:any=await oceanGoogleCalendarRequest(env,user.id,"/users/me/calendarList?maxResults=100&showHidden=false");
+    return json({items:(data.items||[]).map((c:any)=>({id:c.id,summary:c.summary,primary:!!c.primary,backgroundColor:c.backgroundColor||"",accessRole:c.accessRole||""})).filter((c:any)=>c.accessRole!=="freeBusyReader")});
+  }
   if(pathname==="/api/ocean/calendar/events"&&req.method==="GET"){
     const params=new URL(req.url).searchParams;
     const timeMin=params.get("timeMin")||new Date(Date.now()-30*86400000).toISOString();
     const timeMax=params.get("timeMax")||new Date(Date.now()+90*86400000).toISOString();
+    const calendarId=params.get("calendarId")||"primary";
     const query=new URLSearchParams({singleEvents:"true",orderBy:"startTime",maxResults:"250",timeMin,timeMax});
-    return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/primary/events?"+query.toString()));
+    return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/"+encodeURIComponent(calendarId)+"/events?"+query.toString()));
   }
   if(pathname==="/api/ocean/calendar/events"&&req.method==="POST"){
     const body:any=await req.json().catch(()=>({}));
     const summary=String(body.summary||"").trim().slice(0,500);
-    const start=String(body.start||""),end=String(body.end||"");
-    if(!summary||!start||!end||!Number.isFinite(Date.parse(start))||!Number.isFinite(Date.parse(end))||Date.parse(end)<=Date.parse(start))return json({error:"Enter an event title, valid start and end times."},{status:400});
-    const event:any={summary,start:{dateTime:start},end:{dateTime:end}};
+    const calendarId=String(body.calendarId||"primary");
+    const event:any={summary};
+    if(body.allDay){
+      const startDate=String(body.startDate||body.start||"").slice(0,10);
+      const endDate=String(body.endDate||startDate).slice(0,10);
+      if(!summary||!/^\\d{4}-\\d{2}-\\d{2}$/.test(startDate)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(endDate)||endDate<startDate)return json({error:"Enter a valid event title and date range."},{status:400});
+      const exclusiveEnd=new Date(endDate+"T12:00:00");
+      exclusiveEnd.setDate(exclusiveEnd.getDate()+1);
+      event.start={date:startDate};event.end={date:exclusiveEnd.toISOString().slice(0,10)};
+    }else{
+      const start=String(body.start||""),end=String(body.end||"");
+      if(!summary||!start||!end||!Number.isFinite(Date.parse(start))||!Number.isFinite(Date.parse(end))||Date.parse(end)<=Date.parse(start))return json({error:"Enter an event title, valid start and end times."},{status:400});
+      event.start={dateTime:start};event.end={dateTime:end};
+    }
     if(body.description)event.description=String(body.description).slice(0,8000);
     if(body.location)event.location=String(body.location).slice(0,1000);
-    return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/primary/events",{method:"POST",body:JSON.stringify(event)}),{status:201});
+    if(body.recurrence)event.recurrence=[String(body.recurrence).slice(0,100)];
+    if(body.reminderEnabled)event.reminders={useDefault:false,overrides:[{method:"popup",minutes:Math.max(0,Math.min(40320,Number(body.reminderMinutes)||10))}]};
+    return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/"+encodeURIComponent(calendarId)+"/events",{method:"POST",body:JSON.stringify(event)}),{status:201});
   }
-  const eventMatch=pathname.match(/^\/api\/ocean\/calendar\/events\/([^/]+)$/);
+  const eventMatch=pathname.match(/^\\/api\\/ocean\\/calendar\\/events\\/([^/]+)$/);
   if(eventMatch&&req.method==="PATCH"){
     const body:any=await req.json().catch(()=>({}));
     const event:any={};
+    const calendarId=String(body.calendarId||"primary");
     if(Object.prototype.hasOwnProperty.call(body,"summary"))event.summary=String(body.summary).slice(0,500);
     if(Object.prototype.hasOwnProperty.call(body,"description"))event.description=String(body.description).slice(0,8000);
     if(Object.prototype.hasOwnProperty.call(body,"location"))event.location=String(body.location).slice(0,1000);
-    if(body.start)event.start={dateTime:String(body.start)};
-    if(body.end)event.end={dateTime:String(body.end)};
+    if(body.allDay){
+      const startDate=String(body.startDate||"").slice(0,10),endDate=String(body.endDate||startDate).slice(0,10);
+      const exclusiveEnd=new Date(endDate+"T12:00:00");exclusiveEnd.setDate(exclusiveEnd.getDate()+1);
+      event.start={date:startDate};event.end={date:exclusiveEnd.toISOString().slice(0,10)};
+    }else{
+      if(body.start)event.start={dateTime:String(body.start)};
+      if(body.end)event.end={dateTime:String(body.end)};
+    }
+    if(Object.prototype.hasOwnProperty.call(body,"recurrence"))event.recurrence=body.recurrence?[String(body.recurrence).slice(0,100)]:[];
+    if(Object.prototype.hasOwnProperty.call(body,"reminderEnabled"))event.reminders=body.reminderEnabled?{useDefault:false,overrides:[{method:"popup",minutes:Math.max(0,Math.min(40320,Number(body.reminderMinutes)||10))}]}:{useDefault:true};
     if(!Object.keys(event).length)return json({error:"No event changes supplied."},{status:400});
-    return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/primary/events/"+encodeURIComponent(eventMatch[1]),{method:"PATCH",body:JSON.stringify(event)}));
+    return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/"+encodeURIComponent(calendarId)+"/events/"+encodeURIComponent(eventMatch[1]),{method:"PATCH",body:JSON.stringify(event)}));
   }
   if(eventMatch&&req.method==="DELETE"){
-    await oceanGoogleCalendarRequest(env,user.id,"/calendars/primary/events/"+encodeURIComponent(eventMatch[1]),{method:"DELETE"});
+    const calendarId=new URL(req.url).searchParams.get("calendarId")||"primary";
+    await oceanGoogleCalendarRequest(env,user.id,"/calendars/"+encodeURIComponent(calendarId)+"/events/"+encodeURIComponent(eventMatch[1]),{method:"DELETE"});
     return json({ok:true});
   }
   return null;
