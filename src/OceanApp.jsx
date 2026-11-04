@@ -119,9 +119,11 @@ function OceanGoogleCalendarBlock(){
  const [editingId,setEditingId]=useState(null);
  const [draft,setDraft]=useState(null);
  const [saving,setSaving]=useState(false);
- const monthStart=new Date(month.getFullYear(),month.getMonth(),1);
- const gridStart=new Date(month.getFullYear(),month.getMonth(),1-monthStart.getDay());
- const gridEnd=new Date(gridStart.getFullYear(),gridStart.getMonth(),gridStart.getDate()+42);
+ const firstWeekday=new Date(month.getFullYear(),month.getMonth(),1).getDay();
+ const daysInMonth=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
+ const weekCount=Math.ceil((firstWeekday+daysInMonth)/7);
+ const gridStart=new Date(month.getFullYear(),month.getMonth(),1-firstWeekday);
+ const gridEnd=new Date(gridStart.getFullYear(),gridStart.getMonth(),gridStart.getDate()+weekCount*7);
  const load=useCallback(async()=>{
   setLoading(true);setError("");
   try{
@@ -158,21 +160,35 @@ function OceanGoogleCalendarBlock(){
  const remove=async id=>{
   if(!confirm("Delete this event from Google Calendar?"))return;
   setError("");
-  try{await api("/ocean/calendar/events/"+encodeURIComponent(id),{method:"DELETE"});await load();}
+  try{await api("/ocean/calendar/events/"+encodeURIComponent(id),{method:"DELETE"});setDraft(null);setEditingId(null);await load();}
   catch(e){setError(e.message);}
  };
- const days=Array.from({length:42},(_,i)=>new Date(gridStart.getFullYear(),gridStart.getMonth(),gridStart.getDate()+i));
+ const days=Array.from({length:weekCount*7},(_,i)=>new Date(gridStart.getFullYear(),gridStart.getMonth(),gridStart.getDate()+i));
  const byDay=day=>events.filter(e=>dateKey(eventDate(e))===dateKey(day));
  const timeLabel=e=>e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}):"All day";
+ const goToday=()=>setMonth(new Date(new Date().getFullYear(),new Date().getMonth(),1));
  return <section className="ocean-note-calendar">
-  <header className="ocean-note-calendar-head"><div><span><Calendar size={15}/> GOOGLE CALENDAR</span><h3>{month.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</h3></div><div className="ocean-note-calendar-controls"><button onClick={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))} aria-label="Previous month"><ChevronRight className="calendar-prev" size={17}/></button><button onClick={()=>setMonth(new Date(new Date().getFullYear(),new Date().getMonth(),1))}>Today</button><button onClick={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))} aria-label="Next month"><ChevronRight size={17}/></button><button className="ocean-primary" onClick={()=>openForm(null,new Date())}><Plus size={14}/> New event</button></div></header>
+  <div className="ocean-calendar-titlebar"><h3>Calendar View</h3><span><span className="ocean-calendar-live-dot"/> Google Calendar connected</span></div>
+  <div className="ocean-calendar-toolbar">
+   <div className="ocean-calendar-filter"><Calendar size={15}/> All events</div>
+   <div className="ocean-calendar-toolbar-actions">
+    <a className="ocean-calendar-manage" href="https://calendar.google.com/calendar/u/0/r/month" target="_blank" rel="noreferrer">↗ <span>Manage in Calendar</span></a>
+    <div className="ocean-calendar-month-controls">
+     <button onClick={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))} aria-label="Previous month"><ChevronRight className="calendar-prev" size={17}/></button>
+     <button onClick={goToday}>Today</button>
+     <button onClick={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))} aria-label="Next month"><ChevronRight size={17}/></button>
+    </div>
+    <button className="ocean-primary ocean-calendar-new" onClick={()=>openForm(null,new Date())}><Plus size={14}/> New event</button>
+   </div>
+  </div>
+  <div className="ocean-calendar-month-heading"><h4>{month.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</h4><span>Click a day to add an event</span></div>
   {!connection.connected&&!loading?<div className="ocean-note-calendar-connect"><p>Connect Google Calendar to add and manage events from this note.</p><button className="ocean-primary" onClick={()=>{window.location.href="/api/ocean/calendar/connect";}}>Connect Google Calendar</button></div>:null}
   {error&&<div className="ocean-admin-error">{error}</div>}
-  {loading?<div className="ocean-note-calendar-loading"><span className="ocean-mini-spinner"/> Loading your calendar…</div>:connection.connected?<div className="ocean-month-grid">
+  {loading?<div className="ocean-note-calendar-loading"><span className="ocean-mini-spinner"/> Loading your calendar…</div>:connection.connected?<div className="ocean-month-grid" style={{"--calendar-week-count":weekCount}}>
    {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div className="ocean-month-weekday" key={d}>{d}</div>)}
    {days.map(day=><div key={dateKey(day)} className={"ocean-month-day "+(day.getMonth()!==month.getMonth()?"outside":"")+(dateKey(day)===dateKey(new Date())?" today":"")}>
-    <button className="ocean-month-day-number" onClick={()=>openForm(null,day)} title="Add event on this day">{day.getDate()} <Plus size={11}/></button>
-    <div className="ocean-month-day-events">{byDay(day).slice(0,3).map(event=><button key={event.id} className="ocean-month-event" title={event.summary||"Untitled event"} onClick={()=>openForm(event)}><span>{timeLabel(event)}</span>{event.summary||"(No title)"}</button>)}{byDay(day).length>3&&<small>+{byDay(day).length-3} more</small>}</div>
+    <button className="ocean-month-day-number" onClick={()=>openForm(null,day)} title="Add event on this day"><span>{day.getDate()}</span><Plus size={13}/></button>
+    <div className="ocean-month-day-events">{byDay(day).slice(0,4).map(event=><button key={event.id} className="ocean-month-event" title={event.summary||"Untitled event"} onClick={()=>openForm(event)}><span>{timeLabel(event)}</span>{event.summary||"(No title)"}</button>)}{byDay(day).length>4&&<small>+{byDay(day).length-4} more</small>}</div>
    </div>)}
   </div>:null}
   {draft&&<form className="ocean-calendar-form ocean-note-calendar-form" onSubmit={save}>
