@@ -91,7 +91,7 @@ html{scroll-behavior:smooth}
   --hero-progress:0;
   position:relative;
   /* Give the scroll-scrubbed headphone enough travel to rotate visibly. */
-  height:260vh;
+  height:155vh;
   background:
     radial-gradient(circle at 72% 42%,rgba(8,120,232,.12),transparent 28%),
     radial-gradient(circle at 22% 32%,rgba(207,218,228,.42),transparent 30%),
@@ -243,7 +243,7 @@ html{scroll-behavior:smooth}
   transform:rotate(45deg);
 }
 @media(max-width:1050px){
-  .hero-scroll-stage{height:220vh}
+  .hero-scroll-stage{height:150vh}
   .hero-scroll-stage .hero-section{
     grid-template-columns:1fr 1fr;
     padding-left:5vw;
@@ -253,7 +253,7 @@ html{scroll-behavior:smooth}
   .hero-art{width:min(48vw,560px)}
 }
 @media(max-width:760px){
-  .hero-scroll-stage{height:190vh}
+  .hero-scroll-stage{height:145vh}
   .hero-sticky{min-height:620px}
   .hero-scroll-stage .hero-section{
     display:block;
@@ -951,27 +951,28 @@ html{scroll-behavior:smooth}
 
 /* The headphone sits above section backgrounds but below
    every actual piece of page content. */
-.scroll-headphone{
-  position:fixed;
-  left:66%;
+/* The headphone belongs to the hero artwork, not the document.
+   It shares the exact center of the animated rings and naturally scrolls
+   behind the following sections when the hero ends. */
+.hero-art .scroll-headphone{
+  position:absolute;
+  left:50%;
   top:50%;
-  width:min(42vw,620px);
-  max-height:82vh;
-  height:auto;
-  z-index:15;
+  width:88%;
+  height:88%;
+  max-width:620px;
+  max-height:620px;
   margin:0;
   display:block;
   object-fit:contain;
-  /* Keep centering and scroll rotation on one transform declaration. */
   transform:translate3d(-50%,-50%,0) rotate(var(--headphone-rotation,0deg));
   transform-origin:50% 50%;
   backface-visibility:hidden;
   pointer-events:none;
   user-select:none;
   filter:drop-shadow(0 35px 45px rgba(10,54,88,.18));
-  will-change:transform,opacity;
-  opacity:0;
-  transition:opacity .18s linear;
+  will-change:transform;
+  z-index:3;
 }
 .landing > .landing-nav{
   position:fixed;
@@ -985,30 +986,7 @@ html{scroll-behavior:smooth}
   border-bottom:1px solid rgba(20,30,40,.08);
 }
 
-/* Section backgrounds stay in the normal page layer.
-   Their contents are explicitly raised above the headphone. */
-.landing > .hero-scroll-stage,
-.landing > .site-section,
-.landing > .contact-section{
-  position:relative;
-  z-index:auto !important;
-}
-
-.landing > .hero-scroll-stage > .hero-sticky,
-.landing > .site-section > *,
-.landing > .contact-section > *{
-  position:relative;
-  z-index:16;
-}
-
 @media(max-width:760px){
-  .scroll-headphone{
-    left:50%;
-    top:58%;
-    width:min(78vw,440px);
-    max-height:62vh;
-  }
-
   .hero-scroll-stage .hero-art{
     left:50%;
     right:auto;
