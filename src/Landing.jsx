@@ -127,7 +127,7 @@ function Landing() {
       if (scrollHeadphone) {
         // Keep the image visible for the entire sticky interval and scrub
         // two full turns from the same normalized progress value.
-        scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 720).toFixed(2)}deg`);
+        scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 360).toFixed(2)}deg`);
         scrollHeadphone.style.opacity = heroActive ? "1" : "0";
       }
     };
@@ -236,11 +236,6 @@ function Landing() {
       </div>
     </header>
 
-    {typeof document !== "undefined" && createPortal(
-      <img className="scroll-headphone" src="/headphones.webp" alt="" aria-hidden="true" />,
-      document.body
-    )}
-
     <section className="hero-scroll-stage" aria-label="TaalLab introduction">
       <div className="hero-sticky">
         <div className="hero-section">
@@ -254,6 +249,7 @@ function Landing() {
           </div>
 
           <div className="hero-art" aria-hidden="true">
+            <img className="scroll-headphone" src="/headphones.webp" alt="" />
             <div className="hero-art-glow" />
             <div className="hero-art-ring ring-one" />
             <div className="hero-art-ring ring-two" />
