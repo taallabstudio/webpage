@@ -177,7 +177,8 @@ function OceanDatabaseBlock({block,updateBlock}){
   if(["formula","rollup","created_time","edited_time","created_by","edited_by","id"].includes(meta.type))return <span className="ocean-db-computed-value">{meta.type==="id"?(value||String(rowIndex)):value||"—"}</span>;
   if(["person","files","relation","place"].includes(meta.type))return <input type="text" value={value} disabled={!canEdit} onChange={e=>onChange(e.target.value)} placeholder={meta.type==="person"?"Assign a person…":meta.type==="files"?"File name or URL…":meta.type==="relation"?"Related page…":"Add a place…"}/>;
   if(meta.type==="button")return <button type="button" className="ocean-db-cell-action" disabled={!canEdit} onClick={()=>window.alert(meta.buttonLabel||"Button property")}>{meta.buttonLabel||"Run"}</button>;
-  const inputType=({number:"number",date:"date",url:"url",email:"email",phone:"tel"})[meta.type]||"text";
+  if(meta.type==="number")return <input type="text" inputMode="decimal" value={value} disabled={!canEdit} onChange={e=>{let raw=e.target.value.replace(/[^0-9.\\-]/g,"");const negative=raw.startsWith("-");raw=raw.replace(/-/g,"");const parts=raw.split(".");const numeric=(negative?"-":"")+parts.shift()+(parts.length?"."+parts.join(""):"");onChange(numeric);}} placeholder="0"/>;
+  const inputType=({date:"date",url:"url",email:"email",phone:"tel"})[meta.type]||"text";
   return <input type={inputType} value={value} disabled={!canEdit} onChange={e=>onChange(e.target.value)} placeholder={meta.type==="title"?"Untitled":""}/>;
  };
  const visible=headers.map((h,i)=>i).filter(i=>!hidden.includes(i)&&!propertyVisibility.includes(i));
