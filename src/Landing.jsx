@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowDownToLine, ArrowLeft, Check, ChevronRight, Clock3, Copy, Download,
   Eye, File, FileAudio, FileImage, FileText, FileVideo, FolderOpen, Gauge,
@@ -100,12 +101,45 @@ function Landing() {
 
   useEffect(() => {
     const revealElements = Array.from(document.querySelectorAll(".landing .reveal"));
-    if (!revealElements.length) return;
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => entry.target.classList.toggle("show", entry.isIntersecting));
     }, { threshold: 0.01, rootMargin: "0px 0px -5% 0px" });
     revealElements.forEach((element) => observer.observe(element));
-    return () => observer.disconnect();
+
+    const stage = document.querySelector(".hero-scroll-stage");
+    const scrollHeadphone = document.querySelector(".scroll-headphone");
+    let raf = 0;
+
+    const updateHero = () => {
+      raf = 0;
+      if (!stage) return;
+      const viewportHeight = window.innerHeight;
+      const rect = stage.getBoundingClientRect();
+      const scrollable = Math.max(stage.offsetHeight - viewportHeight, 1);
+      const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
+
+      stage.style.setProperty("--hero-progress", progress.toFixed(4));
+      stage.classList.toggle("hero-exiting", progress > 0.34);
+
+      if (scrollHeadphone) {
+        scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 360).toFixed(2)}deg`);
+      }
+    };
+
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(updateHero);
+    };
+
+    updateHero();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", updateHero);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", updateHero);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   useEffect(() => {
@@ -196,29 +230,37 @@ function Landing() {
       </div>
     </header>
 
-    <section className="hero-section" aria-label="TaalLab introduction">
-      <div className="hero-copy">
-        <div className="eyebrow"><span className="dot" /> TAAL LAB • RECORDING &amp; MUSIC PRODUCTION</div>
-        <h1>Sound that feels<br/><em>like you.</em></h1>
-        <p>Music production, recording, mixing and mastering for artists who care about every detail.</p>
-        <div className="hero-actions">
-          <a className="primary-btn" href="#book-session">Book a session <ChevronRight size={16}/></a>
-        </div>
-      </div>
-      <div className="hero-visual" aria-hidden="true">
-        <div className="hero-visual-glow" />
-        <div className="hero-visual-disc">
-          <div className="hero-visual-inner">
-            <span className="hero-visual-label">TAAL LAB <i> / </i> SOUND IN MOTION</span>
-            <div className="hero-waveform"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-            <span className="hero-visual-foot">MUSIC · VOICE · PRODUCTION</span>
+    {typeof document !== "undefined" && createPortal(
+      <ProgressiveImage className="scroll-headphone" src="/headphones.webp" previewSrc="/headphones-preview.avif" alt="" priority />,
+      document.body
+    )}
+
+    <section className="hero-scroll-stage" aria-label="TaalLab introduction">
+      <div className="hero-sticky">
+        <div className="hero-section">
+          <div className="hero-copy">
+            <div className="eyebrow"><span className="dot" /> TAAL LAB • RECORDING &amp; MUSIC PRODUCTION</div>
+            <h1>Sound that feels<br/><em>like you.</em></h1>
+            <p>Music production, recording, mixing and mastering for artists who care about every detail.</p>
+            <div className="hero-actions">
+              <a className="primary-btn" href="#book-session">Book a session <ChevronRight size={16}/></a>
+            </div>
+          </div>
+
+          <div className="hero-art" aria-hidden="true">
+            <div className="hero-art-glow" />
+            <div className="hero-art-ring ring-one" />
+            <div className="hero-art-ring ring-two" />
+            <span className="hero-art-caption">LISTEN<br/>FEEL<br/>CREATE</span>
+          </div>
+
+          <div className="hero-note">
+            <span>TAAL LAB</span>
+            <small>Music • Voice • Production</small>
           </div>
         </div>
-        <span className="hero-visual-index">01 — CREATE</span>
-      </div>
-      <div className="hero-note">
-        <span>TAAL LAB</span>
-        <small>Music • Voice • Production</small>
+
+        <div className="hero-scroll-hint"><span>SCROLL TO EXPLORE</span><i /></div>
       </div>
     </section>
 
