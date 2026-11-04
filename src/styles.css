@@ -959,8 +959,10 @@ html{scroll-behavior:smooth}
   margin:0;
   display:block;
   object-fit:contain;
-  transform:translate(-50%,-50%) rotate(var(--headphone-rotation,0deg));
+  /* Keep centering and scroll rotation on one transform declaration. */
+  transform:translate3d(-50%,-50%,0) rotate(var(--headphone-rotation,0deg));
   transform-origin:50% 50%;
+  backface-visibility:hidden;
   pointer-events:none;
   user-select:none;
   filter:drop-shadow(0 35px 45px rgba(10,54,88,.18));
