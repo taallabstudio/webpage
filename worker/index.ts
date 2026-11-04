@@ -1728,7 +1728,7 @@ async function handleOceanCalendar(req: Request,env: Env,user: any,pathname: str
     if(body.allDay){
       const startDate=String(body.startDate||body.start||"").slice(0,10);
       const endDate=String(body.endDate||startDate).slice(0,10);
-      if(!summary||!/^\\d{4}-\\d{2}-\\d{2}$/.test(startDate)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(endDate)||endDate<startDate)return json({error:"Enter a valid event title and date range."},{status:400});
+      if(!summary||!/^\d{4}-\d{2}-\d{2}$/.test(startDate)||!/^\d{4}-\d{2}-\d{2}$/.test(endDate)||endDate<startDate)return json({error:"Enter a valid event title and date range."},{status:400});
       const exclusiveEnd=new Date(endDate+"T12:00:00");
       exclusiveEnd.setDate(exclusiveEnd.getDate()+1);
       event.start={date:startDate};event.end={date:exclusiveEnd.toISOString().slice(0,10)};
@@ -1743,7 +1743,7 @@ async function handleOceanCalendar(req: Request,env: Env,user: any,pathname: str
     if(body.reminderEnabled)event.reminders={useDefault:false,overrides:[{method:"popup",minutes:Math.max(0,Math.min(40320,Number(body.reminderMinutes)||10))}]};
     return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/"+encodeURIComponent(calendarId)+"/events",{method:"POST",body:JSON.stringify(event)}),{status:201});
   }
-  const eventMatch=pathname.match(/^\\/api\\/ocean\\/calendar\\/events\\/([^/]+)$/);
+  const eventMatch=pathname.match(/^\/api\/ocean\/calendar\/events\/([^/]+)$/);
   if(eventMatch&&req.method==="PATCH"){
     const body:any=await req.json().catch(()=>({}));
     const event:any={};
