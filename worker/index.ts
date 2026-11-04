@@ -1740,7 +1740,7 @@ async function handleOceanCalendar(req: Request,env: Env,user: any,pathname: str
     if(body.description)event.description=String(body.description).slice(0,8000);
     if(body.location)event.location=String(body.location).slice(0,1000);
     if(body.recurrence)event.recurrence=[String(body.recurrence).slice(0,100)];
-    if(body.reminderEnabled)event.reminders={useDefault:false,overrides:[{method:"popup",minutes:Math.max(0,Math.min(40320,Number.isFinite(Number(body.reminderMinutes))?Number(body.reminderMinutes):10))}]};
+    if(body.reminderEnabled)event.reminders=body.reminderEnabled?{useDefault:false,overrides:[{method:"popup",minutes:Math.max(0,Math.min(40320,Number.isFinite(Number(body.reminderMinutes))?Number(body.reminderMinutes):10))}]}:{useDefault:false,overrides:[]};
     return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/"+encodeURIComponent(calendarId)+"/events",{method:"POST",body:JSON.stringify(event)}),{status:201});
   }
   const eventMatch=pathname.match(/^\/api\/ocean\/calendar\/events\/([^/]+)$/);
@@ -1760,7 +1760,7 @@ async function handleOceanCalendar(req: Request,env: Env,user: any,pathname: str
       if(body.end)event.end={dateTime:String(body.end)};
     }
     if(Object.prototype.hasOwnProperty.call(body,"recurrence"))event.recurrence=body.recurrence?[String(body.recurrence).slice(0,100)]:[];
-    if(Object.prototype.hasOwnProperty.call(body,"reminderEnabled"))event.reminders=body.reminderEnabled?{useDefault:false,overrides:[{method:"popup",minutes:Math.max(0,Math.min(40320,Number(body.reminderMinutes)||10))}]}:{useDefault:true};
+    if(Object.prototype.hasOwnProperty.call(body,"reminderEnabled"))event.reminders=body.reminderEnabled?{useDefault:false,overrides:[{method:"popup",minutes:Math.max(0,Math.min(40320,Number.isFinite(Number(body.reminderMinutes))?Number(body.reminderMinutes):10))}]}:{useDefault:false,overrides:[]};
     if(!Object.keys(event).length)return json({error:"No event changes supplied."},{status:400});
     return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/"+encodeURIComponent(calendarId)+"/events/"+encodeURIComponent(eventMatch[1]),{method:"PATCH",body:JSON.stringify(event)}));
   }
