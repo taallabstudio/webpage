@@ -179,6 +179,20 @@ function OceanDatabaseBlock({block,updateBlock}){
  const visible=headers.map((h,i)=>i).filter(i=>!hidden.includes(i)&&!propertyVisibility.includes(i));
  let data=rows.slice(1).map((r,i)=>({r,i})).filter(x=>!filter||(filterColumn===null?x.r.some(v=>String(v).toLowerCase().includes(filter.toLowerCase())):String(x.r[filterColumn]||"").toLowerCase().includes(filter.toLowerCase()))).filter(x=>!search||x.r.some(v=>String(v).toLowerCase().includes(search.toLowerCase())));
  if(sort){const [col,dir]=sort.split(":");data.sort((a,b)=>String(a.r[Number(col)]||"").localeCompare(String(b.r[Number(col)]||""),undefined,{numeric:true})*(dir==="desc"?-1:1));}
+ const calculationResult=(index,operation)=>{
+  const values=data.map(x=>x.r[Number(index)]).filter(v=>v!==""&&v!==null&&v!==undefined);
+  const nums=values.map(Number).filter(Number.isFinite).sort((a,b)=>a-b);
+  if(operation==="Count all")return data.length;
+  if(operation==="Count values")return values.length;
+  if(operation==="Count unique")return new Set(values.map(String)).size;
+  if(operation==="Percent empty")return (data.length?Math.round((data.length-values.length)/data.length*100):0)+"%";
+  if(operation==="Sum")return nums.reduce((a,b)=>a+b,0);
+  if(operation==="Average")return nums.length?(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(2):"—";
+  if(operation==="Median")return nums.length?(nums.length%2?nums[(nums.length-1)/2]:(nums[nums.length/2-1]+nums[nums.length/2])/2):"—";
+  if(operation==="Min")return nums.length?nums[0]:"—";
+  if(operation==="Max")return nums.length?nums[nums.length-1]:"—";
+  return "";
+ };
  const saveRows=next=>updateBlock(block.id,{rows:next});
  const editCell=(row,col,value)=>{const next=rows.map(r=>[...r]);next[row][col]=value;saveRows(next);};
  const addRow=(groupValue="")=>{const row=Array(width).fill("");if(groupValue&&groupBy<width)row[groupBy]=groupValue;saveRows([...rows,row]);};
@@ -337,7 +351,7 @@ function OceanDatabaseBlock({block,updateBlock}){
   </div>}
   {["list","gallery","timeline"].includes(view)&&<div className={"ocean-db-cards "+view}>{data.map(({r,i})=><article key={i}>{visible.map(c=><label key={c}><small>{headers[c]}</small><input value={r[c]||""} onChange={e=>editCell(i+1,c,e.target.value)}/></label>)}</article>)}<button onClick={addRow}><Plus size={14}/> New page</button></div>}
   {addingProperty&&<div className="ocean-db-quickadd-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setAddingProperty(false);}}><div className="ocean-db-property-create"><div className="ocean-db-quickadd-head"><strong>Add a property</strong><button type="button" aria-label="Close" onClick={()=>setAddingProperty(false)}>×</button></div><label>Property name<input autoFocus value={newPropertyName} onChange={e=>setNewPropertyName(e.target.value)} placeholder="Property name"/></label><input className="ocean-db-type-search" placeholder="Search property types…" value={propertyTypeSearch} onChange={e=>setPropertyTypeSearch(e.target.value)}/><div className="ocean-db-type-picker">{propertyTypes.filter(([label,type])=>(label+" "+type).toLowerCase().includes(propertyTypeSearch.toLowerCase())).map(([label,type])=><button type="button" className={newPropertyType===type?"selected":""} key={type} onClick={()=>setNewPropertyType(type)}><span>{label}</span>{newPropertyType===type?"✓":""}</button>)}</div><div className="ocean-db-quickadd-actions"><button type="button" onClick={()=>setAddingProperty(false)}>Cancel</button><button type="button" onClick={confirmAddProperty}>Add property</button></div></div></div>}
-  <div className="ocean-db-footer">{data.length} {data.length===1?"page":"pages"} <span>·</span> {headers.length} properties</div>
+  <div className="ocean-db-footer">{data.length} {data.length===1?"page":"pages"} <span>·</span> {headers.length} properties {Object.entries(calculations).filter(([index,op])=>op&&op!=="None").map(([index,op])=><span className="ocean-db-calc-result" key={index}>{headers[Number(index)]}: {op} — {calculationResult(index,op)}</span>)}</div>
  </div>;
 }
 
