@@ -1513,12 +1513,16 @@ async function ensureOceanSchema(env: Env) {
     )`),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_calendar_states_expiry ON ocean_google_calendar_states(expires_at)")
   ]);
+  for (const statement of [
+    "ALTER TABLE ocean_pages ADD COLUMN is_folder INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE ocean_pages ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 0"
+  ]) { try { await env.DB.prepare(statement).run(); } catch { /* Column already exists. */ } }
 }
 
 function oceanId() { return randomToken(12); }
 
 async function oceanPageForUser(env: Env, userId: string, pageId: string) {
-  return env.DB.prepare("SELECT * FROM ocean_pages WHERE id=? AND user_id=? AND is_archived=0 LIMIT 1")
+  return env.DB.prepare("SELECT * FROM ocean_pages WHERE id=? AND is_archived=0 AND (user_id=? OR is_shared=1) LIMIT 1")
     .bind(pageId, userId).first();
 }
 
@@ -1792,8 +1796,8 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
   if (assetMatch && req.method === "GET") return streamOceanAsset(req,env,user,assetMatch[1]);
 
   if (pathname === "/api/ocean/pages" && req.method === "GET") {
-    let rows = await env.DB.prepare(`SELECT id,user_id,parent_id,title,icon,cover,blocks_json,is_favorite,created_at,updated_at
-      FROM ocean_pages WHERE user_id=? AND is_archived=0 ORDER BY is_favorite DESC,updated_at DESC`)
+    let rows = await env.DB.prepare(`SELECT id,user_id,parent_id,title,icon,cover,blocks_json,is_favorite,is_folder,is_shared,created_at,updated_at
+      FROM ocean_pages WHERE (user_id=? OR is_shared=1) AND is_archived=0 ORDER BY is_shared DESC,is_favorite DESC,updated_at DESC`)
       .bind(user.id).all();
     if (!rows.results?.length) {
       const created = now(), id = oceanId();
@@ -1807,8 +1811,8 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       ];
       await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,icon,cover,blocks_json,created_at,updated_at) VALUES(?,?,NULL,?,?,?,?,?,?)")
         .bind(id,user.id,"Getting started","🌊","",JSON.stringify(starter),created,created).run();
-      rows = await env.DB.prepare(`SELECT id,user_id,parent_id,title,icon,cover,blocks_json,is_favorite,created_at,updated_at
-        FROM ocean_pages WHERE user_id=? AND is_archived=0 ORDER BY is_favorite DESC,updated_at DESC`)
+      rows = await env.DB.prepare(`SELECT id,user_id,parent_id,title,icon,cover,blocks_json,is_favorite,is_folder,is_shared,created_at,updated_at
+        FROM ocean_pages WHERE (user_id=? OR is_shared=1) AND is_archived=0 ORDER BY is_shared DESC,is_favorite DESC,updated_at DESC`)
         .bind(user.id).all();
     }
     return json({ pages: rows.results || [] });
@@ -1818,11 +1822,14 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     const body = await req.json().catch(() => ({}));
     const title = String(body.title || "Untitled").trim().slice(0,160) || "Untitled";
     const parentId = String(body.parent_id || "").trim() || null;
-    if (parentId && !(await oceanPageForUser(env,user.id,parentId))) return json({error:"Parent page not found."},{status:404});
+    const parent = parentId ? await oceanPageForUser(env,user.id,parentId) : null;
+    if (parentId && (!parent || !parent.is_folder)) return json({error:"Choose an existing folder."},{status:404});
+    const isFolder = body.is_folder ? 1 : 0;
+    const isShared = body.is_shared || parent?.is_shared ? 1 : 0;
     const id = oceanId(), created = now();
-    const starter = [{id:oceanId(),type:"text",text:""}];
-    await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,blocks_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)")
-      .bind(id,user.id,parentId,title,JSON.stringify(starter),created,created).run();
+    const starter = isFolder ? [] : [{id:oceanId(),type:"text",text:""}];
+    await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,blocks_json,is_folder,is_shared,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
+      .bind(id,user.id,parentId,title,JSON.stringify(starter),isFolder,isShared,created,created).run();
     const page = await oceanPageForUser(env,user.id,id);
     return json({page},{status:201});
   }
@@ -1873,6 +1880,14 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       updates.push("blocks_json=?"); values.push(blocks);
     }
     if (Object.prototype.hasOwnProperty.call(body,"is_favorite")) { updates.push("is_favorite=?"); values.push(body.is_favorite ? 1 : 0); }
+    if (Object.prototype.hasOwnProperty.call(body,"is_shared")) {
+      if (String(page.user_id)!==String(user.id)) return json({error:"Only the owner can change sharing."},{status:403});
+      updates.push("is_shared=?"); values.push(body.is_shared ? 1 : 0);
+    }
+    if (Object.prototype.hasOwnProperty.call(body,"is_folder")) {
+      if (String(page.user_id)!==String(user.id)) return json({error:"Only the owner can change folders."},{status:403});
+      updates.push("is_folder=?"); values.push(body.is_folder ? 1 : 0);
+    }
     if (Object.prototype.hasOwnProperty.call(body,"parent_id")) {
       const parentId = String(body.parent_id || "").trim() || null;
       if (parentId === pageId) return json({error:"A page cannot be its own parent."},{status:400});
@@ -1882,10 +1897,11 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     if (!updates.length) return json({ok:true});
     updates.push("updated_at=?"); values.push(now());
     values.push(pageId,user.id);
-    await env.DB.prepare(`UPDATE ocean_pages SET ${updates.join(",")} WHERE id=? AND user_id=?`).bind(...values).run();
+    await env.DB.prepare(`UPDATE ocean_pages SET ${updates.join(",")} WHERE id=? AND (user_id=? OR is_shared=1)`).bind(...values).run();
     return json({ok:true});
   }
   if (req.method === "DELETE") {
+    if (String(page.user_id)!==String(user.id)) return json({error:"Only the owner can delete this shared page."},{status:403});
     await env.DB.batch([
       env.DB.prepare("DELETE FROM ocean_comments WHERE page_id=?").bind(pageId),
       env.DB.prepare("UPDATE ocean_pages SET is_archived=1,updated_at=? WHERE id=? AND user_id=?").bind(now(),pageId,user.id),
