@@ -802,3 +802,47 @@
 .ocean-shell[data-theme="dark"] .ocean-db-table td>.ocean-db-cell-select:focus,.ocean-shell[data-theme="dark"] .ocean-db-table td>input:focus{background:#293b4d}
 .ocean-shell[data-theme="dark"] .ocean-db-table th.is-frozen{background:#252b33;box-shadow:1px 0 0 #414c58}
 .ocean-shell[data-theme="dark"] .ocean-db-table td.is-frozen{background:#20252c;box-shadow:1px 0 0 #414c58}
+
+
+/* Notion-style database property controls and typed values. */
+.ocean-db-option-cell{position:relative;min-height:34px;display:flex;align-items:center}
+.ocean-db-option-trigger{width:100%;min-height:34px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:5px 8px!important;text-align:left;color:#596979!important}
+.ocean-db-option-trigger:hover{background:#f6f8fa!important}
+.ocean-db-option-tag{display:inline-flex;align-items:center;max-width:100%;padding:3px 8px;border-radius:5px;background:#e8edf2;color:#526171;font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ocean-db-option-tag.tone-0{background:#e8edf2;color:#56616e}
+.ocean-db-option-tag.tone-1{background:#fce8e6;color:#b34d45}
+.ocean-db-option-tag.tone-2{background:#fcebdc;color:#a9632c}
+.ocean-db-option-tag.tone-3{background:#fbf1cf;color:#92731d}
+.ocean-db-option-tag.tone-4{background:#dff2e6;color:#28764b}
+.ocean-db-option-tag.tone-5{background:#e2edfb;color:#356fae}
+.ocean-db-empty-value{color:#a2acb6;font-size:11px}
+.ocean-db-option-popover{position:absolute;z-index:240;top:calc(100% + 3px);left:0;width:230px;max-height:280px;overflow:auto;padding:8px;background:#fff;border:1px solid #dfe5eb;border-radius:9px;box-shadow:0 12px 34px rgba(20,35,50,.2);display:grid;gap:6px}
+.ocean-db-option-popover>input{width:100%;min-width:0;padding:8px 9px;border:1px solid #dfe5eb;border-radius:6px;background:#fff;color:#344454;font-size:12px;outline:0}
+.ocean-db-option-list{display:grid;gap:2px}
+.ocean-db-option-list button{display:flex;align-items:center;justify-content:space-between;padding:5px 6px;border-radius:5px;text-align:left}
+.ocean-db-option-list button:hover,.ocean-db-option-create:hover,.ocean-db-option-clear:hover{background:#f2f5f8}
+.ocean-db-option-create,.ocean-db-option-clear{padding:7px 6px;border-radius:5px;color:#687786;text-align:left;font-size:11px}
+.ocean-db-option-manage{display:flex;align-items:center;gap:3px}
+.ocean-db-option-manage>button:first-child{flex:1}
+.ocean-db-option-manage>button:last-child{width:26px;justify-content:center;color:#9a6262}
+.ocean-db-cell-action{padding:5px 9px;border:1px solid #dce4eb;border-radius:6px;background:#f7f9fb;color:#526273;font-size:11px}
+.ocean-db-property-create{width:min(540px,100%);max-height:86vh;overflow:auto;display:grid;gap:12px;padding:18px;border:1px solid #dfe6ed;border-radius:13px;background:#fff;color:#293847;box-shadow:0 20px 70px rgba(20,35,50,.24)}
+.ocean-db-property-create>label{display:grid;gap:5px;color:#667586;font-size:11px;font-weight:650}
+.ocean-db-property-create>label input,.ocean-db-type-search{width:100%;padding:9px 10px;border:1px solid #dce4ec;border-radius:7px;background:#fff;color:#263747;font-size:12px;outline:0}
+.ocean-db-type-picker{display:grid;grid-template-columns:1fr 1fr;gap:3px;max-height:330px;overflow:auto}
+.ocean-db-type-picker button{display:flex;align-items:center;justify-content:space-between;padding:9px;border-radius:6px;color:#4c5a68;text-align:left;font-size:12px}
+.ocean-db-type-picker button:hover,.ocean-db-type-picker button.selected{background:#edf4fb;color:#0878e8}
+.ocean-shell[data-theme="dark"] .ocean-db-option-trigger{color:#d2dbe4!important}
+.ocean-shell[data-theme="dark"] .ocean-db-option-trigger:hover{background:#252c34!important}
+.ocean-shell[data-theme="dark"] .ocean-db-option-tag.tone-0{background:#39434e;color:#d2dbe4}
+.ocean-shell[data-theme="dark"] .ocean-db-option-tag.tone-1{background:#503432;color:#ffb2a9}
+.ocean-shell[data-theme="dark"] .ocean-db-option-tag.tone-2{background:#503d2d;color:#f0bc8e}
+.ocean-shell[data-theme="dark"] .ocean-db-option-tag.tone-3{background:#51482a;color:#f1d98a}
+.ocean-shell[data-theme="dark"] .ocean-db-option-tag.tone-4{background:#29483a;color:#9bd8b2}
+.ocean-shell[data-theme="dark"] .ocean-db-option-tag.tone-5{background:#2c435b;color:#a7cefa}
+.ocean-shell[data-theme="dark"] .ocean-db-option-popover,.ocean-shell[data-theme="dark"] .ocean-db-property-create{background:#252b33;border-color:#414c58;color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-db-option-popover>input,.ocean-shell[data-theme="dark"] .ocean-db-property-create>label input,.ocean-shell[data-theme="dark"] .ocean-db-type-search{background:#20252c;border-color:#414c58;color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-db-option-list button,.ocean-shell[data-theme="dark"] .ocean-db-option-create,.ocean-shell[data-theme="dark"] .ocean-db-option-clear,.ocean-shell[data-theme="dark"] .ocean-db-type-picker button{color:#c7d0da}
+.ocean-shell[data-theme="dark"] .ocean-db-option-list button:hover,.ocean-shell[data-theme="dark"] .ocean-db-option-create:hover,.ocean-shell[data-theme="dark"] .ocean-db-option-clear:hover,.ocean-shell[data-theme="dark"] .ocean-db-type-picker button:hover,.ocean-shell[data-theme="dark"] .ocean-db-type-picker button.selected{background:#343e49;color:#fff}
+.ocean-shell[data-theme="dark"] .ocean-db-property-create>label{color:#aab5c1}
+@media(max-width:520px){.ocean-db-type-picker{grid-template-columns:1fr}}
