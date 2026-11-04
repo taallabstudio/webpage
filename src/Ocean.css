@@ -799,6 +799,16 @@
 .ocean-shell[data-theme="dark"] .ocean-db-property-menu button:hover,.ocean-shell[data-theme="dark"] .ocean-db-type-list button:hover{background:#343e49;color:#fff}
 .ocean-shell[data-theme="dark"] .ocean-db-property-menu hr{border-color:#414c58}
 .ocean-shell[data-theme="dark"] .ocean-db-type-list{border-color:#414c58}
+.ocean-db-property-menu[data-theme="dark"]{background:#252b33;border-color:#414c58;box-shadow:0 14px 42px rgba(0,0,0,.4)}
+.ocean-db-property-menu[data-theme="dark"] strong{color:#e1e8ef}
+.ocean-db-property-menu[data-theme="dark"] button,.ocean-db-property-menu[data-theme="dark"] .ocean-db-type-list button{color:#c5ced8}
+.ocean-db-property-menu[data-theme="dark"] button:hover,.ocean-db-property-menu[data-theme="dark"] .ocean-db-type-list button:hover{background:#343e49;color:#fff}
+.ocean-db-property-menu[data-theme="dark"] hr{border-color:#414c58}
+.ocean-db-property-menu[data-theme="dark"] .ocean-db-type-list{border-color:#414c58}
+.ocean-db-property-editor-backdrop[data-theme="dark"] .ocean-db-property-create{background:#252b33;border-color:#414c58;color:#e1e8ef}
+.ocean-db-property-editor-backdrop[data-theme="dark"] .ocean-db-property-create>label{color:#c5ced8}
+.ocean-db-property-editor-backdrop[data-theme="dark"] .ocean-db-property-create>label input,.ocean-db-property-editor-backdrop[data-theme="dark"] .ocean-db-property-create>label select{background:#20252c;border-color:#414c58;color:#e1e8ef}
+
 .ocean-shell[data-theme="dark"] .ocean-db-table td>.ocean-db-cell-select,.ocean-shell[data-theme="dark"] .ocean-db-table td>input{color:#dce4ec}
 .ocean-shell[data-theme="dark"] .ocean-db-table td>.ocean-db-cell-select:focus,.ocean-shell[data-theme="dark"] .ocean-db-table td>input:focus{background:#293b4d}
 .ocean-shell[data-theme="dark"] .ocean-db-table th.is-frozen{background:#252b33;box-shadow:1px 0 0 #414c58}
@@ -926,3 +936,14 @@
 .ocean-shell[data-theme="dark"] .ocean-db-property-editor-options>strong,.ocean-shell[data-theme="dark"] .ocean-db-property-editor-options>div span{color:#d1dae3}
 .ocean-shell[data-theme="dark"] .ocean-db-property-editor-options button{color:#d1dae3}
 .ocean-shell[data-theme="dark"] .ocean-db-property-editor-options button:hover{background:#343e49}
+
+
+/* Portalled OCEAN property UI: keep theme styles after moving menus outside table overflow */
+.ocean-db-property-menu[data-theme="dark"]{background:#252b33;border-color:#414c58;box-shadow:0 14px 42px rgba(0,0,0,.4)}
+.ocean-db-property-menu[data-theme="dark"] strong{color:#e1e8ef}
+.ocean-db-property-menu[data-theme="dark"] button,.ocean-db-property-menu[data-theme="dark"] .ocean-db-type-list button{color:#c5ced8}
+.ocean-db-property-menu[data-theme="dark"] button:hover,.ocean-db-property-menu[data-theme="dark"] .ocean-db-type-list button:hover{background:#343e49;color:#fff}
+.ocean-db-property-menu[data-theme="dark"] hr,.ocean-db-property-menu[data-theme="dark"] .ocean-db-type-list{border-color:#414c58}
+.ocean-db-property-editor-backdrop[data-theme="dark"] .ocean-db-property-create{background:#252b33;border-color:#414c58;color:#e1e8ef}
+.ocean-db-property-editor-backdrop[data-theme="dark"] .ocean-db-property-create>label input{background:#20252c;border-color:#414c58;color:#e1e8ef}
+.ocean-db-property-editor-backdrop[data-theme="dark"] .ocean-db-quickadd-head strong{color:#e1e8ef}
