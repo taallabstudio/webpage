@@ -289,7 +289,7 @@ function OceanGoogleCalendarBlock(){
  const goToday=()=>setMonth(new Date(new Date().getFullYear(),new Date().getMonth(),1));
  const selectedCalendar=calendars.find(c=>c.id===calendarId)||calendars.find(c=>c.primary);
  return <section className="ocean-note-calendar">
-  <div className="ocean-calendar-titlebar"><h3>Calendar View</h3><span><span className="ocean-calendar-live-dot"/> Google Calendar connected</span></div>
+  <div className="ocean-calendar-titlebar"><h3>Calendar View</h3><span><span className="ocean-calendar-live-dot"/> {connection.connected?"Google Calendar connected":"Google Calendar not connected"}</span></div>
   <div className="ocean-calendar-toolbar">
    <div className="ocean-calendar-filter"><Calendar size={15}/> {selectedCalendar?.summary||"All events"}</div>
    <div className="ocean-calendar-toolbar-actions">
