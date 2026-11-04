@@ -107,7 +107,9 @@ function Landing() {
 
     const stage = document.querySelector(".hero-scroll-stage");
     const heroArt = stage?.querySelector(".hero-art");
-    const scrollHeadphone = stage?.querySelector(".scroll-headphone");
+    // Keep the fixed image outside the sticky hero so its viewport position
+    // survives the sticky container releasing at the end of the scroll track.
+    const scrollHeadphone = document.querySelector(".landing > .scroll-headphone");
     let raf = 0;
 
     const updateHero = () => {
@@ -196,6 +198,7 @@ function Landing() {
 
   return <main className="landing" id="home">
     <div className="landing-glow" />
+    <img className="scroll-headphone" src="/headphones.webp" alt="" aria-hidden="true" />
     <header className="landing-nav">
       <a className="studio-brand" href="#home" aria-label="TaalLab home"><Logo studioOnly /></a>
 
@@ -244,7 +247,6 @@ function Landing() {
 
     <section className="hero-scroll-stage" aria-label="TaalLab introduction">
       <div className="hero-sticky">
-        <img className="scroll-headphone" src="/headphones.webp" alt="" aria-hidden="true" />
         <div className="hero-section">
           <div className="hero-copy">
             <div className="eyebrow"><span className="dot" /> TAAL LAB • RECORDING &amp; MUSIC PRODUCTION</div>
