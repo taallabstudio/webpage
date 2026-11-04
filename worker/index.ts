@@ -1710,7 +1710,7 @@ async function handleOceanCalendar(req: Request,env: Env,user: any,pathname: str
   }
   if(pathname==="/api/ocean/calendar/calendars"&&req.method==="GET"){
     const data:any=await oceanGoogleCalendarRequest(env,user.id,"/users/me/calendarList?maxResults=100&showHidden=false");
-    return json({items:(data.items||[]).map((c:any)=>({id:c.id,summary:c.summary,primary:!!c.primary,backgroundColor:c.backgroundColor||"",accessRole:c.accessRole||""})).filter((c:any)=>c.accessRole!=="freeBusyReader")});
+    return json({items:(data.items||[]).map((c:any)=>({id:c.id,summary:c.summary,primary:!!c.primary,backgroundColor:c.backgroundColor||"",accessRole:c.accessRole||""})).filter((c:any)=>c.accessRole==="owner"||c.accessRole==="writer")});
   }
   if(pathname==="/api/ocean/calendar/events"&&req.method==="GET"){
     const params=new URL(req.url).searchParams;
@@ -1740,7 +1740,7 @@ async function handleOceanCalendar(req: Request,env: Env,user: any,pathname: str
     if(body.description)event.description=String(body.description).slice(0,8000);
     if(body.location)event.location=String(body.location).slice(0,1000);
     if(body.recurrence)event.recurrence=[String(body.recurrence).slice(0,100)];
-    if(body.reminderEnabled)event.reminders={useDefault:false,overrides:[{method:"popup",minutes:Math.max(0,Math.min(40320,Number(body.reminderMinutes)||10))}]};
+    if(body.reminderEnabled)event.reminders={useDefault:false,overrides:[{method:"popup",minutes:Math.max(0,Math.min(40320,Number.isFinite(Number(body.reminderMinutes))?Number(body.reminderMinutes):10))}]};
     return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/"+encodeURIComponent(calendarId)+"/events",{method:"POST",body:JSON.stringify(event)}),{status:201});
   }
   const eventMatch=pathname.match(/^\/api\/ocean\/calendar\/events\/([^/]+)$/);
