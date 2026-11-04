@@ -118,8 +118,17 @@ function OceanDatabaseBlock({block,updateBlock}){
  const saveProperties=next=>updateBlock(block.id,{properties:next});
  const updateProperty=(index,patch)=>saveProperties(properties.map((p,i)=>i===index?{...p,...patch}:p));
  const changePropertyType=(index,type)=>{
-  const defaults=type==="status"?["Not started","In progress","Done"]:type==="select"?["Option 1","Option 2"]:type==="multi_select"?["Option 1","Option 2"]:[];
-  updateProperty(index,{type,options:defaults});
+  const previous=properties[index]?.type||"text";
+  const existing=rows.slice(1).map(row=>String(row[index]??"").trim()).filter(Boolean);
+  const unique=[...new Set(existing.flatMap(value=>previous==="multi_select"?(()=>{try{return JSON.parse(value)}catch{return value.split(",").map(x=>x.trim()).filter(Boolean)}})():[value]))];
+  const defaults=type==="status"?["Not started","In progress","Done"]:["select","multi_select"].includes(type)?["Option 1","Option 2"]:[];
+  const options=[...new Set([...defaults,...unique])];
+  if(type==="multi_select"&&previous!=="multi_select"){
+   saveRows(rows.map((row,ri)=>ri===0?row:row.map((value,ci)=>ci===index?(value?JSON.stringify([String(value)]):"[]"):value)));
+  }else if(type!=="multi_select"&&previous==="multi_select"){
+   saveRows(rows.map((row,ri)=>ri===0?row:row.map((value,ci)=>{if(ci!==index)return value;try{return JSON.parse(value||"[]")[0]||""}catch{return String(value||"").split(",")[0].trim()}})));
+  }
+  updateProperty(index,{type,options});
   setPropertyMenu(null);setPropertyTypeMenu(false);
  };
  const addPropertyOption=index=>{
