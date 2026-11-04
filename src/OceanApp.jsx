@@ -137,8 +137,8 @@ function OceanDatabaseBlock({block,updateBlock}){
   const value=prompt("New option name","New option");
   if(value?.trim()&&!current.includes(value.trim()))updateProperty(index,{options:[...current,value.trim()]});
  };
- const renamePropertyOption=(index,oldValue)=>{const value=prompt("Rename option",oldValue);if(value?.trim()&&value.trim()!==oldValue)updateProperty(index,{options:(properties[index]?.options||[]).map(x=>x===oldValue?value.trim():x)});};
- const removePropertyOption=(index,option)=>updateProperty(index,{options:(properties[index]?.options||[]).filter(x=>x!==option)});
+ const renamePropertyOption=(index,oldValue)=>{const value=prompt("Rename option",oldValue);if(value?.trim()&&value.trim()!==oldValue){const colors={...(properties[index]?.optionColors||{})};if(colors[oldValue]!==undefined){colors[value.trim()]=colors[oldValue];delete colors[oldValue];}updateProperty(index,{options:(properties[index]?.options||[]).map(x=>x===oldValue?value.trim():x),optionColors:colors});}};
+ const removePropertyOption=(index,option)=>{const colors={...(properties[index]?.optionColors||{})};delete colors[option];updateProperty(index,{options:(properties[index]?.options||[]).filter(x=>x!==option),optionColors:colors});};
  const insertProperty=(index,side)=>{
   const at=index+(side==="right"?1:0);
   const next=rows.map((row,ri)=>{const copy=[...row];copy.splice(at,0,ri===0?"New property":"");return copy;});
