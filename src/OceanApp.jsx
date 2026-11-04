@@ -183,6 +183,23 @@ function OceanDatabaseBlock({block,updateBlock}){
      }
     }
    }
+   // Older OCEAN-created timed events may not have ownership metadata.
+   // Offer each unmatched timed event for deletion individually, since it could
+   // also be a personal Google Calendar event created outside this database.
+   const staleIds=new Set(stale.map(e=>e.id));
+   const unlinkedTimed=items.filter(e=>{
+    if(matchedIds.has(e.id)||staleIds.has(e.id)||!e.start?.dateTime)return false;
+    const privateProps=e.extendedProperties?.private||{};
+    return !privateProps.oceanSource;
+   });
+   for(const event of unlinkedTimed){
+    const when=new Date(event.start.dateTime).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+    const approved=window.confirm("This timed Google Calendar event is not linked to an item in this OCEAN database:\n\n"+(event.summary||"Untitled")+" — "+when+"\n\nDelete it from Google Calendar?\n\nChoose Cancel to keep it. Events created directly in Google Calendar may also appear here.");
+    if(approved){
+     await api("/ocean/calendar/events/"+encodeURIComponent(event.id)+"?calendarId=primary",{method:"DELETE"});
+     deleted++;
+    }
+   }
    const parts=[];
    if(added)parts.push(added+" added");
    if(tagged)parts.push(tagged+" matched event"+(tagged===1?"":"s")+" linked");
