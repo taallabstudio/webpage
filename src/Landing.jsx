@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import {
   ArrowDownToLine, ArrowLeft, Check, ChevronRight, Clock3, Copy, Download,
   Eye, File, FileAudio, FileImage, FileText, FileVideo, FolderOpen, Gauge,
@@ -119,16 +118,13 @@ function Landing() {
       // Progress is tied to the sticky interval: 0 at its entry and 1
       // exactly when the sticky hero releases at the end of the stage.
       const progress = Math.min(1, Math.max(0, -rect.top / scrollable));
-      const heroActive = rect.top <= 0 && rect.bottom >= viewportHeight;
-
       stage.style.setProperty("--hero-progress", progress.toFixed(4));
       stage.classList.toggle("hero-exiting", progress > 0.34);
 
       if (scrollHeadphone) {
-        // Keep the image visible for the entire sticky interval and scrub
-        // two full turns from the same normalized progress value.
+        // The image lives inside the hero artwork, so it naturally passes
+        // behind the next sections as the sticky hero releases.
         scrollHeadphone.style.setProperty("--headphone-rotation", `${(progress * 360).toFixed(2)}deg`);
-        scrollHeadphone.style.opacity = heroActive ? "1" : "0";
       }
     };
 
