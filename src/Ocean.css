@@ -908,3 +908,20 @@
 .ocean-db-notion.is-locked .ocean-db-control-right>.ocean-db-new{pointer-events:none;opacity:.45}
 .ocean-db-notion.is-locked:after{content:"Database locked";display:inline-block;margin-top:5px;padding:3px 7px;border-radius:5px;background:#f0f2f4;color:#687786;font-size:10px}
 .ocean-shell[data-theme="dark"] .ocean-db-notion.is-locked:after{background:#2b323b;color:#b7c2cd}
+
+
+/* OCEAN property editor modal */
+.ocean-db-property-create>label select{width:100%;padding:9px 10px;border:1px solid #dce4ec;border-radius:7px;background:#fff;color:#263747;font-size:12px;outline:0}
+.ocean-db-property-readonly{display:flex!important;grid-template-columns:auto 1fr;align-items:center!important;gap:8px!important}
+.ocean-db-property-readonly input{width:auto!important}
+.ocean-db-property-editor-options{display:grid;gap:6px;padding:10px;border:1px solid #e4e9ee;border-radius:8px}
+.ocean-db-property-editor-options>strong{font-size:12px;color:#516171}
+.ocean-db-property-editor-options>div{display:flex;align-items:center;gap:6px}
+.ocean-db-property-editor-options>div span{flex:1;min-width:0;font-size:12px;color:#4a5a69}
+.ocean-db-property-editor-options button{padding:5px 8px;border-radius:5px;color:#536373;font-size:11px}
+.ocean-db-property-editor-options button:hover{background:#f0f4f8}
+.ocean-shell[data-theme="dark"] .ocean-db-property-create>label select{background:#20252c;border-color:#414c58;color:#e1e8ef}
+.ocean-shell[data-theme="dark"] .ocean-db-property-editor-options{border-color:#414c58}
+.ocean-shell[data-theme="dark"] .ocean-db-property-editor-options>strong,.ocean-shell[data-theme="dark"] .ocean-db-property-editor-options>div span{color:#d1dae3}
+.ocean-shell[data-theme="dark"] .ocean-db-property-editor-options button{color:#d1dae3}
+.ocean-shell[data-theme="dark"] .ocean-db-property-editor-options button:hover{background:#343e49}
