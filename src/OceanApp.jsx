@@ -70,6 +70,7 @@ function OceanLogin({onLogin}){
 
 function OceanDatabaseBlock({block,updateBlock}){
  const [menu,setMenu]=useState(""),[search,setSearch]=useState(""),[filter,setFilter]=useState(""),[sort,setSort]=useState(""),[hidden,setHidden]=useState([]),[groupBy,setGroupBy]=useState(1);
+ const [calendarMonth,setCalendarMonth]=useState(()=>new Date(new Date().getFullYear(),new Date().getMonth(),1));
  const root=useRef(null);
  const view=block.view||"table";
  const views=[["Table","table"],["Board","board"],["Gallery","gallery"],["List","list"],["Calendar","calendar"],["Timeline","timeline"]];
@@ -83,16 +84,27 @@ function OceanDatabaseBlock({block,updateBlock}){
  const saveRows=next=>updateBlock(block.id,{rows:next});
  const editCell=(row,col,value)=>{const next=rows.map(r=>[...r]);next[row][col]=value;saveRows(next);};
  const addRow=(groupValue="")=>{const row=Array(width).fill("");if(groupValue&&groupBy<width)row[groupBy]=groupValue;saveRows([...rows,row]);};
+ const addRowOnDate=day=>{const row=Array(width).fill("");row[0]="New page";row[dateCol]=dateKey(day);saveRows([...rows,row]);};
  const addProperty=()=>{const name=prompt("Property name","New property");if(!name?.trim())return;saveRows(rows.map((r,i)=>i===0?[...r,name.trim()]:[...r,""]));};
  const renameProperty=i=>{const name=prompt("Rename property",headers[i]);if(name?.trim())editCell(0,i,name.trim());};
  const addView=v=>{updateBlock(block.id,{view:v});setMenu("");};
+ const detectedDateCol=headers.findIndex(h=>/date|due|start/i.test(String(h)));
+ const dateCol=detectedDateCol>=0?detectedDateCol:Math.min(2,width-1);
+ const firstWeekday=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth(),1).getDay();
+ const daysInMonth=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+1,0).getDate();
+ const weekCount=Math.ceil((firstWeekday+daysInMonth)/7);
+ const calendarStart=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth(),1-firstWeekday);
+ const calendarDays=Array.from({length:weekCount*7},(_,i)=>new Date(calendarStart.getFullYear(),calendarStart.getMonth(),calendarStart.getDate()+i));
+ const dateKey=day=>[day.getFullYear(),String(day.getMonth()+1).padStart(2,"0"),String(day.getDate()).padStart(2,"0")].join("-");
+ const parseDate=value=>{const m=String(value||"").match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})/);return m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3])):null;};
+ const rowsForDay=day=>data.filter(x=>{const d=parseDate(x.r[dateCol]);return d&&dateKey(d)===dateKey(day);});
  useEffect(()=>{const close=e=>{if(root.current&&!root.current.contains(e.target))setMenu("");};document.addEventListener("pointerdown",close);return()=>document.removeEventListener("pointerdown",close);},[]);
  const menuButton=(name,label,icon)=><button className={menu===name?"active":""} onClick={()=>setMenu(menu===name?"":name)}>{icon}{label}</button>;
- const newMenu=<div className="ocean-db-popover ocean-db-new-menu"><strong>New database</strong><button onClick={addRow}><Plus size={15}/> New page</button><button onClick={()=>{addRow();setMenu("");}}><FilePlus size={15}/> New page with template</button><button onClick={()=>{const title=prompt("Database template name","Tasks tracker");if(title){saveRows([headers,...rows.slice(1),[title,"Not started",""]]);}setMenu("");}}><CheckSquare size={15}/> Tasks tracker</button></div>;
+ const newMenu=<div className="ocean-db-popover ocean-db-new-menu"><strong>New database</strong><button onClick={()=>{addRow();setMenu("");}}><Plus size={15}/> New page</button><button onClick={()=>{addRow();setMenu("");}}><FilePlus size={15}/> New page with template</button><button onClick={()=>{const title=prompt("Database template name","Tasks tracker");if(title){saveRows([headers,...rows.slice(1),[title,"Not started",""]]);}setMenu("");}}><CheckSquare size={15}/> Tasks tracker</button></div>;
  return <div className="ocean-database-block ocean-db-notion" ref={root}>
-  <div className="ocean-db-heading"><input aria-label="Database title" value={block.text||"New database"} onChange={e=>updateBlock(block.id,{text:e.target.value})}/><div className="ocean-db-view-tabs">{views.filter(v=>["table","board","gallery","list"].includes(v[1])).map(([label,key])=><button key={key} className={view===key?"active":""} onClick={()=>addView(key)}>{label}</button>)}<button onClick={()=>setMenu(menu==="views"?"":"views")}><Plus size={14}/> Add a view</button>{menu==="views"&&<div className="ocean-db-popover ocean-db-views">{views.map(([label,key])=><button key={key} onClick={()=>addView(key)}>{label}{view===key?" ✓":""}</button>)}</div>}</div></div>
+  <div className="ocean-db-heading"><input value={block.text||"New database"} onChange={e=>updateBlock(block.id,{text:e.target.value})}/><div className="ocean-db-view-tabs">{views.filter(v=>["table","board","gallery","list","calendar"].includes(v[1])).map(([label,key])=><button key={key} className={view===key?"active":""} onClick={()=>addView(key)}>{label}</button>)}<button onClick={()=>setMenu(menu==="views"?"":"views")}><Plus size={14}/> Add a view</button>{menu==="views"&&<div className="ocean-db-popover ocean-db-views">{views.map(([label,key])=><button key={key} onClick={()=>addView(key)}>{label}{view===key?" ✓":""}</button>)}</div>}</div></div>
   <div className="ocean-db-controls">
-   <div className="ocean-db-control-left">{menuButton("filter","Filter",<SlidersHorizontal size={14}/>)}{menuButton("sort","Sort",<ChevronsUpDown size={14}/>)}{menuButton("group","Group",<Columns3 size={14}/>)}{menuButton("search","Search",<Search size={14}/>)}{menuButton("properties","Properties",<Settings size={14}/>)}{menuButton("more","•••",<MoreHorizontal size={14}/>)}</div>
+   <div className="ocean-db-control-left">{menuButton("filter","Filter",<SlidersHorizontal size={14}/>)}{menuButton("sort","Sort",<ChevronsUpDown size={14}/>)}{menuButton("group","Group",<Columns3 size={14}/>)}{menuButton("search","Search",<Search size={14}/>)}{menuButton("properties","Properties",<Settings size={14}/>)}{menuButton("more","More",<MoreHorizontal size={14}/>)}</div>
    <div className="ocean-db-control-right"><button className="ocean-db-new" onClick={()=>setMenu(menu==="new"?"":"new")}>New <ChevronDown size={14}/></button></div>
    {menu==="new"&&newMenu}
    {menu==="filter"&&<div className="ocean-db-popover"><strong>Filter</strong><input autoFocus placeholder="Filter rows…" value={filter} onChange={e=>setFilter(e.target.value)}/><button onClick={()=>{setFilter("");setMenu("");}}>Clear filter</button></div>}
@@ -104,11 +116,16 @@ function OceanDatabaseBlock({block,updateBlock}){
   </div>
   {view==="table"&&<div className="ocean-db-table-scroll"><table className="ocean-db-table"><thead><tr>{visible.map(i=><th key={i}><button onClick={()=>renameProperty(i)}>{i===0?<Text size={13}/>:i===1?<CheckSquare size={13}/>:<Calendar size={13}/>} {headers[i]||"Property"}</button></th>)}<th><button onClick={addProperty}><Plus size={14}/> Add property</button></th></tr></thead><tbody>{data.map(({r,i})=><tr key={i}>{visible.map(c=><td key={c}><input value={r[c]||""} onChange={e=>editCell(i+1,c,e.target.value)} placeholder={c===0?"Untitled":""}/></td>)}<td/></tr>)}</tbody></table><button className="ocean-db-add-row" onClick={addRow}><Plus size={14}/> New page</button></div>}
   {view==="board"&&<div className="ocean-db-board">{[...new Set(data.map(x=>x.r[groupBy]||"No status"))].map((group,gi)=><section key={group}><header><span className={"ocean-db-status status-"+gi%4}/><strong>{group}</strong><small>{data.filter(x=>(x.r[groupBy]||"No status")===group).length}</small></header>{data.filter(x=>(x.r[groupBy]||"No status")===group).map(({r,i})=><article key={i}>{visible.filter(c=>c!==groupBy).map(c=><input key={c} value={r[c]||""} onChange={e=>editCell(i+1,c,e.target.value)} placeholder={headers[c]}/>)}</article>)}<button onClick={()=>addRow(group==="No status"?"":group)}><Plus size={14}/> New page</button></section>)}<button className="ocean-db-add-group" onClick={()=>{const name=prompt("New group name","New status");if(name)saveRows([...rows,[...Array(width).fill("").map((v,i)=>i===groupBy?name:v)]]);}}>+ New group</button></div>}
-  {["list","gallery","calendar","timeline"].includes(view)&&<div className={"ocean-db-cards "+view}>{data.map(({r,i})=><article key={i}>{visible.map(c=><label key={c}><small>{headers[c]}</small><input value={r[c]||""} onChange={e=>editCell(i+1,c,e.target.value)}/></label>)}</article>)}<button onClick={addRow}><Plus size={14}/> New page</button></div>}
+  {view==="calendar"&&<div className="ocean-db-calendar">
+   <div className="ocean-db-calendar-toolbar"><div><strong>{calendarMonth.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</strong><small>{data.filter(x=>parseDate(x.r[dateCol])).length} dated pages</small></div><div><button onClick={()=>setCalendarMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))} aria-label="Previous month"><ChevronRight className="calendar-prev" size={16}/></button><button onClick={()=>setCalendarMonth(new Date(new Date().getFullYear(),new Date().getMonth(),1))}>Today</button><button onClick={()=>setCalendarMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))} aria-label="Next month"><ChevronRight size={16}/></button><button className="ocean-db-new" onClick={()=>addRowOnDate(new Date())}><Plus size={13}/> New page</button></div></div>
+   {detectedDateCol<0&&<p className="ocean-db-calendar-hint">No Date property was found. The calendar is using column {dateCol+1} ({headers[dateCol]||"Property"}). Add or rename a Date property to make this clearer.</p>}
+   <div className="ocean-db-calendar-grid" style={{"--db-calendar-weeks":weekCount}}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div className="ocean-db-calendar-weekday" key={d}>{d}</div>)}{calendarDays.map(day=><div key={dateKey(day)} className={"ocean-db-calendar-day "+(day.getMonth()!==calendarMonth.getMonth()?"outside":"")+(dateKey(day)===dateKey(new Date())?" today":"")}><button className="ocean-db-calendar-date" onClick={()=>addRowOnDate(day)} title="Add a page on this date"><span>{day.getDate()}</span><Plus size={12}/></button><div className="ocean-db-calendar-items">{rowsForDay(day).map(({r,i})=><button key={i} title="Edit page title" onClick={()=>{const title=prompt("Page title",r[0]||"Untitled");if(title!==null)editCell(i+1,0,title);}}>{r[0]||"Untitled"}</button>)}</div></div>)}</div>
+   <p className="ocean-db-calendar-hint">Select a date to add a page. Select a page card to rename it. Set its date in the Table view.</p>
+  </div>}
+  {["list","gallery","timeline"].includes(view)&&<div className={"ocean-db-cards "+view}>{data.map(({r,i})=><article key={i}>{visible.map(c=><label key={c}><small>{headers[c]}</small><input value={r[c]||""} onChange={e=>editCell(i+1,c,e.target.value)}/></label>)}</article>)}<button onClick={addRow}><Plus size={14}/> New page</button></div>}
   <div className="ocean-db-footer">{data.length} {data.length===1?"page":"pages"} <span>·</span> {headers.length} properties</div>
  </div>;
 }
-
 
 function OceanGoogleCalendarBlock(){
  const [connection,setConnection]=useState({connected:false,email:""});
