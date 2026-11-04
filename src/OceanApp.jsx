@@ -105,7 +105,7 @@ function OceanDatabaseBlock({block,updateBlock}){
  const calendarStart=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth(),1-firstWeekday);
  const calendarDays=Array.from({length:weekCount*7},(_,i)=>new Date(calendarStart.getFullYear(),calendarStart.getMonth(),calendarStart.getDate()+i));
  const dateKey=day=>[day.getFullYear(),String(day.getMonth()+1).padStart(2,"0"),String(day.getDate()).padStart(2,"0")].join("-");
- const parseDate=value=>{const m=String(value||"").match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);return m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3])):null;};
+ const parseDate=value=>{const raw=String(value||"").trim();if(!raw)return null;const m=raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));const parsed=new Date(raw);return Number.isNaN(parsed.getTime())?null:new Date(parsed.getFullYear(),parsed.getMonth(),parsed.getDate());};
  const rowsForDay=day=>data.filter(x=>{const d=parseDate(x.r[dateCol]);return d&&dateKey(d)===dateKey(day);});
  useEffect(()=>{const close=e=>{if(root.current&&!root.current.contains(e.target))setMenu("");};document.addEventListener("pointerdown",close);return()=>document.removeEventListener("pointerdown",close);},[]);
  const menuButton=(name,label,icon)=><button className={menu===name?"active":""} onClick={()=>setMenu(menu===name?"":name)}>{icon}{label}</button>;
