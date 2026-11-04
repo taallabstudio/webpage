@@ -82,6 +82,15 @@ function OceanDatabaseBlock({block,updateBlock}){
  const [calendarMonth,setCalendarMonth]=useState(()=>new Date(new Date().getFullYear(),new Date().getMonth(),1));
  const [quickAddDate,setQuickAddDate]=useState("");
  const [quickAddTitle,setQuickAddTitle]=useState("");
+ const [quickAddAllDay,setQuickAddAllDay]=useState(true);
+ const [quickAddStart,setQuickAddStart]=useState("10:00");
+ const [quickAddEnd,setQuickAddEnd]=useState("11:00");
+ const [quickAddLocation,setQuickAddLocation]=useState("");
+ const [quickAddDescription,setQuickAddDescription]=useState("");
+ const [quickAddReminder,setQuickAddReminder]=useState(true);
+ const [quickAddError,setQuickAddError]=useState("");
+ const [syncBusy,setSyncBusy]=useState(false);
+ const [syncMessage,setSyncMessage]=useState("");
  const root=useRef(null);
  const view=block.view||"table";
  const views=[["Table","table"],["Board","board"],["Gallery","gallery"],["List","list"],["Calendar","calendar"],["Timeline","timeline"]];
@@ -95,8 +104,50 @@ function OceanDatabaseBlock({block,updateBlock}){
  const saveRows=next=>updateBlock(block.id,{rows:next});
  const editCell=(row,col,value)=>{const next=rows.map(r=>[...r]);next[row][col]=value;saveRows(next);};
  const addRow=(groupValue="")=>{const row=Array(width).fill("");if(groupValue&&groupBy<width)row[groupBy]=groupValue;saveRows([...rows,row]);};
- const openQuickAdd=day=>{setQuickAddDate(dateKey(day));setQuickAddTitle("");};
- const createQuickAdd=()=>{const title=quickAddTitle.trim();if(!title)return;const baseRows=detectedDateCol<0?rows.map((r,i)=>i===0?[...r,"Date"]:[...r,""]):rows;const targetDateCol=detectedDateCol<0?width:dateCol;const row=Array(Math.max(width,targetDateCol+1)).fill("");row[0]=title;row[targetDateCol]=quickAddDate;saveRows([...baseRows,row]);setQuickAddDate("");setQuickAddTitle("");};
+ const resetQuickAdd=()=>{setQuickAddDate("");setQuickAddTitle("");setQuickAddAllDay(true);setQuickAddStart("10:00");setQuickAddEnd("11:00");setQuickAddLocation("");setQuickAddDescription("");setQuickAddReminder(true);setQuickAddError("");};
+ const openQuickAdd=day=>{setQuickAddDate(dateKey(day));setQuickAddTitle("");setQuickAddError("");};
+ const createQuickAdd=async()=>{
+  const title=quickAddTitle.trim();if(!title||!quickAddDate)return;
+  setQuickAddError("");
+  try{
+   const connection=await api("/ocean/calendar/connection");
+   if(!connection.connected){setQuickAddError("Connect Google Calendar first to sync this item.");return;}
+   const payload={summary:title,calendarId:"primary",allDay:quickAddAllDay,startDate:quickAddDate,endDate:quickAddDate,location:quickAddLocation,description:quickAddDescription,reminderEnabled:quickAddReminder,reminderMinutes:10};
+   if(!quickAddAllDay){
+    const start=new Date(quickAddDate+"T"+quickAddStart),end=new Date(quickAddDate+"T"+quickAddEnd);
+    if(end<=start){setQuickAddError("The end time must be after the start time.");return;}
+    payload.start=start.toISOString();payload.end=end.toISOString();
+   }
+   await api("/ocean/calendar/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+   const baseRows=detectedDateCol<0?rows.map((r,i)=>i===0?[...r,"Date"]:[...r,""]):rows;
+   const targetDateCol=detectedDateCol<0?width:dateCol;
+   const row=Array(Math.max(width,targetDateCol+1)).fill("");row[0]=title;row[targetDateCol]=quickAddDate;
+   saveRows([...baseRows,row]);resetQuickAdd();
+  }catch(e){setQuickAddError(e.message||"Could not sync this item to Google Calendar.");}
+ };
+ const syncExistingRows=async()=>{
+  const dated=rows.slice(1).map(r=>({title:String(r[0]||"").trim(),date:parseDate(r[dateCol])})).filter(x=>x.title&&x.date);
+  if(!dated.length){setSyncMessage("There are no dated items to sync.");return;}
+  setSyncBusy(true);setSyncMessage("");
+  try{
+   const connection=await api("/ocean/calendar/connection");
+   if(!connection.connected){setSyncMessage("Connect Google Calendar before syncing.");return;}
+   const dates=dated.map(x=>dateKey(x.date)).sort();
+   const min=new Date(dates[0]+"T00:00:00"),max=new Date(dates[dates.length-1]+"T00:00:00");max.setDate(max.getDate()+1);
+   const q=new URLSearchParams({timeMin:min.toISOString(),timeMax:max.toISOString(),calendarId:"primary"});
+   const existing=await api("/ocean/calendar/events?"+q.toString());
+   const keys=new Set((existing.items||[]).map(e=>String(e.summary||"").trim().toLowerCase()+"|"+(e.start?.date||e.start?.dateTime?.slice(0,10)||"")));
+   let added=0;
+   for(const item of dated){
+    const key=item.title.toLowerCase()+"|"+dateKey(item.date);
+    if(keys.has(key))continue;
+    await api("/ocean/calendar/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({summary:item.title,calendarId:"primary",allDay:true,startDate:dateKey(item.date),endDate:dateKey(item.date)})});
+    keys.add(key);added++;
+   }
+   setSyncMessage(added?added+" item"+(added===1?"":"s")+" synced to Google Calendar.":"All dated items are already in Google Calendar.");
+  }catch(e){setSyncMessage(e.message||"Could not sync existing items.");}
+  finally{setSyncBusy(false);}
+ };
  const addProperty=()=>{const name=prompt("Property name","New property");if(!name?.trim())return;saveRows(rows.map((r,i)=>i===0?[...r,name.trim()]:[...r,""]));};
  const renameProperty=i=>{const name=prompt("Rename property",headers[i]);if(name?.trim())editCell(0,i,name.trim());};
  const addView=v=>{updateBlock(block.id,{view:v});setMenu("");};
@@ -129,11 +180,23 @@ function OceanDatabaseBlock({block,updateBlock}){
   {view==="table"&&<div className="ocean-db-table-scroll"><table className="ocean-db-table"><thead><tr>{visible.map(i=><th key={i}><button onClick={()=>renameProperty(i)}>{i===0?<Text size={13}/>:i===1?<CheckSquare size={13}/>:<Calendar size={13}/>} {headers[i]||"Property"}</button></th>)}<th><button onClick={addProperty}><Plus size={14}/> Add property</button></th></tr></thead><tbody>{data.map(({r,i})=><tr key={i}>{visible.map(c=><td key={c}><input value={r[c]||""} onChange={e=>editCell(i+1,c,e.target.value)} placeholder={c===0?"Untitled":""}/></td>)}<td/></tr>)}</tbody></table><button className="ocean-db-add-row" onClick={addRow}><Plus size={14}/> New page</button></div>}
   {view==="board"&&<div className="ocean-db-board">{[...new Set(data.map(x=>x.r[groupBy]||"No status"))].map((group,gi)=><section key={group}><header><span className={"ocean-db-status status-"+gi%4}/><strong>{group}</strong><small>{data.filter(x=>(x.r[groupBy]||"No status")===group).length}</small></header>{data.filter(x=>(x.r[groupBy]||"No status")===group).map(({r,i})=><article key={i}>{visible.filter(c=>c!==groupBy).map(c=><input key={c} value={r[c]||""} onChange={e=>editCell(i+1,c,e.target.value)} placeholder={headers[c]}/>)}</article>)}<button onClick={()=>addRow(group==="No status"?"":group)}><Plus size={14}/> New page</button></section>)}<button className="ocean-db-add-group" onClick={()=>{const name=prompt("New group name","New status");if(name)saveRows([...rows,[...Array(width).fill("").map((v,i)=>i===groupBy?name:v)]]);}}>+ New group</button></div>}
   {view==="calendar"&&<div className="ocean-db-calendar">
-   <div className="ocean-db-calendar-toolbar"><div><strong>{calendarMonth.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</strong><small>{data.filter(x=>parseDate(x.r[dateCol])).length} dated pages</small></div><div><button onClick={()=>setCalendarMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))} aria-label="Previous month"><ChevronRight className="calendar-prev" size={16}/></button><button onClick={()=>setCalendarMonth(new Date(new Date().getFullYear(),new Date().getMonth(),1))}>Today</button><button onClick={()=>setCalendarMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))} aria-label="Next month"><ChevronRight size={16}/></button><button className="ocean-db-new" onClick={()=>addRowOnDate(new Date())}><Plus size={13}/> New page</button></div></div>
+   <div className="ocean-db-calendar-toolbar"><div><strong>{calendarMonth.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</strong><small>{data.filter(x=>parseDate(x.r[dateCol])).length} dated pages</small></div><div><button onClick={()=>setCalendarMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))} aria-label="Previous month"><ChevronRight className="calendar-prev" size={16}/></button><button onClick={()=>setCalendarMonth(new Date(new Date().getFullYear(),new Date().getMonth(),1))}>Today</button><button onClick={()=>setCalendarMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))} aria-label="Next month"><ChevronRight size={16}/></button><button onClick={syncExistingRows} disabled={syncBusy}>{syncBusy?"Syncing…":"Sync Google"}</button><button className="ocean-db-new" onClick={()=>addRowOnDate(new Date())}><Plus size={13}/> New page</button></div></div>
    {detectedDateCol<0&&<p className="ocean-db-calendar-hint">No Date property was found. The calendar is using column {dateCol+1} ({headers[dateCol]||"Property"}). Add or rename a Date property to make this clearer.</p>}
    <div className="ocean-db-calendar-grid" style={{"--db-calendar-weeks":weekCount}}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div className="ocean-db-calendar-weekday" key={d}>{d}</div>)}{calendarDays.map(day=><div key={dateKey(day)} className={"ocean-db-calendar-day "+(day.getMonth()!==calendarMonth.getMonth()?"outside":"")+(dateKey(day)===dateKey(new Date())?" today":"")}><div className="ocean-db-calendar-day-head"><button className="ocean-db-calendar-add" onClick={()=>openQuickAdd(day)} title={"Add an item on "+day.toLocaleDateString()} aria-label={"Add an item on "+dateKey(day)}><Plus size={13}/></button><button className="ocean-db-calendar-date" onClick={()=>openQuickAdd(day)} title="Add an item on this date"><span>{day.getDate()}</span></button></div><div className="ocean-db-calendar-items">{rowsForDay(day).map(({r,i})=><button key={i} title="Edit page title" onClick={()=>{const title=prompt("Page title",r[0]||"Untitled");if(title!==null)editCell(i+1,0,title);}}>{r[0]||"Untitled"}</button>)}</div></div>)}</div>
-   <p className="ocean-db-calendar-hint">Select + on a date to add an item. Select an existing item to rename it.</p>
-   {quickAddDate&&<div className="ocean-db-quickadd-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget){setQuickAddDate("");setQuickAddTitle("");}}}><form className="ocean-db-quickadd" onSubmit={e=>{e.preventDefault();createQuickAdd();}}><div className="ocean-db-quickadd-head"><strong>Add an item</strong><button type="button" aria-label="Close" onClick={()=>{setQuickAddDate("");setQuickAddTitle("");}}>×</button></div><label>Task name<input autoFocus value={quickAddTitle} onChange={e=>setQuickAddTitle(e.target.value)} placeholder="What needs to be done?"/></label><label>Due date<input type="date" value={quickAddDate} onChange={e=>setQuickAddDate(e.target.value)}/></label><div className="ocean-db-quickadd-actions"><button type="button" onClick={()=>{setQuickAddDate("");setQuickAddTitle("");}}>Cancel</button><button type="submit" disabled={!quickAddTitle.trim()}>Create item</button></div></form></div>}
+   <p className="ocean-db-calendar-hint">Select + on a date to add an item. New items sync to Google Calendar. Select an existing item to rename it.</p>
+   {syncMessage&&<p className="ocean-db-calendar-hint">{syncMessage}</p>}
+   {quickAddDate&&<div className="ocean-db-quickadd-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)resetQuickAdd();}}><form className="ocean-db-quickadd" onSubmit={e=>{e.preventDefault();createQuickAdd();}}>
+    <div className="ocean-db-quickadd-head"><strong>Create calendar event</strong><button type="button" aria-label="Close" onClick={resetQuickAdd}>×</button></div>
+    <label>Event title<input autoFocus required value={quickAddTitle} onChange={e=>setQuickAddTitle(e.target.value)} placeholder="Add title"/></label>
+    <label>Date<input type="date" required value={quickAddDate} onChange={e=>setQuickAddDate(e.target.value)}/></label>
+    <label className="ocean-db-quickadd-check"><input type="checkbox" checked={quickAddAllDay} onChange={e=>setQuickAddAllDay(e.target.checked)}/> All day</label>
+    {!quickAddAllDay&&<div className="ocean-db-quickadd-time"><label>Starts<input type="time" value={quickAddStart} onChange={e=>setQuickAddStart(e.target.value)}/></label><label>Ends<input type="time" value={quickAddEnd} onChange={e=>setQuickAddEnd(e.target.value)}/></label></div>}
+    <label>Location<input value={quickAddLocation} onChange={e=>setQuickAddLocation(e.target.value)} placeholder="Add location"/></label>
+    <label>Description<textarea rows={3} value={quickAddDescription} onChange={e=>setQuickAddDescription(e.target.value)} placeholder="Add description"/></label>
+    <label className="ocean-db-quickadd-check"><input type="checkbox" checked={quickAddReminder} onChange={e=>setQuickAddReminder(e.target.checked)}/> Notification (10 minutes before)</label>
+    {quickAddError&&<p className="ocean-db-quickadd-error">{quickAddError} {quickAddError.includes("Connect Google")&&<button type="button" onClick={()=>{window.location.href="/api/ocean/calendar/connect";}}>Connect Google Calendar</button>}</p>}
+    <div className="ocean-db-quickadd-actions"><button type="button" onClick={resetQuickAdd}>Cancel</button><button type="submit" disabled={!quickAddTitle.trim()||!quickAddDate}>Create event</button></div>
+   </form></div>}
   </div>}
   {["list","gallery","timeline"].includes(view)&&<div className={"ocean-db-cards "+view}>{data.map(({r,i})=><article key={i}>{visible.map(c=><label key={c}><small>{headers[c]}</small><input value={r[c]||""} onChange={e=>editCell(i+1,c,e.target.value)}/></label>)}</article>)}<button onClick={addRow}><Plus size={14}/> New page</button></div>}
   <div className="ocean-db-footer">{data.length} {data.length===1?"page":"pages"} <span>·</span> {headers.length} properties</div>
