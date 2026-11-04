@@ -311,7 +311,9 @@ function OceanDatabaseBlock({block,updateBlock}){
  };
  const addProperty=()=>{if(locked)return;setNewPropertyName("");setNewPropertyType("text");setPropertyTypeSearch("");setAddingProperty(true);};
  const confirmAddProperty=()=>{if(locked)return;const name=newPropertyName.trim()||"New property";saveRows(rows.map((r,i)=>i===0?[...r,name]:[...r,""]));saveProperties([...properties,{name,type:newPropertyType,options:newPropertyType==="status"?["Not started","In progress","Done"]:["select","multi_select"].includes(newPropertyType)?["Option 1","Option 2"]:[]}]);setAddingProperty(false);};
- const renameProperty=i=>{if(locked)return;const name=prompt("Rename property",headers[i]);if(name?.trim())editCell(0,i,name.trim());};
+ const openPropertyEditor=i=>{if(locked)return;setPropertyDraft({name:headers[i]||"",type:properties[i]?.type||"text",readOnly:!!properties[i]?.readOnly});setPropertyEditorIndex(i);setPropertyMenu(null);setPropertyTypeMenu(false);};
+ const savePropertyEditor=()=>{if(propertyEditorIndex===null||locked)return;const i=propertyEditorIndex;const name=propertyDraft.name.trim();if(!name){window.alert("Property name cannot be empty.");return;}if(propertyDraft.type!==properties[i]?.type)changePropertyType(i,propertyDraft.type);const latest=properties.map((p,index)=>index===i?{...p,name,readOnly:propertyDraft.readOnly}:p);saveProperties(latest);if(headers[i]!==name)editCell(0,i,name);setPropertyEditorIndex(null);}; 
+ const renameProperty=i=>{if(locked)return;openPropertyEditor(i);};
  const addView=v=>{updateBlock(block.id,{view:v});setMenu("");};
  const detectedDateCol=headers.findIndex(h=>/date|due|start/i.test(String(h)));
  const dateCol=detectedDateCol>=0?detectedDateCol:width;
