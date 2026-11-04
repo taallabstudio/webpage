@@ -345,3 +345,73 @@
  .ocean-month-event{font-size:8px;padding:3px 3px!important}
  .ocean-month-event span{font-size:7px}
 }
+
+
+/* Full-width monthly calendar layout, matching the requested reference in OCEAN light mode */
+.ocean-editor:has(.ocean-note-calendar){width:min(1540px,100%);padding-left:36px;padding-right:36px}
+.ocean-note-calendar{margin:12px 0 32px;padding:0;background:#fff;border:1px solid #e1e7ed;border-radius:13px;box-shadow:0 5px 22px rgba(31,54,77,.045);overflow:hidden}
+.ocean-calendar-titlebar{min-height:48px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#eaf4ff;border-bottom:1px solid #dceafa}
+.ocean-calendar-titlebar h3{margin:0;color:#25384b;font:700 19px "Space Grotesk",sans-serif;letter-spacing:-.025em}
+.ocean-calendar-titlebar>span{display:flex;align-items:center;gap:7px;color:#68819a;font-size:10px}
+.ocean-calendar-live-dot{width:7px;height:7px;border-radius:50%;background:#20a36b;box-shadow:0 0 0 3px rgba(32,163,107,.1)}
+.ocean-calendar-toolbar{min-height:54px;padding:9px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #e8edf2}
+.ocean-calendar-filter{display:inline-flex;align-items:center;gap:8px;padding:7px 11px;border-radius:20px;background:#f3f6f9;color:#536474;font-size:11px;font-weight:650}
+.ocean-calendar-filter svg{color:#708397}
+.ocean-calendar-toolbar-actions{display:flex;align-items:center;gap:9px}
+.ocean-calendar-manage{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #e0e6ed;border-radius:7px;color:#566779;text-decoration:none;font-size:11px;font-weight:600}
+.ocean-calendar-manage:hover{background:#f5f9fd;color:#0878e8}
+.ocean-calendar-month-controls{display:flex;align-items:center;gap:4px}
+.ocean-calendar-month-controls>button{height:31px;min-width:31px;padding:0 9px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #e0e6ed!important;border-radius:6px!important;background:#fff!important;color:#596979!important;font-size:11px;font-weight:600}
+.ocean-calendar-month-controls>button:hover{background:#f2f7fc!important;color:#0878e8!important}
+.ocean-calendar-month-controls .calendar-prev{transform:rotate(180deg)}
+.ocean-calendar-toolbar-actions>.ocean-calendar-new{height:32px;display:inline-flex;align-items:center;gap:6px;padding:0 12px!important;border-radius:7px!important}
+.ocean-calendar-month-heading{min-height:43px;padding:10px 15px 8px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ocean-calendar-month-heading h4{margin:0;color:#273746;font:700 14px "Space Grotesk",sans-serif}
+.ocean-calendar-month-heading>span{color:#98a3ae;font-size:10px}
+.ocean-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:36px repeat(var(--calendar-week-count),minmax(118px,1fr));border-top:1px solid #e3e9ef;border-left:1px solid #e3e9ef;border-radius:0;overflow:hidden}
+.ocean-month-weekday{padding:10px 8px;text-align:center;background:#fafbfd;border-right:1px solid #e3e9ef;border-bottom:1px solid #e3e9ef;color:#8b97a3;font-size:10px;font-weight:600;letter-spacing:.015em}
+.ocean-month-day{min-width:0;min-height:118px;padding:7px 8px;border-right:1px solid #e3e9ef;border-bottom:1px solid #e3e9ef;background:#fff}
+.ocean-month-day.outside{background:#fbfcfd}
+.ocean-month-day.today{background:#f5f9ff}
+.ocean-month-day-number{width:100%;min-height:22px;display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:0 3px 5px;color:#465564;font-size:12px;font-weight:600}
+.ocean-month-day-number svg{opacity:0;color:#0878e8}
+.ocean-month-day:hover .ocean-month-day-number svg{opacity:1}
+.ocean-month-day.outside .ocean-month-day-number{color:#b0bac4}
+.ocean-month-day.today .ocean-month-day-number span{width:23px;height:23px;display:grid;place-items:center;border-radius:50%;background:#0878e8;color:#fff}
+.ocean-month-day-events{display:grid;align-content:start;gap:4px}
+.ocean-month-event{width:100%;min-width:0;min-height:28px;display:flex;flex-direction:row;align-items:center;gap:6px;padding:5px 7px!important;border:0!important;border-left:3px solid #2685df!important;border-radius:4px!important;background:#eaf4ff!important;color:#28577e!important;text-align:left;font-size:10px;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ocean-month-event:hover{background:#dceeff!important}
+.ocean-month-event span{flex:none;font-size:9px;color:#6287a8}
+.ocean-month-event:not(:has(span)){display:block}
+.ocean-month-day-events>small{padding:2px 5px;color:#748394;font-size:9px}
+.ocean-note-calendar-loading,.ocean-note-calendar-connect{min-height:180px}
+.ocean-note-calendar-form{margin:16px!important}
+.ocean-note-calendar-foot{padding:11px 15px;margin:0;border-top:1px solid #edf0f3;background:#fbfcfd}
+@media(max-width:900px){
+ .ocean-editor:has(.ocean-note-calendar){width:100%;padding-left:20px;padding-right:20px}
+ .ocean-calendar-toolbar{align-items:flex-start}
+ .ocean-calendar-toolbar-actions{flex-wrap:wrap;justify-content:flex-end}
+ .ocean-month-grid{grid-template-rows:34px repeat(var(--calendar-week-count),minmax(96px,1fr))}
+ .ocean-month-day{min-height:96px;padding:5px}
+}
+@media(max-width:640px){
+ .ocean-editor:has(.ocean-note-calendar){padding-left:10px;padding-right:10px}
+ .ocean-calendar-titlebar{min-height:44px;padding:0 11px}
+ .ocean-calendar-titlebar h3{font-size:16px}
+ .ocean-calendar-titlebar>span{font-size:9px}
+ .ocean-calendar-toolbar{padding:8px;flex-direction:column;align-items:stretch}
+ .ocean-calendar-toolbar-actions{justify-content:space-between;gap:5px}
+ .ocean-calendar-manage{font-size:0;padding:7px}
+ .ocean-calendar-manage span{display:none}
+ .ocean-calendar-month-controls{gap:2px}
+ .ocean-calendar-month-controls>button{min-width:28px;padding:0 6px}
+ .ocean-calendar-month-heading{padding:9px 10px}
+ .ocean-calendar-month-heading>span{font-size:9px}
+ .ocean-month-grid{grid-template-rows:30px repeat(var(--calendar-week-count),minmax(76px,1fr))}
+ .ocean-month-weekday{padding:8px 1px;font-size:9px}
+ .ocean-month-day{min-height:76px;padding:4px 2px}
+ .ocean-month-day-number{font-size:10px;padding:0 1px 4px}
+ .ocean-month-day.today .ocean-month-day-number span{width:20px;height:20px}
+ .ocean-month-event{min-height:0;padding:4px 3px!important;display:block;font-size:8px;white-space:normal}
+ .ocean-month-event span{display:block;font-size:7px;margin-bottom:1px}
+}
