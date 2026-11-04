@@ -1741,7 +1741,7 @@ async function handleOceanCalendar(req: Request,env: Env,user: any,pathname: str
     if(body.location)event.location=String(body.location).slice(0,1000);
     if(body.colorId)event.colorId=String(body.colorId).slice(0,2);
     if(body.recurrence)event.recurrence=[String(body.recurrence).slice(0,100)];
-    if(body.reminderEnabled)event.reminders=body.reminderEnabled?{useDefault:false,overrides:[{method:"popup",minutes:Math.max(0,Math.min(40320,Number.isFinite(Number(body.reminderMinutes))?Number(body.reminderMinutes):10))}]}:{useDefault:false,overrides:[]};
+    event.reminders=body.reminderEnabled?{useDefault:false,overrides:[{method:"popup",minutes:Math.max(0,Math.min(40320,Number.isFinite(Number(body.reminderMinutes))?Number(body.reminderMinutes):10))}]}:{useDefault:false,overrides:[]};
     return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/"+encodeURIComponent(calendarId)+"/events",{method:"POST",body:JSON.stringify(event)}),{status:201});
   }
   const eventMatch=pathname.match(/^\/api\/ocean\/calendar\/events\/([^/]+)$/);
