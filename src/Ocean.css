@@ -608,3 +608,17 @@
 .ocean-shell[data-theme="dark"] .ocean-db-quickadd-actions button{background:#252b33!important;border-color:#3a424d!important;color:#d1dae3!important}
 .ocean-shell[data-theme="dark"] .ocean-db-quickadd-actions button[type="submit"]{background:#0878e8!important;border-color:#0878e8!important;color:#fff!important}
 .ocean-shell[data-theme="dark"] .ocean-sidebar-reopen{color:#c1cad4}
+
+
+/* Theme-aware inline highlights: keep light colours in light mode and soften them in dark mode. */
+.ocean-block-text[data-highlight="true"]{
+  padding:3px 6px;
+  border-radius:4px;
+  box-decoration-break:clone;
+  -webkit-box-decoration-break:clone;
+  background:var(--ocean-block-highlight);
+}
+.ocean-shell[data-theme="dark"] .ocean-block-text[data-highlight="true"]{
+  background:color-mix(in srgb,var(--ocean-block-highlight) 22%,#20252c);
+  outline:1px solid color-mix(in srgb,var(--ocean-block-highlight) 38%,#414b57);
+}
