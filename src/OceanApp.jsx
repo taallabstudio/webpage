@@ -240,7 +240,7 @@ function OceanGoogleCalendarBlock(){
  const openForm=(event=null,day=new Date())=>{
   const start=event?eventDate(event):new Date(day.getFullYear(),day.getMonth(),day.getDate(),10,0);
   const end=event?.end?.dateTime?new Date(event.end.dateTime):new Date(start.getTime()+3600000);
-  const allDay=!!event?.start?.date;
+  const allDay=event?!!event?.start?.date:true;
   const startDate=event?.start?.date||dateKey(start);
   let endDate=startDate;
   if(event?.end?.date){const d=new Date(event.end.date+"T12:00:00");d.setDate(d.getDate()-1);endDate=dateKey(d);}
