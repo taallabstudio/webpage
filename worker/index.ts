@@ -1494,7 +1494,21 @@ async function ensureOceanSchema(env: Env) {
     )`),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_comments_page ON ocean_comments(page_id,created_at)"),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS ocean_assets (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,page_id TEXT NOT NULL,storage_key TEXT NOT NULL UNIQUE,file_name TEXT NOT NULL,mime_type TEXT NOT NULL,size INTEGER NOT NULL,created_at INTEGER NOT NULL)`),
-    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_assets_user_page ON ocean_assets(user_id,page_id,created_at)")
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_assets_user_page ON ocean_assets(user_id,page_id,created_at)"),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS ocean_google_calendar (
+      user_id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      refresh_token_enc TEXT NOT NULL,
+      scope TEXT NOT NULL DEFAULT '',
+      connected_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS ocean_google_calendar_states (
+      state TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      expires_at INTEGER NOT NULL
+    )`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_calendar_states_expiry ON ocean_google_calendar_states(expires_at)")
   ]);
 }
 
@@ -1577,10 +1591,164 @@ async function streamOceanAsset(req: Request, env: Env, user: any, id: string) {
   if (response.status === 206) out.set("Accept-Ranges","bytes");
   return new Response(response.body,{status:response.status,headers:out});
 }
+
+const OCEAN_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
+
+async function oceanCalendarConnection(env: Env, userId: string) {
+  return env.DB.prepare("SELECT user_id,email,refresh_token_enc,scope,connected_at,updated_at FROM ocean_google_calendar WHERE user_id=? LIMIT 1")
+    .bind(userId).first<any>();
+}
+
+async function oceanCalendarAccessToken(env: Env, userId: string) {
+  const connection = await oceanCalendarConnection(env,userId);
+  if (!connection?.refresh_token_enc) throw json({error:"Google Calendar is not connected."},{status:409});
+  const refreshToken = await decryptSecret(env.SESSION_SECRET,String(connection.refresh_token_enc));
+  const response = await fetch("https://oauth2.googleapis.com/token",{
+    method:"POST",
+    headers:{"content-type":"application/x-www-form-urlencoded"},
+    body:new URLSearchParams({
+      client_id:env.GOOGLE_CLIENT_ID,
+      client_secret:env.GOOGLE_CLIENT_SECRET,
+      refresh_token:refreshToken,
+      grant_type:"refresh_token"
+    })
+  });
+  const data:any = await response.json().catch(()=>({}));
+  if(!response.ok || !data.access_token) {
+    console.error("OCEAN Calendar token refresh failed",response.status,data);
+    if(data.error==="invalid_grant") await env.DB.prepare("DELETE FROM ocean_google_calendar WHERE user_id=?").bind(userId).run();
+    throw json({error:data.error==="invalid_grant"?"Google Calendar connection expired. Please reconnect.":"Could not refresh Google Calendar access."},{status:401});
+  }
+  return String(data.access_token);
+}
+
+async function oceanGoogleCalendarRequest(env: Env,userId: string,path: string,init: RequestInit={}) {
+  const accessToken=await oceanCalendarAccessToken(env,userId);
+  const response=await fetch("https://www.googleapis.com/calendar/v3"+path,{
+    ...init,
+    headers:{
+      "Authorization":"Bearer "+accessToken,
+      ...(init.body?{"Content-Type":"application/json"}:{}),
+      ...(init.headers||{})
+    }
+  });
+  const data:any=await response.json().catch(()=>({}));
+  if(!response.ok) {
+    console.error("OCEAN Google Calendar API error",response.status,data);
+    throw json({error:data?.error?.message||"Google Calendar request failed."},{status:response.status});
+  }
+  return data;
+}
+
+async function oceanCalendarConnect(req: Request,env: Env,user: any) {
+  if(!env.GOOGLE_CLIENT_ID||!env.GOOGLE_CLIENT_SECRET) return json({error:"Google OAuth is not configured on this Worker."},{status:503});
+  const state=randomToken(24),expires=now()+600;
+  await env.DB.prepare("DELETE FROM ocean_google_calendar_states WHERE expires_at<?").bind(now()).run();
+  await env.DB.prepare("INSERT INTO ocean_google_calendar_states(state,user_id,expires_at) VALUES(?,?,?)").bind(state,user.id,expires).run();
+  const url=new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  url.searchParams.set("client_id",env.GOOGLE_CLIENT_ID);
+  url.searchParams.set("redirect_uri",`${origin(env)}/api/ocean/calendar/callback`);
+  url.searchParams.set("response_type","code");
+  url.searchParams.set("scope",OCEAN_CALENDAR_SCOPE+" https://www.googleapis.com/auth/userinfo.email");
+  url.searchParams.set("access_type","offline");
+  url.searchParams.set("prompt","consent select_account");
+  url.searchParams.set("include_granted_scopes","true");
+  url.searchParams.set("state",state);
+  return new Response(null,{status:302,headers:{location:url.toString(),"cache-control":"no-store"}});
+}
+
+async function oceanCalendarCallback(req: Request,env: Env,user: any) {
+  const url=new URL(req.url),state=url.searchParams.get("state")||"",code=url.searchParams.get("code")||"";
+  const redirect=(status:string,message="")=>{
+    const target=new URL("/", "https://app.taallab.work");
+    target.searchParams.set("panel","calendar");
+    target.searchParams.set("calendar",status);
+    if(message)target.searchParams.set("calendar_error",message.slice(0,180));
+    return Response.redirect(target.toString(),302);
+  };
+  const stateRow:any=await env.DB.prepare("SELECT user_id,expires_at FROM ocean_google_calendar_states WHERE state=? LIMIT 1").bind(state).first();
+  await env.DB.prepare("DELETE FROM ocean_google_calendar_states WHERE state=?").bind(state).run();
+  if(!stateRow||stateRow.user_id!==user.id||Number(stateRow.expires_at)<now())return redirect("error","Authorization expired. Please try connecting again.");
+  if(url.searchParams.get("error"))return redirect("error","Google authorization was cancelled.");
+  if(!code)return redirect("error","Google did not return an authorization code.");
+  const tokenResponse=await fetch("https://oauth2.googleapis.com/token",{
+    method:"POST",
+    headers:{"content-type":"application/x-www-form-urlencoded"},
+    body:new URLSearchParams({code,client_id:env.GOOGLE_CLIENT_ID,client_secret:env.GOOGLE_CLIENT_SECRET,redirect_uri:`${origin(env)}/api/ocean/calendar/callback`,grant_type:"authorization_code"})
+  });
+  const tokenData:any=await tokenResponse.json().catch(()=>({}));
+  if(!tokenResponse.ok||!tokenData.access_token){console.error("OCEAN Calendar OAuth exchange failed",tokenData);return redirect("error","Google authorization failed. Check OAuth redirect URI configuration.");}
+  let refreshToken=String(tokenData.refresh_token||"");
+  if(!refreshToken){
+    const existing:any=await oceanCalendarConnection(env,user.id);
+    if(existing?.refresh_token_enc)refreshToken=await decryptSecret(env.SESSION_SECRET,String(existing.refresh_token_enc));
+  }
+  if(!refreshToken)return redirect("error","Google did not provide offline access. Disconnect the old connection and try again.");
+  const profileResponse=await fetch("https://www.googleapis.com/oauth2/v2/userinfo",{headers:{Authorization:"Bearer "+tokenData.access_token}});
+  const profile:any=await profileResponse.json().catch(()=>({}));
+  if(!profileResponse.ok||!profile.email)return redirect("error","Could not identify the connected Google account.");
+  const encrypted=await encryptSecret(env.SESSION_SECRET,refreshToken),timestamp=now();
+  await env.DB.prepare(`INSERT INTO ocean_google_calendar(user_id,email,refresh_token_enc,scope,connected_at,updated_at)
+    VALUES(?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET email=excluded.email,refresh_token_enc=excluded.refresh_token_enc,scope=excluded.scope,updated_at=excluded.updated_at`)
+    .bind(user.id,String(profile.email),encrypted,String(tokenData.scope||OCEAN_CALENDAR_SCOPE),timestamp,timestamp).run();
+  return redirect("connected");
+}
+
+async function handleOceanCalendar(req: Request,env: Env,user: any,pathname: string) {
+  if(pathname==="/api/ocean/calendar/connect"&&req.method==="GET")return oceanCalendarConnect(req,env,user);
+  if(pathname==="/api/ocean/calendar/callback"&&req.method==="GET")return oceanCalendarCallback(req,env,user);
+  if(pathname==="/api/ocean/calendar/connection"&&req.method==="GET"){
+    const c:any=await oceanCalendarConnection(env,user.id);
+    return json({connected:!!c,email:c?.email||"",connected_at:c?.connected_at||null});
+  }
+  if(pathname==="/api/ocean/calendar/connection"&&req.method==="DELETE"){
+    await env.DB.prepare("DELETE FROM ocean_google_calendar WHERE user_id=?").bind(user.id).run();
+    return json({ok:true});
+  }
+  if(pathname==="/api/ocean/calendar/events"&&req.method==="GET"){
+    const params=new URL(req.url).searchParams;
+    const timeMin=params.get("timeMin")||new Date(Date.now()-30*86400000).toISOString();
+    const timeMax=params.get("timeMax")||new Date(Date.now()+90*86400000).toISOString();
+    const query=new URLSearchParams({singleEvents:"true",orderBy:"startTime",maxResults:"250",timeMin,timeMax});
+    return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/primary/events?"+query.toString()));
+  }
+  if(pathname==="/api/ocean/calendar/events"&&req.method==="POST"){
+    const body:any=await req.json().catch(()=>({}));
+    const summary=String(body.summary||"").trim().slice(0,500);
+    const start=String(body.start||""),end=String(body.end||"");
+    if(!summary||!start||!end||!Number.isFinite(Date.parse(start))||!Number.isFinite(Date.parse(end))||Date.parse(end)<=Date.parse(start))return json({error:"Enter an event title, valid start and end times."},{status:400});
+    const event:any={summary,start:{dateTime:start},end:{dateTime:end}};
+    if(body.description)event.description=String(body.description).slice(0,8000);
+    if(body.location)event.location=String(body.location).slice(0,1000);
+    return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/primary/events",{method:"POST",body:JSON.stringify(event)}),{status:201});
+  }
+  const eventMatch=pathname.match(/^\\/api\\/ocean\\/calendar\\/events\\/([^/]+)$/);
+  if(eventMatch&&req.method==="PATCH"){
+    const body:any=await req.json().catch(()=>({}));
+    const event:any={};
+    if(Object.prototype.hasOwnProperty.call(body,"summary"))event.summary=String(body.summary).slice(0,500);
+    if(Object.prototype.hasOwnProperty.call(body,"description"))event.description=String(body.description).slice(0,8000);
+    if(Object.prototype.hasOwnProperty.call(body,"location"))event.location=String(body.location).slice(0,1000);
+    if(body.start)event.start={dateTime:String(body.start)};
+    if(body.end)event.end={dateTime:String(body.end)};
+    if(!Object.keys(event).length)return json({error:"No event changes supplied."},{status:400});
+    return json(await oceanGoogleCalendarRequest(env,user.id,"/calendars/primary/events/"+encodeURIComponent(eventMatch[1]),{method:"PATCH",body:JSON.stringify(event)}));
+  }
+  if(eventMatch&&req.method==="DELETE"){
+    await oceanGoogleCalendarRequest(env,user.id,"/calendars/primary/events/"+encodeURIComponent(eventMatch[1]),{method:"DELETE"});
+    return json({ok:true});
+  }
+  return null;
+}
+
 async function handleOceanRequest(req: Request, env: Env, pathname: string) {
   if (!pathname.startsWith("/api/ocean/")) return null;
   const user = await requireOceanUser(req, env);
   await ensureOceanSchema(env);
+  if(pathname.startsWith("/api/ocean/calendar/")){
+    const calendarResponse=await handleOceanCalendar(req,env,user,pathname);
+    if(calendarResponse)return calendarResponse;
+  }
   if (pathname === "/api/ocean/admin/users" && req.method === "GET") { await requireAdmin(req,env); return oceanAdminUsers(env); }
   const roleMatch = pathname.match(/^\/api\/ocean\/admin\/users\/([^/]+)$/);
   if (roleMatch && req.method === "PATCH") return updateOceanUserRole(req,env,roleMatch[1]);
