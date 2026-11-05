@@ -6,7 +6,7 @@ import {
   ArrowDownToLine, ArrowLeft, Check, ChevronRight, Clock3, Copy, Download,
   Eye, File, FileAudio, FileImage, FileText, FileVideo, FolderOpen, Gauge,
   HardDrive, Link2, LockKeyhole, LogOut, Menu, MessageSquare, MoreHorizontal, Plus, RefreshCw, Search, Settings, ShieldCheck, Trash2, UploadCloud,
-  UserRound, X, ChevronDown, Mail, MapPin, MessageCircle, Phone, ShoppingCart
+  UserRound, X, ChevronDown, Mail, MapPin, MessageCircle, Phone, ShoppingCart, KeyRound, Laptop, Smartphone
 } from "lucide-react";
 import "./styles.css";
 
@@ -569,117 +569,26 @@ function SecurityMethods({user}) {
   const [code,setCode]=useState(""),[name,setName]=useState("This device");
   const [recoveryCodes,setRecoveryCodes]=useState([]);
   const [message,setMessage]=useState(""),[error,setError]=useState("");
-
-  async function refresh(){
-    try{setMethods(await api("/account/security/methods"));}
-    catch(e){setError(e.message);}
-    finally{setLoading(false);}
-  }
+  async function refresh(){try{setMethods(await api("/account/security/methods"));}catch(e){setError(e.message);}finally{setLoading(false);}}
   useEffect(()=>{refresh()},[user?.id]);
-
-  async function beginAuthenticator(){
-    setBusy(true);setError("");setMessage("");
-    try{
-      const result=await api("/account/totp/setup",{method:"POST"});
-      const image=await QRCode.toDataURL(result.otpauthUrl,{width:220,margin:2});
-      setSetup(result);setQr(image);setCode("");
-    }catch(e){setError(e.message);}
-    finally{setBusy(false);}
-  }
-  async function confirmAuthenticator(e){
-    e.preventDefault();setBusy(true);setError("");setMessage("");
-    try{
-      const result=await api("/account/totp/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});
-      setRecoveryCodes(result.recoveryCodes||[]);setSetup(null);setQr("");setCode("");
-      setMessage("Authenticator app enabled. Save these recovery codes now; they will only be shown once.");
-      await refresh();
-    }catch(e){setError(e.message);}
-    finally{setBusy(false);}
-  }
-  async function addPasskey(){
-    setBusy(true);setError("");setMessage("");
-    try{
-      const start=await api("/account/passkeys/register/options",{method:"POST"});
-      const response=await startRegistration({optionsJSON:start.options});
-      await api("/account/passkeys/register/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({challengeId:start.challengeId,response,name})});
-      setMessage("Passkey added. You can now use it to sign in without a password.");
-      await refresh();
-    }catch(e){if(e.name!=="NotAllowedError")setError(e.message||"Passkey setup was cancelled.");}
-    finally{setBusy(false);}
-  }
-  async function removePasskey(id){
-    if(!window.confirm("Remove this passkey from your TaalLab account?"))return;
-    setBusy(true);setError("");setMessage("");
-    try{await api("/account/passkeys/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});setMessage("Passkey removed.");await refresh();}
-    catch(e){setError(e.message);}
-    finally{setBusy(false);}
-  }
-  async function disableAuthenticator(){
-    setBusy(true);setError("");setMessage("");
-    try{await api("/account/totp/disable",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});setCode("");setMessage("Authenticator app disabled. Until you set it up again, email verification will be used as a temporary sign-in fallback.");setRecoveryCodes([]);await refresh();}
-    catch(e){setError(e.message);}
-    finally{setBusy(false);}
-  }
-  async function renewRecoveryCodes(){
-    setBusy(true);setError("");setMessage("");
-    try{const result=await api("/account/recovery-codes/regenerate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});setRecoveryCodes(result.recoveryCodes||[]);setCode("");setMessage("New recovery codes generated. Your previous codes are no longer valid.");await refresh();}
-    catch(e){setError(e.message);}
-    finally{setBusy(false);}
-  }
-
-  return <section className="panel" style={{maxWidth:720,padding:24,marginBottom:18}}>
-    <h2>Security &amp; authentication</h2>
-    <p className="muted" style={{marginTop:6}}>Manage passkeys, authenticator app verification and emergency recovery access. These settings work on taallab.work and app.taallab.work.</p>
-    {error&&<div className="error-box" style={{marginTop:14}}>{error}</div>}
-    {message&&<div className="success-pill" style={{marginTop:14}}>{message}</div>}
-    <div className="security-setting-card" style={{marginTop:18}}>
-      <div><strong>Passkeys</strong><small>Passwordless sign-in using fingerprint, Face ID, Windows Hello or a device PIN.</small></div>
-      <span className="status-pill">{methods.passkeys.length} added</span>
-    </div>
-    <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}>
-      <input aria-label="Passkey device name" value={name} onChange={e=>setName(e.target.value)} maxLength={60} placeholder="Device name" style={{flex:"1 1 180px"}}/>
-      <button type="button" className="primary-btn" onClick={addPasskey} disabled={busy}>{busy?"Please wait…":"Add a passkey"}</button>
-    </div>
-    {methods.passkeys.map(item=><div key={item.id} className="security-setting-card" style={{marginTop:10}}>
-      <div><strong>{item.name}</strong><small>{item.deviceType==="multiDevice"?"Synced passkey":"Device-bound credential"}{item.backedUp?" · Backed up":""}</small></div>
-      <button type="button" className="ghost-btn" disabled={busy} onClick={()=>removePasskey(item.id)}>Remove</button>
-    </div>)}
-    <div className="security-setting-card" style={{marginTop:22}}>
-      <div><strong>Authenticator app</strong><small>{methods.authenticatorEnabled?"Enabled · Use a six-digit code when signing in with your password or Google.":"Not configured · Email codes are temporarily used until an authenticator is connected."}</small></div>
-      <span className={methods.authenticatorEnabled?"success-pill":"status-pill"}>{methods.authenticatorEnabled?"Active":"Not set up"}</span>
-    </div>
-    {!methods.authenticatorEnabled&&!setup&&<button type="button" className="primary-btn" style={{marginTop:12}} onClick={beginAuthenticator} disabled={busy}>{busy?"Please wait…":"Set up authenticator app"}</button>}
-    {setup&&<div style={{marginTop:16,padding:16,border:"1px solid var(--border-color, #ddd)",borderRadius:12}}>
-      <strong>Scan this QR code</strong>
-      <p className="muted" style={{marginTop:5}}>Open Google Authenticator, Microsoft Authenticator, 2FAS or another TOTP app and scan this code.</p>
-      {qr&&<img src={qr} alt="Authenticator setup QR code" width="220" height="220" style={{display:"block",margin:"14px auto",background:"#fff",padding:8,borderRadius:8}}/>}
-      <label>Or enter this setup key manually<input readOnly value={setup.secret}/></label>
-      <form onSubmit={confirmAuthenticator}>
-        <label>Enter the six-digit code from your app<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} required/></label>
-        <button className="primary-btn" disabled={busy||code.length!==6}>{busy?"Verifying…":"Verify and enable"}</button>
-        <button type="button" className="ghost-btn" style={{marginLeft:8}} onClick={()=>{setSetup(null);setQr("");setCode("");}}>Cancel</button>
-      </form>
-    </div>}
-    {methods.authenticatorEnabled&&<div style={{marginTop:14}}>
-      <p className="muted">Unused recovery codes: {methods.recoveryCodesRemaining}. Each code can be used once if you lose access to your authenticator.</p>
-      <div style={{marginTop:12}}>
-        <label>Authenticator or recovery code<input value={code} onChange={e=>setCode(e.target.value)} autoComplete="off" placeholder="Enter a code to confirm a security change"/></label>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <button type="button" className="ghost-btn" disabled={busy||!code.trim()} onClick={renewRecoveryCodes}>Generate new recovery codes</button>
-          <button type="button" className="ghost-btn" disabled={busy||!code.trim()} onClick={disableAuthenticator}>Disable authenticator</button>
-        </div>
-      </div>
-    </div>}
-    {recoveryCodes.length>0&&<div style={{marginTop:18,padding:16,border:"1px solid var(--border-color, #ddd)",borderRadius:12}}>
-      <strong>Save your recovery codes</strong>
-      <p className="muted">These are displayed only now. Store them somewhere safe, separate from your device.</p>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,margin:"12px 0"}}>
-        {recoveryCodes.map(item=><code key={item} style={{padding:8,background:"var(--surface-secondary, #f2f2f2)",borderRadius:6}}>{item}</code>)}
-      </div>
-      <button type="button" className="ghost-btn" onClick={()=>navigator.clipboard?.writeText(recoveryCodes.join("\n"))}>Copy recovery codes</button>
-      <button type="button" className="ghost-btn" style={{marginLeft:8}} onClick={()=>setRecoveryCodes([])}>I've saved them</button>
-    </div>}
-    {loading&&<p className="muted" style={{marginTop:12}}>Loading security methods…</p>}
+  async function beginAuthenticator(){setBusy(true);setError("");setMessage("");try{const result=await api("/account/totp/setup",{method:"POST"});const image=await QRCode.toDataURL(result.otpauthUrl,{width:240,margin:2});setSetup(result);setQr(image);setCode("");}catch(e){setError(e.message);}finally{setBusy(false);}}
+  async function confirmAuthenticator(e){e.preventDefault();setBusy(true);setError("");setMessage("");try{const result=await api("/account/totp/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});setRecoveryCodes(result.recoveryCodes||[]);setSetup(null);setQr("");setCode("");setMessage("Authenticator app enabled. Save these recovery codes now; they will only be shown once.");await refresh();}catch(e){setError(e.message);}finally{setBusy(false);}}
+  async function addPasskey(){setBusy(true);setError("");setMessage("");try{const start=await api("/account/passkeys/register/options",{method:"POST"});const response=await startRegistration({optionsJSON:start.options});await api("/account/passkeys/register/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({challengeId:start.challengeId,response,name:name.trim()||"This device"})});setMessage("Passkey added. You can now sign in without a password.");await refresh();}catch(e){if(e.name!=="NotAllowedError")setError(e.message||"Passkey setup was cancelled.");}finally{setBusy(false);}}
+  async function removePasskey(id){if(!window.confirm("Remove this passkey from your TaalLab account?"))return;setBusy(true);setError("");setMessage("");try{await api("/account/passkeys/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});setMessage("Passkey removed.");await refresh();}catch(e){setError(e.message);}finally{setBusy(false);}}
+  async function disableAuthenticator(){setBusy(true);setError("");setMessage("");try{await api("/account/totp/disable",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});setCode("");setMessage("Authenticator app disabled. Email verification will be used as a temporary sign-in fallback.");setRecoveryCodes([]);await refresh();}catch(e){setError(e.message);}finally{setBusy(false);}}
+  async function renewRecoveryCodes(){setBusy(true);setError("");setMessage("");try{const result=await api("/account/recovery-codes/regenerate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});setRecoveryCodes(result.recoveryCodes||[]);setCode("");setMessage("New recovery codes generated. Your previous codes are no longer valid.");await refresh();}catch(e){setError(e.message);}finally{setBusy(false);}}
+  return <section className="panel security-panel">
+    <div className="security-panel-heading"><div><span className="eyebrow">ACCOUNT PROTECTION</span><h2>Security &amp; authentication</h2><p className="muted">Manage passkeys, authenticator verification and emergency recovery access across taallab.work and app.taallab.work.</p></div><span className="security-shield"><ShieldCheck size={21}/></span></div>
+    {error&&<div className="error-box security-feedback">{error}</div>}{message&&<div className="success-pill security-feedback">{message}</div>}
+    <div className="security-method-card"><div className="security-method-copy"><div className="security-method-title"><KeyRound size={17}/><strong>Passkeys</strong></div><p>Passwordless sign-in with Windows Hello, Touch ID, Face ID or your device PIN.</p></div><span className="security-count">{methods.passkeys.length} {methods.passkeys.length===1?"passkey":"passkeys"}</span></div>
+    <div className="security-add-passkey"><label className="security-field"><span>Device name</span><input aria-label="Passkey device name" value={name} onChange={e=>setName(e.target.value)} maxLength={60} placeholder="e.g. My Windows PC"/></label><button type="button" className="primary-btn" onClick={addPasskey} disabled={busy}>{busy?"Please wait…":<><Plus size={15}/> Add passkey</>}</button></div>
+    {methods.passkeys.length>0&&<div className="security-passkey-list">{methods.passkeys.map(item=><div key={item.id} className="security-passkey-item"><span className="security-device-icon"><Laptop size={18}/></span><div className="security-device-copy"><strong>{item.name}</strong><small>{item.deviceType==="multiDevice"?"Synced passkey":"Device-bound passkey"}{item.backedUp?" · Backed up":""}</small></div><button type="button" className="ghost-btn security-remove-btn" disabled={busy} onClick={()=>removePasskey(item.id)}>Remove</button></div>)}</div>}
+    <div className="security-method-card security-auth-card"><div className="security-method-copy"><div className="security-method-title"><Smartphone size={17}/><strong>Authenticator app</strong></div><p>{methods.authenticatorEnabled?"Use a six-digit code from your authenticator app when signing in with your password or Google.":"Connect an authenticator app for stronger two-step verification."}</p></div><span className={methods.authenticatorEnabled?"security-state security-state-active":"security-state"}>{methods.authenticatorEnabled?"Active":"Not set up"}</span></div>
+    {!methods.authenticatorEnabled&&!setup&&<button type="button" className="primary-btn security-setup-btn" onClick={beginAuthenticator} disabled={busy}>{busy?"Please wait…":<><Plus size={15}/> Set up authenticator</>}</button>}
+    {setup&&<div className="security-setup-box"><div><strong>Connect your authenticator</strong><p>Scan this QR code with Google Authenticator, Microsoft Authenticator, 2FAS or another compatible app.</p></div>{qr&&<img src={qr} alt="Authenticator setup QR code" className="security-qr"/>}<label className="security-field"><span>Or enter this setup key manually</span><input readOnly value={setup.secret}/></label><form onSubmit={confirmAuthenticator} className="security-confirm-form"><label className="security-field"><span>Six-digit verification code</span><input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="000 000" required/></label><div className="security-actions"><button className="primary-btn" disabled={busy||code.length!==6}>{busy?"Verifying…":"Verify and enable"}</button><button type="button" className="ghost-btn" onClick={()=>{setSetup(null);setQr("");setCode("");}}>Cancel</button></div></form></div>}
+    {methods.authenticatorEnabled&&<div className="security-recovery-section"><div className="security-recovery-heading"><div><strong>Recovery codes</strong><p>Keep these somewhere safe. Each code can only be used once if you lose access to your authenticator.</p></div><span className="security-count">{methods.recoveryCodesRemaining} remaining</span></div><div className="security-recovery-controls"><label className="security-field"><span>Confirm your identity</span><input value={code} onChange={e=>setCode(e.target.value)} autoComplete="off" placeholder="Enter authenticator or recovery code"/></label><div className="security-actions"><button type="button" className="ghost-btn" disabled={busy||!code.trim()} onClick={renewRecoveryCodes}>Regenerate codes</button><button type="button" className="security-danger-btn" disabled={busy||!code.trim()} onClick={disableAuthenticator}>Disable authenticator</button></div></div></div>}
+    {recoveryCodes.length>0&&<div className="security-recovery-output"><div><strong>Save your recovery codes</strong><p>These codes are shown only once. Copy them and store them somewhere secure.</p></div><div className="security-recovery-grid">{recoveryCodes.map(item=><code key={item}>{item}</code>)}</div><div className="security-actions"><button type="button" className="ghost-btn" onClick={()=>navigator.clipboard?.writeText(recoveryCodes.join("\n"))}><Copy size={14}/> Copy codes</button><button type="button" className="primary-btn" onClick={()=>setRecoveryCodes([])}>I've saved them</button></div></div>}
+    {loading&&<p className="security-loading">Loading security methods…</p>}
   </section>;
 }
 
