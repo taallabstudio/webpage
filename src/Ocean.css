@@ -1020,3 +1020,19 @@
 /* Ensure page titles keep strong contrast in dark mode. */
 .ocean-shell[data-theme="dark"] .ocean-title{color:#edf2f7!important}
 .ocean-shell[data-theme="dark"] .ocean-title-row input.ocean-title{color:#edf2f7!important;-webkit-text-fill-color:#edf2f7}
+
+/* Notion-style private page sharing dialog */
+.ocean-share-scrim{z-index:80}
+.ocean-share-dialog{position:fixed;z-index:81;top:72px;right:24px;width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 100px);overflow:auto;background:var(--ocean-panel,#fff);color:var(--ocean-text,#17202a);border:1px solid var(--ocean-border,#dce2e8);border-radius:14px;box-shadow:0 18px 60px #0003;padding:18px}
+.ocean-share-dialog header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+.ocean-share-dialog header div{display:grid;gap:5px}.ocean-share-dialog header strong{font-size:17px}.ocean-share-dialog header span,.ocean-share-dialog small{font-size:12px;color:var(--ocean-muted,#77818d)}
+.ocean-share-dialog header button,.ocean-share-remove{border:0;background:transparent;color:inherit;cursor:pointer}
+.ocean-share-dialog form{display:flex;gap:8px;flex-wrap:wrap}
+.ocean-share-dialog form input{flex:1;min-width:180px;padding:10px 12px;border:1px solid var(--ocean-border,#dce2e8);border-radius:8px;background:transparent;color:inherit}
+.ocean-share-dialog select{max-width:145px;padding:9px 8px;border:1px solid var(--ocean-border,#dce2e8);border-radius:8px;background:var(--ocean-panel,#fff);color:inherit}
+.ocean-share-section{border-top:1px solid var(--ocean-border,#dce2e8);margin-top:18px;padding-top:16px}.ocean-share-section>strong{display:block;margin-bottom:12px;font-size:13px}
+.ocean-share-person{display:flex;align-items:center;gap:10px;padding:8px 0;min-width:0}.ocean-share-person>div{display:grid;gap:3px;flex:1;min-width:0}.ocean-share-person b{font-size:13px;overflow:hidden;text-overflow:ellipsis}.ocean-share-person>span:last-child{font-size:12px;color:var(--ocean-muted,#77818d);text-transform:capitalize}
+.ocean-share-person select{max-width:140px;font-size:12px}.ocean-share-error{color:#c43b3b;font-size:13px;margin:12px 0}
+.ocean-share-dialog footer{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--ocean-border,#dce2e8);margin-top:14px;padding-top:14px;font-size:12px;color:var(--ocean-muted,#77818d)}
+.ocean-share-dialog footer span{display:flex;align-items:center;gap:6px}.ocean-share-dialog footer button{border:1px solid var(--ocean-border,#dce2e8);background:transparent;color:inherit;border-radius:7px;padding:7px 10px;cursor:pointer}
+.ocean-shell[data-theme="dark"] .ocean-share-dialog{--ocean-panel:#252a30;--ocean-text:#e6ebf0;--ocean-muted:#9ba5af;--ocean-border:#414850}
