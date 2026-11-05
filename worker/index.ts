@@ -1567,6 +1567,7 @@ async function uploadOceanAsset(req: Request, env: Env, user: any) {
   const url = new URL(req.url), pageId = String(url.searchParams.get("page_id") || "");
   const page: any = await oceanPageForUser(env,user.id,pageId);
   if (!page) return json({ error: "Page not found." }, { status: 404 });
+  if (!oceanCanEdit(page)) return json({error:"You do not have permission to upload files to this page."},{status:403});
   const filename = (url.searchParams.get("filename") || "upload.bin").split("/").pop()!.replace(/[^a-zA-Z0-9._ -]/g,"_").slice(-180);
   const mime = (req.headers.get("Content-Type") || "application/octet-stream").split(";")[0].trim();
   const declared = Number(req.headers.get("Content-Length") || 0);
