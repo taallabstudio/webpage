@@ -17,7 +17,10 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "lucide-react": "^0.468.0",
-    "aws4fetch": "^1.0.20"
+    "aws4fetch": "^1.0.20",
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.0.3",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
