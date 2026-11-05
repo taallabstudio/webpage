@@ -1068,7 +1068,13 @@ function OceanApp(){
  };
  const handleEditorKeyDown=(e,block,index)=>{
  const element=e.currentTarget;
- if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();e.stopPropagation();if(e.shiftKey)redoBlocks();else undoBlocks();return;}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){
+  e.preventDefault();e.stopPropagation();
+  const liveText=readEditorText(element),liveHtml=editorHtml(element),saved=page.blocks[index];
+  const runHistory=()=>{if(e.shiftKey)redoBlocks();else undoBlocks();};
+  if(saved&&(liveText!==saved.text||liveHtml!==saved.html)){updateBlock(block.id,{text:liveText,html:liveHtml});window.setTimeout(runHistory,0);}else runHistory();
+  return;
+ }
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();e.stopPropagation();redoBlocks();return;}
  // Each OCEAN paragraph is its own contentEditable host. Browsers do not
  // naturally move the caret between sibling hosts with vertical arrows.
