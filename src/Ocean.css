@@ -238,7 +238,7 @@
 .ocean-simple-table-wrap .ocean-table td{min-width:110px}
 
 
-/* OCEAN also uses the site-wide Google Roboto typography. */
+/* OCEAN uses Notion's Inter typography throughout its interface. */
 .ocean-shell, .ocean-shell *, .ocean-auth, .ocean-auth *, .ocean-loading, .ocean-loading *, .ocean-access-denied, .ocean-access-denied * { font-family: "Inter", sans-serif !important; }
 
 /* OCEAN Google Calendar integration */
