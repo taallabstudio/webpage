@@ -1,5 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
-:root{--ocean-bg:#191919;--ocean-panel:#202020;--ocean-panel2:#262626;--ocean-hover:#303030;--ocean-border:#343434;--ocean-text:#e7e7e7;--ocean-muted:#929292;--ocean-dim:#6f6f6f;--ocean-accent:#8bb8e8;--ocean-font:"DM Sans",Inter,system-ui,sans-serif;--ocean-display:"Manrope",Inter,system-ui,sans-serif}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+:root{--ocean-bg:#191919;--ocean-panel:#202020;--ocean-panel2:#262626;--ocean-hover:#303030;--ocean-border:#343434;--ocean-text:#e7e7e7;--ocean-muted:#929292;--ocean-dim:#6f6f6f;--ocean-accent:#8bb8e8;--ocean-font:"Inter",system-ui,sans-serif;--ocean-display:"Inter",system-ui,sans-serif}
 .ocean-shell,.ocean-auth,.ocean-loading{font-family:var(--ocean-font);color:var(--ocean-text);background:var(--ocean-bg);min-height:100vh}
 .ocean-shell *,.ocean-auth *{box-sizing:border-box}
 .ocean-shell button,.ocean-auth button,.ocean-shell input,.ocean-shell textarea,.ocean-shell select,.ocean-auth input{font:inherit}
@@ -129,7 +129,7 @@
 @media(max-width:760px){.ocean-sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);transition:transform .2s ease;width:270px;box-shadow:15px 0 40px #0008}.ocean-sidebar.mobile-open{transform:translateX(0)}.ocean-topbar{padding:0 12px}.ocean-mobile-menu{display:grid;place-items:center;width:30px;height:30px;margin-right:8px}.ocean-crumb{flex:1}.ocean-editor{padding:28px 24px 80px 35px}.ocean-title{font-size:34px}.ocean-title-row{margin-top:20px}.ocean-page-controls{opacity:1;gap:10px}.ocean-page-controls button{font-size:10px}.ocean-cover{height:150px}.ocean-slash-menu{left:0;width:min(340px,calc(100vw - 50px))}.ocean-save-state{display:none}}
 @media(min-width:761px){.ocean-shell.sidebar-collapsed .ocean-sidebar{width:0;overflow:hidden;border:0}}
 
-:root{--ocean-bg:#f4f6f8;--ocean-panel:#fff;--ocean-panel2:#f8fafc;--ocean-hover:#edf5fd;--ocean-border:#e3e8ee;--ocean-text:#1d2229;--ocean-muted:#707782;--ocean-dim:#858d97;--ocean-accent:#0878e8;--ocean-font:Inter,system-ui,sans-serif;--ocean-display:"Space Grotesk",Inter,system-ui,sans-serif}
+:root{--ocean-bg:#f4f6f8;--ocean-panel:#fff;--ocean-panel2:#f8fafc;--ocean-hover:#edf5fd;--ocean-border:#e3e8ee;--ocean-text:#1d2229;--ocean-muted:#707782;--ocean-dim:#858d97;--ocean-accent:#0878e8;--ocean-font:Inter,system-ui,sans-serif;--ocean-display:"Inter",system-ui,sans-serif}
 .ocean-shell,.ocean-auth,.ocean-loading,.ocean-access-denied{background:#f4f6f8;color:#1d2229;font-family:var(--ocean-font)}
 .ocean-sidebar{background:#fff;border-color:#e4e7eb}.ocean-brand{color:#1d2229}.ocean-brand-mark{width:34px;height:30px;color:#0878e8;background:transparent;display:grid;place-items:center}.ocean-brand-mark svg{width:31px;height:25px}
 .ocean-mark{background:#e7f2ff;color:#0878e8;border:1px solid #d6e9fc}.ocean-mark svg{width:27px;height:20px}
@@ -239,7 +239,7 @@
 
 
 /* OCEAN also uses the site-wide Google Roboto typography. */
-.ocean-shell, .ocean-shell *, .ocean-auth, .ocean-auth *, .ocean-loading, .ocean-loading *, .ocean-access-denied, .ocean-access-denied * { font-family: "Roboto", sans-serif !important; }
+.ocean-shell, .ocean-shell *, .ocean-auth, .ocean-auth *, .ocean-loading, .ocean-loading *, .ocean-access-denied, .ocean-access-denied * { font-family: "Inter", sans-serif !important; }
 
 /* OCEAN Google Calendar integration */
 .ocean-calendar-content{max-width:980px}
@@ -293,7 +293,7 @@
 .ocean-loader-orbit>i:nth-of-type(1){top:9px;left:50%}
 .ocean-loader-orbit>i:nth-of-type(2){right:7px;bottom:30px;animation-delay:-1s}
 .ocean-loader-orbit>i:nth-of-type(3){left:8px;bottom:27px;animation-delay:-2s}
-.ocean-loading>strong{font:800 13px "Space Grotesk",sans-serif!important;letter-spacing:.24em;color:#26384a}
+.ocean-loading>strong{font:800 13px "Inter",sans-serif!important;letter-spacing:.24em;color:#26384a}
 .ocean-loading>span{font-size:14px;color:#5f7183}
 .ocean-loading>small{font-size:11px;color:#96a3b0}
 @keyframes ocean-loader-pulse{0%{transform:scale(.72);opacity:.75}100%{transform:scale(1.3);opacity:0}}
@@ -305,7 +305,7 @@
 .ocean-note-calendar{margin:24px 0 30px;padding:20px;background:#fff;border:1px solid #e1e8ef;border-radius:15px;box-shadow:0 8px 24px rgba(34,58,82,.045);color:#263442}
 .ocean-note-calendar-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}
 .ocean-note-calendar-head>div:first-child>span{display:flex;align-items:center;gap:7px;color:#0878e8;font-size:9px;font-weight:800;letter-spacing:.13em}
-.ocean-note-calendar-head h3{margin:7px 0 0;color:#1d2a37;font:700 22px "Space Grotesk",sans-serif;letter-spacing:-.035em}
+.ocean-note-calendar-head h3{margin:7px 0 0;color:#1d2a37;font:700 22px "Inter",sans-serif;letter-spacing:-.035em}
 .ocean-note-calendar-controls{display:flex;align-items:center;gap:6px}
 .ocean-note-calendar-controls>button{min-width:32px;height:32px;padding:0 9px;border:1px solid #e0e7ee!important;border-radius:7px!important;background:#fff!important;color:#586777!important;display:inline-flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:600}
 .ocean-note-calendar-controls>button:hover{background:#f2f7fc!important;color:#0878e8!important}
@@ -351,7 +351,7 @@
 .ocean-editor:has(.ocean-note-calendar){width:min(1540px,100%);padding-left:36px;padding-right:36px}
 .ocean-note-calendar{margin:12px 0 32px;padding:0;background:#fff;border:1px solid #e1e7ed;border-radius:13px;box-shadow:0 5px 22px rgba(31,54,77,.045);overflow:hidden}
 .ocean-calendar-titlebar{min-height:48px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#eaf4ff;border-bottom:1px solid #dceafa}
-.ocean-calendar-titlebar h3{margin:0;color:#25384b;font:700 19px "Space Grotesk",sans-serif;letter-spacing:-.025em}
+.ocean-calendar-titlebar h3{margin:0;color:#25384b;font:700 19px "Inter",sans-serif;letter-spacing:-.025em}
 .ocean-calendar-titlebar>span{display:flex;align-items:center;gap:7px;color:#68819a;font-size:10px}
 .ocean-calendar-live-dot{width:7px;height:7px;border-radius:50%;background:#20a36b;box-shadow:0 0 0 3px rgba(32,163,107,.1)}
 .ocean-calendar-toolbar{min-height:54px;padding:9px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #e8edf2}
@@ -366,7 +366,7 @@
 .ocean-calendar-month-controls .calendar-prev{transform:rotate(180deg)}
 .ocean-calendar-toolbar-actions>.ocean-calendar-new{height:32px;display:inline-flex;align-items:center;gap:6px;padding:0 12px!important;border-radius:7px!important}
 .ocean-calendar-month-heading{min-height:43px;padding:10px 15px 8px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.ocean-calendar-month-heading h4{margin:0;color:#273746;font:700 14px "Space Grotesk",sans-serif}
+.ocean-calendar-month-heading h4{margin:0;color:#273746;font:700 14px "Inter",sans-serif}
 .ocean-calendar-month-heading>span{color:#98a3ae;font-size:10px}
 .ocean-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:36px repeat(var(--calendar-week-count),minmax(118px,1fr));border-top:1px solid #e3e9ef;border-left:1px solid #e3e9ef;border-radius:0;overflow:hidden}
 .ocean-month-weekday{padding:10px 8px;text-align:center;background:#fafbfd;border-right:1px solid #e3e9ef;border-bottom:1px solid #e3e9ef;color:#8b97a3;font-size:10px;font-weight:600;letter-spacing:.015em}
@@ -429,7 +429,7 @@
 .ocean-db-calendar{padding:8px 0 4px}
 .ocean-db-calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 2px 14px}
 .ocean-db-calendar-toolbar>div:first-child{display:grid;gap:4px}
-.ocean-db-calendar-toolbar>div:first-child strong{font:700 15px "Space Grotesk",sans-serif;color:#273746}
+.ocean-db-calendar-toolbar>div:first-child strong{font:700 15px "Inter",sans-serif;color:#273746}
 .ocean-db-calendar-toolbar>div:first-child small{font-size:10px;color:#8794a0}
 .ocean-db-calendar-toolbar>div:last-child{display:flex;align-items:center;gap:5px}
 .ocean-db-calendar-toolbar>div:last-child>button{height:30px;min-width:30px;padding:0 9px;display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid #e0e6ed!important;border-radius:6px!important;background:#fff!important;color:#596979!important;font-size:11px;font-weight:600}
@@ -471,7 +471,7 @@
 .ocean-db-property-editor-backdrop{position:fixed!important;inset:0!important;z-index:2147483000!important;display:grid!important;place-items:center!important;padding:18px!important;background:rgba(20,28,36,.42)!important;backdrop-filter:blur(4px);isolation:isolate}
 .ocean-db-quickadd{width:min(390px,100%);display:grid;gap:15px;padding:19px;border:1px solid #dfe6ee;border-radius:13px;background:#fff;color:#263746;box-shadow:0 18px 60px rgba(20,35,50,.2)}
 .ocean-db-quickadd-head{display:flex;align-items:center;justify-content:space-between}
-.ocean-db-quickadd-head strong{font:700 16px "Space Grotesk",sans-serif;color:#1c2a37}
+.ocean-db-quickadd-head strong{font:700 16px "Inter",sans-serif;color:#1c2a37}
 .ocean-db-quickadd-head>button{width:28px;height:28px;border-radius:7px!important;background:#f2f5f8!important;color:#657586!important;font-size:20px}
 .ocean-db-quickadd label{display:grid;gap:6px;color:#637487;font-size:11px;font-weight:650}
 .ocean-db-quickadd input{width:100%;height:39px;padding:0 10px;border:1px solid #dce4ec;border-radius:7px;background:#fff;color:#243444;font:inherit;font-size:13px;outline:none}
@@ -879,7 +879,7 @@
 .ocean-db-record-page{width:min(760px,100%);min-height:70vh;padding:22px 34px 24px;border:1px solid #e2e7ec;border-radius:13px;background:#fff;color:#263747;box-shadow:0 24px 80px rgba(0,0,0,.25)}
 .ocean-db-record-page>header{display:flex;align-items:center;justify-content:space-between;color:#8793a0;font-size:11px}
 .ocean-db-record-page>header button{width:29px;height:29px;border-radius:6px;background:#f2f4f6;color:#647383;font-size:19px}
-.ocean-db-record-page>h2{margin:20px 0 24px;font:700 30px "Space Grotesk",sans-serif;color:#273746;overflow-wrap:anywhere}
+.ocean-db-record-page>h2{margin:20px 0 24px;font:700 30px "Inter",sans-serif;color:#273746;overflow-wrap:anywhere}
 .ocean-db-record-properties{display:grid;gap:0;max-width:560px}
 .ocean-db-record-property{display:grid;grid-template-columns:minmax(125px,175px) 1fr;align-items:center;min-height:42px;border-bottom:1px solid #edf0f3}
 .ocean-db-record-property>label{color:#8793a0;font-size:12px}
@@ -1236,3 +1236,28 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 .ocean-icon-upload{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:1px dashed #4b5964;border-radius:12px;color:#aab7c1}.ocean-icon-upload input{display:none}.ocean-icon-upload strong{color:#edf2f6;font-size:14px}.ocean-icon-upload span{font-size:11px}.ocean-icon-upload button{margin-top:6px;padding:9px 14px;border-radius:8px;background:#8bb8e8!important;color:#14202b!important;font-size:11px;font-weight:700}
 .ocean-page-icon-image{width:1.25em;height:1.25em;object-fit:cover;border-radius:4px;vertical-align:middle}.ocean-page-icon-symbol{font-size:12px;text-transform:capitalize}.ocean-title-icon .ocean-page-icon-image{width:1em;height:1em}
 @media(max-width:700px){.ocean-icon-grid{grid-template-columns:repeat(7,minmax(0,1fr));max-height:32vh}.ocean-icon-tabs button{padding:9px 10px}.ocean-emoji-categories button{font-size:10px}}
+
+
+/* Notion-like list rhythm and alignment. Keep markers independent from global block indexes. */
+.ocean-block-row:has(>.ocean-list-marker){
+  gap:10px;
+  min-height:38px;
+  margin:1px 0;
+  align-items:flex-start;
+}
+.ocean-block-row:has(>.ocean-list-marker) .ocean-list-marker{
+  width:22px;
+  flex:none;
+  padding-top:2px;
+  color:var(--ocean-muted);
+  font-size:16px;
+  line-height:1.65;
+  text-align:center;
+}
+.ocean-block-row:has(>.ocean-list-marker) .ocean-block-text{
+  min-height:30px;
+  padding:2px 0;
+  font-size:16px!important;
+  line-height:1.65;
+  letter-spacing:0;
+}
