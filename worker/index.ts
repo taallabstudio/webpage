@@ -772,15 +772,18 @@ async function setSetting(env: Env, key: string, value: string) {
 }
 
 
-function googleLoginRedirect(env: Env, params: Record<string, string> = {}) {
-  const url = new URL("/admin", origin(env));
+function googleLoginRedirect(env: Env, params: Record<string, string> = {}, returnTo = "/admin") {
+  const safeReturn = returnTo === "/ocean.html" ? returnTo : "/admin";
+  const url = new URL(safeReturn, origin(env));
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   return url;
 }
 
 async function googleAuthStart(req: Request, env: Env) {
+  const requestedReturn = new URL(req.url).searchParams.get("return_to") || "/admin";
+  const returnTo = requestedReturn === "/ocean.html" ? "/ocean.html" : "/admin";
   if (!env.GOOGLE_LOGIN_CLIENT_ID || !env.GOOGLE_LOGIN_CLIENT_SECRET) {
-    return new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: "Google sign-in is not configured yet." }).toString() } });
+    return new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: "Google sign-in is not configured yet." }, returnTo).toString() } });
   }
   const state = randomToken(24);
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
@@ -793,16 +796,19 @@ async function googleAuthStart(req: Request, env: Env) {
   url.searchParams.set("include_granted_scopes", "true");
   return new Response(null, {
     status: 302,
-    headers: { location: url.toString(), "set-cookie": cookie("google_login_state", state, 600, req) },
+    headers: { location: url.toString(), "set-cookie": [cookie("google_login_state", state, 600, req), cookie("google_login_return", returnTo, 600, req)] },
   });
 }
 
 async function googleAuthCallback(req: Request, env: Env) {
   const url = new URL(req.url);
   const clearStateCookie = "google_login_state=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const clearReturnCookie = "google_login_return=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const returnTo = parseCookie(req, "google_login_return") === "/ocean.html" ? "/ocean.html" : "/admin";
   const fail = (message: string) => {
-    const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: message }).toString() } });
+    const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: message }, returnTo).toString() } });
     response.headers.append("set-cookie", clearStateCookie);
+    response.headers.append("set-cookie", clearReturnCookie);
     return response;
   };
   if (!env.GOOGLE_LOGIN_CLIENT_ID || !env.GOOGLE_LOGIN_CLIENT_SECRET) return fail("Google sign-in is not configured yet.");
@@ -894,14 +900,15 @@ async function googleAuthCallback(req: Request, env: Env) {
     }
     const response = new Response(null, {
       status: 302,
-      headers: { location: googleLoginRedirect(env, { google_2fa: "1", challenge_id: challengeId, email: user.email }).toString() },
+      headers: { location: googleLoginRedirect(env, { google_2fa: "1", challenge_id: challengeId, email: user.email }, returnTo).toString() },
     });
     response.headers.append("set-cookie", clearStateCookie);
+    response.headers.append("set-cookie", clearReturnCookie);
     return response;
   }
 
   const sid = await createUserSession(env, user.id);
-  const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env).toString() } });
+  const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, {}, returnTo).toString() } });
   response.headers.append("set-cookie", clearStateCookie);
   response.headers.append("set-cookie", cookie("taallab_session", sid, 7 * 86400, req));
   return response;
