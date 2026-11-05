@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
+import QRCode from "qrcode";
 import {
   ArrowDownToLine, ArrowLeft, Check, ChevronRight, Clock3, Copy, Download,
   Eye, File, FileAudio, FileImage, FileText, FileVideo, FolderOpen, Gauge,
@@ -172,6 +174,8 @@ function Login({onLogin}) {
   const [notice,setNotice]=useState(loginParams.get("verified")==="1" ? "Email verified. You can sign in now." : "");
   const [signup,setSignup]=useState(false);
   const [twoFactor,setTwoFactor]=useState(loginParams.get("google_2fa")==="1");
+  const [twoFactorMethod,setTwoFactorMethod]=useState(loginParams.get("method")||"email");
+  const [passkeyBusy,setPasskeyBusy]=useState(false);
   const [resendCooldown,setResendCooldown]=useState(0);
   const [verificationRequired,setVerificationRequired]=useState(false);
   const [forgotMode,setForgotMode]=useState(false);
@@ -184,6 +188,17 @@ function Login({onLogin}) {
     const next=new URLSearchParams(location.search).get("next")||"";
     if(next.startsWith("/checkout.html")&&!next.startsWith("//")) { location.assign(next); return; }
     api("/auth/me").then(result => location.assign(result.user?.role === "admin" ? "/admin" : location.pathname === "/account/settings" ? "/account/settings" : "/account")).catch(() => location.assign("/account"));
+  }
+
+  async function signInWithPasskey(){
+    setError("");setPasskeyBusy(true);
+    try{
+      const start=await api("/auth/passkeys/options",{method:"POST"});
+      const response=await startAuthentication({optionsJSON:start.options});
+      await api("/auth/passkeys/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({challengeId:start.challengeId,response})});
+      afterLogin();
+    }catch(e){if(e.name!=="NotAllowedError")setError(e.message||"Passkey sign-in failed.");}
+    finally{setPasskeyBusy(false);}
   }
 
   useEffect(()=>{
@@ -255,6 +270,7 @@ function Login({onLogin}) {
       if (result.requiresTwoFactor) {
         setChallengeId(result.challengeId);
         setTwoFactor(true);
+        setTwoFactorMethod(result.method||"email");
         setCode("");
         setNotice(`We sent a 6-digit sign-in code to ${result.email}.`);
       } else if (result.needsVerification) {
@@ -305,62 +321,16 @@ function Login({onLogin}) {
 
   if(twoFactor) return <div className="login-page"><div className="login-card">
     <Logo/><div className="login-icon"><ShieldCheck/></div>
-    <h1>Check your email</h1>
-    <p>Enter the 6-digit code we sent to <strong>{email}</strong>.</p>
+    <h1>{twoFactorMethod==="authenticator"?"Authenticator verification":"Check your email"}</h1>
+    <p>{twoFactorMethod==="authenticator"?"Enter the six-digit code from your authenticator app, or use one of your recovery codes.":<>Enter the six-digit code we sent to <strong>{email}</strong>.</>}</p>
     <form ref={codeForm} onSubmit={submit}>
-      <label className="otp-label">Verification code</label>
-      <div className="otp-inputs" role="group" aria-label="Six-digit verification code" onPaste={e=>{
-        const pasted=e.clipboardData.getData("text").replace(/\D/g,"").slice(0,6);
-        if(!pasted) return;
-        e.preventDefault();
-        const digits=Array.from({length:6},(_,i)=>pasted[i]||"");
-        setCode(digits.join(""));
-        const target=Math.min(pasted.length,5);
-        codeInputs.current[target]?.focus();
-      }}>
-        {Array.from({length:6},(_,i)=><input
-          key={i}
-          ref={el=>codeInputs.current[i]=el}
-          className="otp-digit"
-          type="text"
-          inputMode="numeric"
-          autoComplete={i===0?"one-time-code":"off"}
-          aria-label={`Digit ${i+1} of 6`}
-          maxLength={6}
-          value={code[i]||""}
-          autoFocus={i===0}
-          required={i===0}
-          onChange={e=>{
-            const digits=e.target.value.replace(/\D/g,"").slice(0,6);
-            if(digits.length>1){
-              const next=Array.from({length:6},(_,j)=>digits[j]||"");
-              setCode(next.join(""));
-              codeInputs.current[Math.min(digits.length,5)]?.focus();
-              return;
-            }
-            const next=code.padEnd(6," ").split("");
-            next[i]=digits||"";
-            const joined=next.map(x=>x===" "?"":x).join("");
-            setCode(joined);
-            if(digits&&i<5) codeInputs.current[i+1]?.focus();
-          }}
-          onKeyDown={e=>{
-            if(e.key==="Backspace"&&!code[i]&&i>0) codeInputs.current[i-1]?.focus();
-            if(e.key==="ArrowLeft"&&i>0){e.preventDefault();codeInputs.current[i-1]?.focus();}
-            if(e.key==="ArrowRight"&&i<5){e.preventDefault();codeInputs.current[i+1]?.focus();}
-          }}
-        />)}
-      </div>
+      <label>{twoFactorMethod==="authenticator"?"Authenticator or recovery code":"Verification code"}<input value={code} onChange={e=>setCode(e.target.value.replace(twoFactorMethod==="authenticator"?/[^a-zA-Z0-9-]/g:/\D/g,"").slice(0,32))} autoComplete="one-time-code" autoFocus maxLength={32} required/></label>
       {error&&<div className="error-box">{error}</div>}
       {notice&&<div className="success-pill">{notice}</div>}
-      <button className="primary-btn full" disabled={code.length!==6}>Verify & sign in</button>
+      <button className="primary-btn full" disabled={!code.trim()}>Verify &amp; sign in</button>
     </form>
-    <button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendCode}>
-      {resendCooldown>0?`Resend code in ${resendCooldown}s`:"Resend code"}
-    </button>
-    <button className="ghost-btn full" style={{marginTop:8}} onClick={()=>{setTwoFactor(false);setChallengeId("");setCode("");setError("");setNotice("");}}>
-      Back to sign in
-    </button>
+    {twoFactorMethod==="email"&&<button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendCode}>{resendCooldown>0?`Resend code in ${resendCooldown}s`:"Resend code"}</button>}
+    <button className="ghost-btn full" style={{marginTop:8}} onClick={()=>{setTwoFactor(false);setChallengeId("");setCode("");setError("");setNotice("");}}>Back to sign in</button>
   </div></div>;
 
   if(forgotMode) return <div className="login-page"><div className="login-card">
@@ -395,6 +365,7 @@ function Login({onLogin}) {
     <Logo/><div className="login-icon"><ShieldCheck/></div>
     <h1>{signup?"Create account":"Sign in"}</h1>
     <p>{signup?"Create your TaalLab account to receive files shared with you.":"Manage TaalLab transfers securely."}</p>
+    {!signup&&<button type="button" className="ghost-btn full" style={{marginBottom:12}} onClick={signInWithPasskey} disabled={passkeyBusy}><ShieldCheck size={17}/>{passkeyBusy?"Waiting for passkey…":"Sign in with a passkey"}</button>}
     <button type="button" className="google-login-btn" onClick={()=>window.location.assign("/api/auth/google/start")}>
       <svg aria-hidden="true" viewBox="0 0 48 48" width="20" height="20"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z" transform="translate(0 4) scale(.92)"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.72 7.18l7.62 5.91c4.45-4.11 7.14-10.17 7.14-17.56Z"/><path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.2A23.9 23.9 0 0 0 0 24c0 3.87.93 7.53 2.56 10.78l7.97-6.19Z" transform="translate(0 2) scale(1)"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.89l-7.62-5.91c-2.12 1.42-4.84 2.26-8.28 2.26-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.2C6.51 42.62 14.62 48 24 48Z" transform="translate(0 -1) scale(.98)"/></svg>
       <span>Continue with Google</span>
@@ -591,6 +562,128 @@ function UserManagement({currentUser}) {
   </div>;
 }
 
+function SecurityMethods({user}) {
+  const [methods,setMethods]=useState({authenticatorEnabled:false,passkeys:[],recoveryCodesRemaining:0});
+  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
+  const [setup,setSetup]=useState(null),[qr,setQr]=useState("");
+  const [code,setCode]=useState(""),[name,setName]=useState("This device");
+  const [recoveryCodes,setRecoveryCodes]=useState([]);
+  const [message,setMessage]=useState(""),[error,setError]=useState("");
+
+  async function refresh(){
+    try{setMethods(await api("/account/security/methods"));}
+    catch(e){setError(e.message);}
+    finally{setLoading(false);}
+  }
+  useEffect(()=>{refresh()},[user?.id]);
+
+  async function beginAuthenticator(){
+    setBusy(true);setError("");setMessage("");
+    try{
+      const result=await api("/account/totp/setup",{method:"POST"});
+      const image=await QRCode.toDataURL(result.otpauthUrl,{width:220,margin:2});
+      setSetup(result);setQr(image);setCode("");
+    }catch(e){setError(e.message);}
+    finally{setBusy(false);}
+  }
+  async function confirmAuthenticator(e){
+    e.preventDefault();setBusy(true);setError("");setMessage("");
+    try{
+      const result=await api("/account/totp/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});
+      setRecoveryCodes(result.recoveryCodes||[]);setSetup(null);setQr("");setCode("");
+      setMessage("Authenticator app enabled. Save these recovery codes now; they will only be shown once.");
+      await refresh();
+    }catch(e){setError(e.message);}
+    finally{setBusy(false);}
+  }
+  async function addPasskey(){
+    setBusy(true);setError("");setMessage("");
+    try{
+      const start=await api("/account/passkeys/register/options",{method:"POST"});
+      const response=await startRegistration({optionsJSON:start.options});
+      await api("/account/passkeys/register/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({challengeId:start.challengeId,response,name})});
+      setMessage("Passkey added. You can now use it to sign in without a password.");
+      await refresh();
+    }catch(e){if(e.name!=="NotAllowedError")setError(e.message||"Passkey setup was cancelled.");}
+    finally{setBusy(false);}
+  }
+  async function removePasskey(id){
+    if(!window.confirm("Remove this passkey from your TaalLab account?"))return;
+    setBusy(true);setError("");setMessage("");
+    try{await api("/account/passkeys/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});setMessage("Passkey removed.");await refresh();}
+    catch(e){setError(e.message);}
+    finally{setBusy(false);}
+  }
+  async function disableAuthenticator(e){
+    e.preventDefault();setBusy(true);setError("");setMessage("");
+    try{await api("/account/totp/disable",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});setCode("");setMessage("Authenticator app disabled. Until you set it up again, email verification will be used as a temporary sign-in fallback.");setRecoveryCodes([]);await refresh();}
+    catch(e){setError(e.message);}
+    finally{setBusy(false);}
+  }
+  async function renewRecoveryCodes(e){
+    e.preventDefault();setBusy(true);setError("");setMessage("");
+    try{const result=await api("/account/recovery-codes/regenerate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});setRecoveryCodes(result.recoveryCodes||[]);setCode("");setMessage("New recovery codes generated. Your previous codes are no longer valid.");await refresh();}
+    catch(e){setError(e.message);}
+    finally{setBusy(false);}
+  }
+
+  return <section className="panel" style={{maxWidth:720,padding:24,marginBottom:18}}>
+    <h2>Security &amp; authentication</h2>
+    <p className="muted" style={{marginTop:6}}>Manage passkeys, authenticator app verification and emergency recovery access. These settings work on taallab.work and app.taallab.work.</p>
+    {error&&<div className="error-box" style={{marginTop:14}}>{error}</div>}
+    {message&&<div className="success-pill" style={{marginTop:14}}>{message}</div>}
+    <div className="security-setting-card" style={{marginTop:18}}>
+      <div><strong>Passkeys</strong><small>Passwordless sign-in using fingerprint, Face ID, Windows Hello or a device PIN.</small></div>
+      <span className="status-pill">{methods.passkeys.length} added</span>
+    </div>
+    <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}>
+      <input aria-label="Passkey device name" value={name} onChange={e=>setName(e.target.value)} maxLength={60} placeholder="Device name" style={{flex:"1 1 180px"}}/>
+      <button type="button" className="primary-btn" onClick={addPasskey} disabled={busy}>{busy?"Please wait…":"Add a passkey"}</button>
+    </div>
+    {methods.passkeys.map(item=><div key={item.id} className="security-setting-card" style={{marginTop:10}}>
+      <div><strong>{item.name}</strong><small>{item.deviceType==="multiDevice"?"Synced passkey":"Device-bound credential"}{item.backedUp?" · Backed up":""}</small></div>
+      <button type="button" className="ghost-btn" disabled={busy} onClick={()=>removePasskey(item.id)}>Remove</button>
+    </div>)}
+    <div className="security-setting-card" style={{marginTop:22}}>
+      <div><strong>Authenticator app</strong><small>{methods.authenticatorEnabled?"Enabled · Use a six-digit code when signing in with your password or Google.":"Not configured · Email codes are temporarily used until an authenticator is connected."}</small></div>
+      <span className={methods.authenticatorEnabled?"success-pill":"status-pill"}>{methods.authenticatorEnabled?"Active":"Not set up"}</span>
+    </div>
+    {!methods.authenticatorEnabled&&!setup&&<button type="button" className="primary-btn" style={{marginTop:12}} onClick={beginAuthenticator} disabled={busy}>{busy?"Please wait…":"Set up authenticator app"}</button>}
+    {setup&&<div style={{marginTop:16,padding:16,border:"1px solid var(--border-color, #ddd)",borderRadius:12}}>
+      <strong>Scan this QR code</strong>
+      <p className="muted" style={{marginTop:5}}>Open Google Authenticator, Microsoft Authenticator, 2FAS or another TOTP app and scan this code.</p>
+      {qr&&<img src={qr} alt="Authenticator setup QR code" width="220" height="220" style={{display:"block",margin:"14px auto",background:"#fff",padding:8,borderRadius:8}}/>}
+      <label>Or enter this setup key manually<input readOnly value={setup.secret}/></label>
+      <form onSubmit={confirmAuthenticator}>
+        <label>Enter the six-digit code from your app<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} required/></label>
+        <button className="primary-btn" disabled={busy||code.length!==6}>{busy?"Verifying…":"Verify and enable"}</button>
+        <button type="button" className="ghost-btn" style={{marginLeft:8}} onClick={()=>{setSetup(null);setQr("");setCode("");}}>Cancel</button>
+      </form>
+    </div>}
+    {methods.authenticatorEnabled&&<div style={{marginTop:14}}>
+      <p className="muted">Unused recovery codes: {methods.recoveryCodesRemaining}. Each code can be used once if you lose access to your authenticator.</p>
+      <form onSubmit={renewRecoveryCodes} style={{marginTop:12}}>
+        <label>Authenticator or recovery code<input value={code} onChange={e=>setCode(e.target.value)} autoComplete="off" placeholder="Enter a code to regenerate recovery codes" required/></label>
+        <button className="ghost-btn" disabled={busy||!code.trim()}>Generate new recovery codes</button>
+      </form>
+      <form onSubmit={disableAuthenticator} style={{marginTop:12}}>
+        <label>Confirm code to disable authenticator<input value={code} onChange={e=>setCode(e.target.value)} autoComplete="off" placeholder="Authenticator or recovery code" required/></label>
+        <button className="ghost-btn" disabled={busy||!code.trim()}>Disable authenticator</button>
+      </form>
+    </div>}
+    {recoveryCodes.length>0&&<div style={{marginTop:18,padding:16,border:"1px solid var(--border-color, #ddd)",borderRadius:12}}>
+      <strong>Save your recovery codes</strong>
+      <p className="muted">These are displayed only now. Store them somewhere safe, separate from your device.</p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,margin:"12px 0"}}>
+        {recoveryCodes.map(item=><code key={item} style={{padding:8,background:"var(--surface-secondary, #f2f2f2)",borderRadius:6}}>{item}</code>)}
+      </div>
+      <button type="button" className="ghost-btn" onClick={()=>navigator.clipboard?.writeText(recoveryCodes.join("\n"))}>Copy recovery codes</button>
+      <button type="button" className="ghost-btn" style={{marginLeft:8}} onClick={()=>setRecoveryCodes([])}>I've saved them</button>
+    </div>}
+    {loading&&<p className="muted" style={{marginTop:12}}>Loading security methods…</p>}
+  </section>;
+}
+
 function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [currentPassword,setCurrentPassword]=useState("");
   const [newPassword,setNewPassword]=useState("");
@@ -683,26 +776,7 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
         <button className="primary-btn" disabled={profileSaving}>{profileSaving?"Saving profile…":"Save profile"}</button>
       </form>
     </section>
-    <section className="panel" style={{maxWidth:620,padding:24}}>
-      <h2>Security</h2>
-      <p className="muted" style={{marginTop:6}}>Email verification is required for every account. Two-step verification adds a one-time code sent to your email after your password.</p>
-      <div className="security-setting-card">
-        <div>
-          <strong>Two-step verification</strong>
-          <small>{twoFactorEnabled?"Enabled — a code is required at every sign-in.":"Opted out — password only."}</small>
-        </div>
-        <label className="toggle-control">
-          <input type="checkbox" checked={twoFactorEnabled} onChange={e=>setTwoFactorEnabled(e.target.checked)}/>
-          <span className="toggle-track"><span className="toggle-thumb"/></span>
-        </label>
-      </div>
-      <form onSubmit={saveSecurity} style={{marginTop:16}}>
-        <label>Current password<input type="password" value={securityPassword} onChange={e=>setSecurityPassword(e.target.value)} placeholder="Required to change this setting" required/></label>
-        {securityError&&<div className="error-box">{securityError}</div>}
-        {securityMessage&&<div className="success-pill">{securityMessage}</div>}
-        <button className="primary-btn" disabled={securitySaving}>{securitySaving?"Saving…":"Save security setting"}</button>
-      </form>
-    </section>
+    <SecurityMethods user={user}/>
     <section className="panel" style={{maxWidth:620,padding:24,marginTop:18}}><h2>Change password</h2><form onSubmit={change}>
       <label>Current password<input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} required/></label>
       <label>New password<input type="password" minLength={8} value={newPassword} onChange={e=>setNewPassword(e.target.value)} required/></label>
