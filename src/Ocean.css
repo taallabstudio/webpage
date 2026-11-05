@@ -1223,3 +1223,16 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 .ocean-crop-reset{border:1px solid #3b454d!important;background:transparent!important;color:#aebbc5!important;font-size:10px}
 .ocean-cover-adjust-controls{display:none}
 @media(max-width:700px){.ocean-cover-crop-preview{aspect-ratio:2.2/1;max-height:170px}.ocean-crop-toolbar{gap:5px}.ocean-crop-tool-group{gap:2px;padding:3px}.ocean-crop-tool-group button{min-width:28px;padding:0 5px}.ocean-crop-reset{padding:0 7px}}
+
+/* OCEAN page icon picker */
+.ocean-icon-tabs{display:flex;align-items:center;gap:4px;margin:14px 0 12px;border-bottom:1px solid #39434b}
+.ocean-icon-tabs button{padding:9px 13px;border:0!important;border-bottom:2px solid transparent!important;border-radius:0!important;background:transparent!important;color:#9aa7b1!important;font-size:12px}
+.ocean-icon-tabs button.active{color:#eef4f8!important;border-bottom-color:#8bb8e8!important}.ocean-icon-tabs .ocean-icon-remove-tab{margin-left:auto;color:#d59a9a!important}
+.ocean-icon-search-row{display:flex;gap:7px}.ocean-icon-search-row .ocean-media-search{flex:1;min-width:0}.ocean-icon-search-row>button{width:44px;border:1px solid #424c55!important;border-radius:9px;background:#303940!important;color:#e9f0f5!important}
+.ocean-icon-section-label{margin:13px 0 7px;color:#98a5af;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.ocean-icon-recent,.ocean-emoji-categories{display:flex;gap:7px;overflow-x:auto;padding:2px 1px 7px}.ocean-icon-recent button{flex:0 0 39px;height:39px;border:1px solid #343c43!important;border-radius:8px;background:#292f34!important;font-size:22px}
+.ocean-emoji-categories button{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid #39434b!important;border-radius:8px;background:#292f34!important;color:#cbd4db!important;font-size:11px;white-space:nowrap}.ocean-emoji-categories button.active{border-color:#8bb8e8!important;background:#344653!important;color:#fff!important}
+.ocean-icon-grid{max-height:min(36vh,310px);min-height:110px}.ocean-icon-grid button{display:grid;place-items:center}.ocean-icon-grid button svg{color:#dce7ef}.ocean-icon-status{grid-column:1/-1;padding:24px 10px;text-align:center;color:#9ba8b2;font-size:12px}
+.ocean-icon-upload{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:1px dashed #4b5964;border-radius:12px;color:#aab7c1}.ocean-icon-upload input{display:none}.ocean-icon-upload strong{color:#edf2f6;font-size:14px}.ocean-icon-upload span{font-size:11px}.ocean-icon-upload button{margin-top:6px;padding:9px 14px;border-radius:8px;background:#8bb8e8!important;color:#14202b!important;font-size:11px;font-weight:700}
+.ocean-page-icon-image{width:1.25em;height:1.25em;object-fit:cover;border-radius:4px;vertical-align:middle}.ocean-page-icon-symbol{font-size:12px;text-transform:capitalize}.ocean-title-icon .ocean-page-icon-image{width:1em;height:1em}
+@media(max-width:700px){.ocean-icon-grid{grid-template-columns:repeat(7,minmax(0,1fr));max-height:32vh}.ocean-icon-tabs button{padding:9px 10px}.ocean-emoji-categories button{font-size:10px}}
