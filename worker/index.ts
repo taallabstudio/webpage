@@ -1883,7 +1883,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
         .bind(pageId,target.id,permission,timestamp,timestamp).run();
       return json({ok:true,share:{user_id:target.id,email:target.email,display_name:target.display_name,permission}},{status:201});
     }
-    const shareUserMatch=pathname.match(/^\\/api\\/ocean\\/pages\\/([a-f0-9]+)\\/shares\\/([^/]+)$/i);
+    const shareUserMatch=pathname.match(/^\/api\/ocean\/pages\/([a-f0-9]+)\/shares\/([^/]+)$/i);
     if(shareUserMatch&&req.method==="PATCH"){
       const body:any=await req.json().catch(()=>({}));
       const permission=String(body.permission||"");
@@ -1918,6 +1918,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
 
   if (req.method === "GET") return json({page});
   if (req.method === "PATCH") {
+    if (!oceanCanEdit(page)) return json({error:"You have view-only access to this page."},{status:403});
     const body = await req.json().catch(() => ({}));
     const updates: string[] = [], values: any[] = [];
     if (Object.prototype.hasOwnProperty.call(body,"title")) {
