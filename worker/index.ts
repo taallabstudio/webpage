@@ -540,6 +540,7 @@ async function authLogout(req: Request, env: Env) {
   const response = json({ ok: true });
   response.headers.append("set-cookie", "taallab_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax");
   response.headers.append("set-cookie", cookie("taallab_session", "", 0, req));
+  response.headers.set("cache-control", "no-store");
   return response;
 }
 
@@ -923,7 +924,7 @@ async function googleAuthCallback(req: Request, env: Env) {
   const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, {}, returnTo).toString() } });
   response.headers.append("set-cookie", clearStateCookie);
   response.headers.append("set-cookie", clearReturnCookie);
-  response.headers.append("set-cookie", cookie("taallab_session", sid, 7 * 86400, req));
+  attachSessionCookie(response, sid, req);
   return response;
 }
 
