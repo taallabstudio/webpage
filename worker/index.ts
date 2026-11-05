@@ -2020,7 +2020,7 @@ export default {
         if (sharePage) return sharePage;
       }
       await ensureSupportSchema(env);
-      const publicPageMatch=url.pathname.match(/^\\/p\\/([a-f0-9]+)$/i);
+      const publicPageMatch=url.pathname.match(/^\/p\/([a-f0-9]+)$/i);
       if(publicPageMatch&&req.method==="GET"){
         await ensureOceanSchema(env);
         const publicPage:any=await env.DB.prepare("SELECT id,title,icon,cover,blocks_json,updated_at FROM ocean_pages WHERE public_token=? AND general_access='public' AND is_archived=0 LIMIT 1").bind(publicPageMatch[1]).first();
