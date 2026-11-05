@@ -997,3 +997,17 @@
 .ocean-shell[data-theme="dark"] .ocean-db-table tbody tr.is-selected td.is-frozen{background:#2a4358}
 .ocean-shell[data-theme="dark"] .ocean-db-table tbody tr:hover td{background:#282f38}
 .ocean-shell[data-theme="dark"] .ocean-db-table tbody tr.is-selected:hover td{background:#29445b}
+
+
+/* Keep native text selection reliable throughout the OCEAN page editor.
+   Explicitly allow selection across wrapped lines and adjacent editor rows. */
+.ocean-blocks,
+.ocean-blocks .ocean-block-row,
+.ocean-blocks .ocean-block-text,
+.ocean-blocks .ocean-block-text * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+.ocean-blocks .ocean-block-text {
+  cursor: text;
+}
