@@ -45,7 +45,7 @@
 .ocean-editor{width:min(900px,100%);padding:32px 64px 100px;margin:0 auto;position:relative}
 .ocean-page-scroll:has(.ocean-cover) .ocean-editor{padding-top:18px}
 .ocean-page-controls{height:27px;display:flex;align-items:center;gap:14px;opacity:0;transition:opacity .15s}
-.ocean-editor:has(.ocean-title-row:hover) .ocean-page-controls,.ocean-page-controls:focus-within{opacity:1}
+.ocean-editor:hover .ocean-page-controls,.ocean-page-controls:focus-within{opacity:1}
 .ocean-page-controls button{display:flex;align-items:center;gap:6px;color:#898989;font-size:12px;padding:4px 0}
 .ocean-page-controls button:hover{color:#e4e4e4}
 .ocean-title-row{display:flex;align-items:center;gap:12px;margin:28px 0 24px}
