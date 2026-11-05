@@ -1,0 +1,128 @@
+name: Build and Release OCEAN
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (without v)"
+        required: true
+        default: "1.0.3"
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ocean-release
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Build Windows installer
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0.0" --locked
+      - name: Generate OCEAN app icons
+        working-directory: src-tauri
+        run: cargo tauri icon icons/three-waves.svg
+      - name: Build NSIS installer
+        working-directory: src-tauri
+        run: cargo tauri build --bundles nsis
+      - name: Prepare installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis/*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "NSIS installer was not produced." }
+          Copy-Item $installer.FullName "release-assets/OCEAN-Windows-v${{ inputs.version }}-Setup.exe"
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: OCEAN-Windows-v${{ inputs.version }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 2
+
+  android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install Android SDK components
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses
+          "$SDKMANAGER" "platform-tools"
+          "$SDKMANAGER" "platforms;android-35"
+          "$SDKMANAGER" "build-tools;35.0.0"
+          "$SDKMANAGER" "ndk;27.2.12479018"
+      - name: Configure Android NDK
+        run: echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0.0" --locked
+      - name: Initialize Android project
+        working-directory: src-tauri
+        run: cargo tauri android init --ci
+      - name: Generate OCEAN adaptive and launcher icons
+        working-directory: src-tauri
+        run: cargo tauri icon icons/three-waves.svg
+      - name: Build installable Android APK
+        working-directory: src-tauri
+        run: cargo tauri android build --apk --debug --ci --target aarch64
+      - name: Prepare APK
+        run: |
+          mkdir -p release-assets
+          APK="$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' -type f | head -n 1)"
+          test -n "$APK" || (echo "Android APK was not produced." && exit 1)
+          cp "$APK" "release-assets/OCEAN-Android-v${{ inputs.version }}.apk"
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OCEAN-Android-v${{ inputs.version }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 2
+
+  publish:
+    name: Publish GitHub Release
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: OCEAN-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: OCEAN v${{ inputs.version }}
+          target_commitish: main
+          make_latest: true
+          generate_release_notes: true
+          body: |
+            OCEAN v${{ inputs.version }}
+
+            - Windows: NSIS installer. Run it to install or upgrade OCEAN.
+            - Android: APK (debug-signed build).
+
+            Note: Android APKs from this workflow use the runner's debug signing key. For seamless in-place Android upgrades between releases, configure a persistent Android signing keystore.
+          files: release-assets/*
+          fail_on_unmatched_files: true
