@@ -1114,3 +1114,11 @@
 .ocean-shell[data-theme="dark"] .ocean-top-actions>button.ocean-share-trigger{
   --ocean-panel:#252a30;--ocean-text:#e6ebf0;--ocean-border:#414850;--ocean-soft:#343b43;
 }
+
+/* OCEAN sign-in reuses the site's Google OAuth flow */
+.ocean-google-login{width:100%;display:flex;align-items:center;justify-content:center;gap:11px;margin:0 0 16px;padding:11px 14px;border:1px solid #d4d8de;border-radius:7px;background:#fff;color:#202124;font:600 13px inherit;cursor:pointer;transition:background .15s,border-color .15s}
+.ocean-google-login:hover{background:#f7f8fa;border-color:#b8bec7}
+.ocean-google-login svg{flex:0 0 auto}
+.ocean-login-divider{display:flex;align-items:center;gap:12px;margin:0 0 17px;color:#888;font-size:11px}
+.ocean-login-divider:before,.ocean-login-divider:after{content:"";height:1px;flex:1;background:#414141}
+.ocean-auth-card .ocean-google-login{font-family:inherit}
