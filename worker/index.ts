@@ -1535,10 +1535,10 @@ async function ensureOceanSchema(env: Env) {
 function oceanId() { return randomToken(12); }
 
 async function oceanPageForUser(env: Env, userId: string, pageId: string) {
-  return env.DB.prepare(`SELECT p.*,CASE WHEN p.user_id=? THEN 'owner' ELSE COALESCE(s.permission,'') END AS access_permission
+  return env.DB.prepare(`SELECT p.*,CASE WHEN p.user_id=? THEN 'owner' WHEN s.permission IS NOT NULL THEN s.permission ELSE 'view' END AS access_permission
     FROM ocean_pages p LEFT JOIN ocean_page_shares s ON s.page_id=p.id AND s.user_id=?
-    WHERE p.id=? AND p.is_archived=0 AND (p.user_id=? OR s.user_id=?) LIMIT 1`)
-    .bind(userId,userId,pageId,userId,userId).first();
+    WHERE p.id=? AND p.is_archived=0 AND (p.user_id=? OR s.user_id=? OR (p.general_access='workspace' AND EXISTS(SELECT 1 FROM users wu WHERE wu.id=? AND wu.status='active' AND wu.role IN ('admin','super_user')))) LIMIT 1`)
+    .bind(userId,userId,pageId,userId,userId,userId).first();
 }
 function oceanCanEdit(page: any) { return page?.access_permission === "owner" || page?.access_permission === "full_access" || page?.access_permission === "edit" || page?.access_permission === "edit_content"; }
 function oceanCanManageSharing(page: any) { return page?.access_permission === "owner" || page?.access_permission === "full_access"; }
@@ -1900,14 +1900,20 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       const permission=String(body.permission||"view");
       if(!email||!/^\\S+@\\S+\\.\\S+$/.test(email))return json({error:"Enter a valid email address."},{status:400});
       if(!["full_access","edit","edit_content","comment","view"].includes(permission))return json({error:"Choose a valid access level."},{status:400});
-      const target:any=await env.DB.prepare("SELECT id,email,display_name,role,status FROM users WHERE email=? LIMIT 1").bind(email).first();
-      if(!target||target.status!=="active"||!["admin","super_user"].includes(target.role))return json({error:"That email does not belong to an active OCEAN user yet. Ask them to create or activate their OCEAN account first."},{status:404});
-      if(String(target.id)===String(page.user_id))return json({error:"The page owner already has full access."},{status:400});
-      const timestamp=now();
-      await env.DB.prepare(`INSERT INTO ocean_page_shares(page_id,user_id,permission,created_at,updated_at) VALUES(?,?,?,?,?)
-        ON CONFLICT(page_id,user_id) DO UPDATE SET permission=excluded.permission,updated_at=excluded.updated_at`)
-        .bind(pageId,target.id,permission,timestamp,timestamp).run();
-      return json({ok:true,share:{user_id:target.id,email:target.email,display_name:target.display_name,permission}},{status:201});
+      const emails=String(body.email||"").split(",").map((value:string)=>normalizeEmail(value)).filter(Boolean);
+      if(!emails.length||emails.some((value:string)=>!/^\\S+@\\S+\\.\\S+$/.test(value)))return json({error:"Enter valid email addresses, separated by commas."},{status:400});
+      const granted:any[]=[];
+      for(const inviteEmail of emails){
+        const target:any=await env.DB.prepare("SELECT id,email,display_name,role,status FROM users WHERE email=? LIMIT 1").bind(inviteEmail).first();
+        if(!target||target.status!=="active"||!["admin","super_user"].includes(target.role))return json({error:"The address "+inviteEmail+" is not an active OCEAN account yet."},{status:404});
+        if(String(target.id)===String(page.user_id))continue;
+        const timestamp=now();
+        await env.DB.prepare(`INSERT INTO ocean_page_shares(page_id,user_id,permission,created_at,updated_at) VALUES(?,?,?,?,?)
+          ON CONFLICT(page_id,user_id) DO UPDATE SET permission=excluded.permission,updated_at=excluded.updated_at`)
+          .bind(pageId,target.id,permission,timestamp,timestamp).run();
+        granted.push({user_id:target.id,email:target.email,display_name:target.display_name,permission});
+      }
+      return json({ok:true,shares:granted},{status:201});
     }
     const shareUserMatch=pathname.match(/^\/api\/ocean\/pages\/([a-f0-9]+)\/shares\/([^/]+)$/i);
     if(shareUserMatch&&req.method==="PATCH"){
@@ -2014,6 +2020,16 @@ export default {
         if (sharePage) return sharePage;
       }
       await ensureSupportSchema(env);
+      const publicPageMatch=url.pathname.match(/^\\/p\\/([a-f0-9]+)$/i);
+      if(publicPageMatch&&req.method==="GET"){
+        await ensureOceanSchema(env);
+        const publicPage:any=await env.DB.prepare("SELECT id,title,icon,cover,blocks_json,updated_at FROM ocean_pages WHERE public_token=? AND general_access='public' AND is_archived=0 LIMIT 1").bind(publicPageMatch[1]).first();
+        if(!publicPage)return new Response("This page is not publicly available.",{status:404,headers:{"content-type":"text/plain; charset=utf-8"}});
+        const blocks=JSON.parse(publicPage.blocks_json||"[]");
+        const esc=(value:any)=>String(value??"").replace(/[&<>"]/g,(ch:string)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]!));
+        const content=blocks.map((block:any)=>{const tag=({heading1:"h1",heading2:"h2",heading3:"h3",quote:"blockquote",bullet:"p",numbered:"p",todo:"p",callout:"aside",code:"pre"} as any)[block.type]||"p";return "<"+tag+">"+esc(block.text||"")+"</"+tag+">";}).join("");
+        return new Response("<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>"+esc(publicPage.title)+" — OCEAN</title><style>body{margin:0;background:#f7f8fa;color:#202832;font:16px/1.7 system-ui,sans-serif}.page{max-width:760px;margin:8vh auto;padding:48px;background:white;border:1px solid #e5e9ef;border-radius:16px}h1{line-height:1.2}blockquote,aside{border-left:3px solid #2586e8;padding:8px 18px;background:#f4f8fd}pre{white-space:pre-wrap;background:#f2f4f7;padding:16px;border-radius:8px}@media(max-width:700px){.page{margin:0;padding:28px 20px;border:0;border-radius:0}}</style></head><body><main class=page><h1>"+esc(publicPage.icon||"")+" "+esc(publicPage.title)+"</h1>"+content+"<p style='color:#87909b;font-size:12px;margin-top:40px'>Published with OCEAN by TaalLab</p></main></body></html>",{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
+      }
       if (url.pathname.startsWith("/api/ocean/")) {
         const oceanResponse = await handleOceanRequest(req, env, url.pathname);
         if (oceanResponse) return oceanResponse;
