@@ -1201,7 +1201,7 @@ function OceanApp(){
    const styles=window.getComputedStyle(element);
    const lineHeight=parseFloat(styles.lineHeight)||parseFloat(styles.fontSize)*1.65||24;
    const atFirstLine=caret.height===0?caret.top<=host.top+lineHeight*.7:caret.top<=host.top+lineHeight*.7;
-   const atLastLine=caret.height===0?caret.top>=host.bottom-lineHeight*1.7:caret.bottom>=host.bottom-lineHeight*.7;
+   const atLastLine=caret.height===0?caret.top>=host.bottom-lineHeight*.7:caret.bottom>=host.bottom-lineHeight*.7;
    const targetIndex=e.key==="ArrowUp"&&atFirstLine?index-1:e.key==="ArrowDown"&&atLastLine?index+1:-1;
    const targetBlock=targetIndex>=0?page.blocks[targetIndex]:null;
    const target=targetBlock?blockRefs.current[targetBlock.id]:null;
