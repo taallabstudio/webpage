@@ -9,7 +9,7 @@ import {
   FileText,Film,Folder,FolderPlus,GalleryHorizontal,Globe,Grid2X2,Hash,Heart,
   Image as ImageIcon,Inbox,Link,LogOut,Lock,Map,Menu,MessageCircle,Minus,MoreHorizontal,
   PanelLeftClose,PanelLeftOpen,Plus,Palette,Search,Settings,Share2,ShieldCheck,SlidersHorizontal,
-  Smile,Table2,Text,Trash2,Upload,User,Users,Video,X,Moon,Sun,RotateCcw
+  Smile,Table2,Text,Trash2,Upload,User,Users,Video,X,Moon,Sun,RotateCcw,Undo2,Redo2
 } from "lucide-react";
 
 const api=async(path,options={})=>{
@@ -636,6 +636,8 @@ function OceanGoogleCalendarBlock(){
 function OceanApp(){
  const [user,setUser]=useState(null),[checking,setChecking]=useState(true),[authError,setAuthError]=useState("");
  const [pages,setPages]=useState([]),[page,setPage]=useState(null),[loading,setLoading]=useState(false),[saving,setSaving]=useState(false);
+ const blockHistory=useRef({pageId:null,past:[],future:[],snapshot:"",applying:false});
+ const [historyAvailability,setHistoryAvailability]=useState({canUndo:false,canRedo:false});
  const [collapsed,setCollapsed]=useState(false),[theme,setTheme]=useState("light"),[query,setQuery]=useState(""),[showSearch,setShowSearch]=useState(false),[showSlash,setShowSlash]=useState(false),[slashQuery,setSlashQuery]=useState(""),[slashBlock,setSlashBlock]=useState(null),[slashFromTyping,setSlashFromTyping]=useState(false),[activeSlashIndex,setActiveSlashIndex]=useState(0);
  const [showComments,setShowComments]=useState(false),[comments,setComments]=useState([]),[comment,setComment]=useState("");
  const [showAccount,setShowAccount]=useState(false),[showPageMenu,setShowPageMenu]=useState(false),[menuBlock,setMenuBlock]=useState(null),[colorMenu,setColorMenu]=useState(false);
@@ -793,6 +795,23 @@ function OceanApp(){
 
  const loadPages=useCallback(async()=>{const data=await api("/ocean/pages");setPages(data.pages||[]);return data.pages||[];},[]);
  const openPage=useCallback(async(id)=>{const shareUrl=new URL(window.location.href);shareUrl.searchParams.set("page",id);window.history.replaceState({}, "", shareUrl.pathname+shareUrl.search);setActivePanel("page");setMobileNav(false);setLoading(true);setShowSlash(false);setShowPageMenu(false);localDirty.current=false;skipNextSave.current=false;try{const data=await api("/ocean/pages/"+id);const p=data.page;p.blocks=JSON.parse(p.blocks_json||"[]");lastSyncedAt.current=Number(p.updated_at||0);setPage(p);setShowComments(false);}catch(e){setToast(e.message);}finally{setLoading(false);}},[]);
+ // Page-local block history; snapshots exclude transient UI state.
+ useEffect(()=>{
+  if(!page?.id)return;
+  const history=blockHistory.current,snapshot=JSON.stringify(page.blocks||[]);
+  if(history.pageId!==page.id){blockHistory.current={pageId:page.id,past:[],future:[],snapshot,applying:false};setHistoryAvailability({canUndo:false,canRedo:false});return;}
+  if(history.applying){history.applying=false;history.snapshot=snapshot;setHistoryAvailability({canUndo:history.past.length>0,canRedo:history.future.length>0});return;}
+  if(snapshot!==history.snapshot){history.past.push(history.snapshot);if(history.past.length>100)history.past.shift();history.future=[];history.snapshot=snapshot;setHistoryAvailability({canUndo:true,canRedo:false});}
+ },[page?.id,page?.blocks]);
+ const applyBlockHistory=direction=>{
+  if(!page?.id)return;
+  const history=blockHistory.current,source=direction==="undo"?history.past:history.future,destination=direction==="undo"?history.future:history.past;
+  if(!source.length)return;
+  const current=JSON.stringify(page.blocks||[]),target=source.pop();destination.push(current);if(destination.length>100)destination.shift();
+  history.applying=true;history.snapshot=target;setHistoryAvailability({canUndo:history.past.length>0,canRedo:history.future.length>0});
+  setPage(old=>old?{...old,blocks:JSON.parse(target)}:old);
+ };
+ const undoBlocks=()=>applyBlockHistory("undo"),redoBlocks=()=>applyBlockHistory("redo");
  useEffect(()=>{let alive=true;api("/auth/me").then(async d=>{if(!alive)return;if(!d.authenticated){setChecking(false);return;}setUser(d.user);if(d.user.role!=="admin"&&d.user.role!=="super_user")return;const list=await loadPages();if(alive&&list.length){const requested=new URLSearchParams(window.location.search).get("page");const target=requested&&list.some(p=>p.id===requested)?requested:list[0].id;await openPage(target);}}).catch(e=>setAuthError(e.message)).finally(()=>{if(alive)setChecking(false);});return()=>{alive=false;};},[loadPages,openPage]);
  useEffect(()=>{if(!page)return;if(skipNextSave.current){skipNextSave.current=false;return;}localDirty.current=true;clearTimeout(saveTimer.current);setSaving(true);saveTimer.current=setTimeout(async()=>{try{const saved=await api("/ocean/pages/"+page.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(page.access_permission==="edit_content"?{blocks:page.blocks}:{title:page.title,icon:page.icon,cover:page.cover,blocks:page.blocks,is_favorite:!!page.is_favorite,...(String(page.user_id)===String(user?.id)?{is_shared:!!page.is_shared}:{})})});lastSyncedAt.current=Number(saved.updated_at||lastSyncedAt.current);localDirty.current=false;setPages(old=>old.map(p=>p.id===page.id?{...p,title:page.title,icon:page.icon,cover:page.cover,is_favorite:page.is_favorite,is_shared:page.is_shared,updated_at:lastSyncedAt.current}:p));setSaving(false);}catch(e){localDirty.current=false;setSaving(false);setToast("Save failed: "+e.message);}},650);return()=>clearTimeout(saveTimer.current);},[page]);
  useEffect(()=>{if(!page?.id)return;let alive=true;let checkingRemote=false;const poll=async()=>{if(!alive||checkingRemote||localDirty.current)return;checkingRemote=true;try{const data=await api("/ocean/pages/"+page.id);if(!alive||localDirty.current)return;const remote=data.page;const version=Number(remote?.updated_at||0);if(remote&&version>lastSyncedAt.current){remote.blocks=JSON.parse(remote.blocks_json||"[]");skipNextSave.current=true;lastSyncedAt.current=version;setPage(remote);setPages(old=>old.map(item=>item.id===remote.id?{...item,...remote}:item));}}catch{/* Retry on the next polling cycle. */}finally{checkingRemote=false;}};const timer=window.setInterval(poll,1500);return()=>{alive=false;window.clearInterval(timer);};},[page?.id]);
@@ -1049,6 +1068,8 @@ function OceanApp(){
  };
  const handleEditorKeyDown=(e,block,index)=>{
  const element=e.currentTarget;
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();e.stopPropagation();if(e.shiftKey)redoBlocks();else undoBlocks();return;}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();e.stopPropagation();redoBlocks();return;}
  // Each OCEAN paragraph is its own contentEditable host. Browsers do not
  // naturally move the caret between sibling hosts with vertical arrows.
  if((e.key==="ArrowUp"||e.key==="ArrowDown")&&!e.altKey&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey){
@@ -1179,7 +1200,7 @@ function OceanApp(){
   </aside>
   {mobileNav&&<button type="button" className="ocean-mobile-backdrop" aria-label="Close sidebar" onClick={()=>setMobileNav(false)}/>}
   <main className="ocean-main">
-   <header className="ocean-topbar"><button className={"ocean-sidebar-reopen "+(collapsed?"visible":"")} title="Open sidebar" aria-label="Open sidebar" onClick={()=>setCollapsed(false)}><PanelLeftOpen size={17}/></button><button className="ocean-mobile-menu" onClick={()=>setMobileNav(v=>!v)}><Menu size={19}/></button><div className="ocean-crumb"><span>{activePanel==="access"?"Administration":"Private"}</span>{activePanel==="access"?<><ChevronRight size={13}/><strong>Access management</strong></>:page&&<><ChevronRight size={13}/><strong>{page.title||"Untitled"}</strong></>}</div><div className="ocean-top-actions"><button className="ocean-theme-toggle" title={theme==="light"?"Switch to dark theme":"Switch to light theme"} aria-label={theme==="light"?"Switch to dark theme":"Switch to light theme"} onClick={()=>setTheme(v=>v==="light"?"dark":"light")}>{theme==="light"?<Moon size={16}/>:<Sun size={16}/>}</button><span className="ocean-save-state">{saving?"Saving…":"Saved"}</span><button className="ocean-share-trigger" title="Share page" onClick={openShareDialog}><Lock size={14}/> <span>Share</span></button><button title="Comments" onClick={()=>setShowComments(v=>!v)}><MessageCircle size={17}/></button><button title="Favorite" onClick={()=>updatePage({is_favorite:!page?.is_favorite})}><Heart size={17} fill={page?.is_favorite?"currentColor":"none"}/></button><button title="Page menu" onClick={()=>setShowPageMenu(v=>!v)}><MoreHorizontal size={19}/></button></div></header>
+   <header className="ocean-topbar"><button className={"ocean-sidebar-reopen "+(collapsed?"visible":"")} title="Open sidebar" aria-label="Open sidebar" onClick={()=>setCollapsed(false)}><PanelLeftOpen size={17}/></button><button className="ocean-mobile-menu" onClick={()=>setMobileNav(v=>!v)}><Menu size={19}/></button><div className="ocean-crumb"><span>{activePanel==="access"?"Administration":"Private"}</span>{activePanel==="access"?<><ChevronRight size={13}/><strong>Access management</strong></>:page&&<><ChevronRight size={13}/><strong>{page.title||"Untitled"}</strong></>}</div><div className="ocean-top-actions"><button type="button" title="Undo (Ctrl+Z)" aria-label="Undo" disabled={!historyAvailability.canUndo} onClick={undoBlocks}><Undo2 size={16}/></button><button type="button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled={!historyAvailability.canRedo} onClick={redoBlocks}><Redo2 size={16}/></button><button className="ocean-theme-toggle" title={theme==="light"?"Switch to dark theme":"Switch to light theme"} aria-label={theme==="light"?"Switch to dark theme":"Switch to light theme"} onClick={()=>setTheme(v=>v==="light"?"dark":"light")}>{theme==="light"?<Moon size={16}/>:<Sun size={16}/>}</button><span className="ocean-save-state">{saving?"Saving…":"Saved"}</span><button className="ocean-share-trigger" title="Share page" onClick={openShareDialog}><Lock size={14}/> <span>Share</span></button><button title="Comments" onClick={()=>setShowComments(v=>!v)}><MessageCircle size={17}/></button><button title="Favorite" onClick={()=>updatePage({is_favorite:!page?.is_favorite})}><Heart size={17} fill={page?.is_favorite?"currentColor":"none"}/></button><button title="Page menu" onClick={()=>setShowPageMenu(v=>!v)}><MoreHorizontal size={19}/></button></div></header>
    {showSearch&&<div className="ocean-search-modal"><div><Search size={17}/><input autoFocus placeholder="Search pages…" value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Escape"&&setShowSearch(false)}/><button onClick={()=>{setQuery("");setShowSearch(false);}}><X size={16}/></button></div>{filteredPages.map(p=><button key={p.id} onClick={()=>{openPage(p.id);setShowSearch(false);setQuery("");}}>{p.icon||"▤"} {p.title}</button>)}</div>}
    {showPageMenu&&<div className="ocean-page-menu"><button onClick={()=>{navigator.clipboard?.writeText(new URL("/?page="+encodeURIComponent(page.id),window.location.origin).toString());setToast("Private page link copied");setShowPageMenu(false);}}><Copy size={14}/> Copy link</button><button onClick={()=>{updatePage({is_favorite:!page?.is_favorite});setShowPageMenu(false);}}><Heart size={14}/> {page?.is_favorite?"Remove from favorites":"Add to favorites"}</button>{String(page?.user_id)===String(user?.id)&&<button onClick={()=>{setShowPageMenu(false);openShareDialog();}}><Users size={14}/> Share</button>}<button onClick={deletePage}><Trash2 size={14}/> Move to trash</button></div>}
    {activePanel==="calendar"?<div className="ocean-admin-scroll"><section className="ocean-admin-content ocean-calendar-content">
