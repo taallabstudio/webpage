@@ -40,7 +40,7 @@ const COMMANDS=[
 ];
 const EMOJIS=["🌊","📝","📚","🎧","🎵","🎹","🎬","💡","⭐","🔥","🎯","🧠","📌","🗂️","🪄","🌱","🚀","❤️","🎨","📷","💻","🧪","🛠️","🗓️","☕","🌙"];
 const PAGE_ICON_CHOICES=[["Wave",Activity],["Book",BookOpen],["Music",AudioLines],["Calendar",Calendar],["Camera",ImageIcon],["Heart",Heart],["Star",Check],["Folder",Folder],["Globe",Globe],["Code",Code],["Chart",BarChart3],["Grid",Grid2X2],["Bookmark",Bookmark],["Message",MessageCircle],["Palette",Palette],["Video",Video],["File",FileText],["Database",Database],["Bell",Bell],["Users",Users],["Map",Map],["Hash",Hash],["Inbox",Inbox],["Smile",Smile]];
-const pageIconNode=(v,f="▤")=>String(v||"").startsWith("/api/ocean/assets/")?<img className="ocean-page-icon-image" src={v} alt=""/>:String(v||"").startsWith("icon:")?<span className="ocean-page-icon-symbol">{String(v).slice(5)}</span>:v||f;
+const pageIconNode=(v,f="▤")=>{if(String(v||"").startsWith("/api/ocean/assets/"))return <img className="ocean-page-icon-image" src={v} alt=""/>;if(String(v||"").startsWith("icon:")){const found=PAGE_ICON_CHOICES.find(([name])=>name.toLowerCase()===String(v).slice(5));const Icon=found?.[1];return Icon?<Icon className="ocean-page-icon-symbol" size={15}/>:f;}return v||f;};
 const COLORS=[["Default",""],["Gray","gray"],["Brown","brown"],["Orange","orange"],["Yellow","yellow"],["Green","green"],["Blue","blue"],["Purple","purple"],["Pink","pink"],["Red","red"]];
 const VIEWS=["Table","Board","Gallery","List","Feed","Calendar","Timeline","Map","Vertical bar chart","Horizontal bar chart","Line chart","Donut chart","Number chart"];
 const escapeHtml=(value="")=>String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
@@ -817,6 +817,7 @@ function OceanApp(){
   try{await api("/ocean/pages/"+page.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});}
   catch(error){setToast(error.message||"Could not save page settings.");}
  };
+ useEffect(()=>{if(mediaPicker==="icon"){setIconSearch("");setIconTab("emoji");setEmojiError("");loadEmojiCategories();}},[mediaPicker]);
  const loadEmojiCategory=async(cat)=>{if(!cat)return;setEmojiLoading(true);setEmojiError("");try{const r=await api("/ocean/emoji/category?name="+encodeURIComponent(cat));setEmojiResults(r.results||[]);}catch(e){setEmojiError(e.message||"Could not load emojis.");}finally{setEmojiLoading(false);}};
  const loadEmojiCategories=async()=>{try{const r=await api("/ocean/emoji/categories");const cats=r.categories||[];setEmojiCategories(cats);if(cats.length){const cat=emojiCategory||cats[0].slug||cats[0].name;setEmojiCategory(cat);loadEmojiCategory(cat);}}catch(e){setEmojiError(e.message||"Could not load categories.");}};
  const searchEmojis=async()=>{const q=iconSearch.trim();if(!q){loadEmojiCategory(emojiCategory);return;}setEmojiLoading(true);setEmojiError("");try{const r=await api("/ocean/emoji/search?query="+encodeURIComponent(q));setEmojiResults(r.results||[]);}catch(e){setEmojiError(e.message||"Emoji search failed.");}finally{setEmojiLoading(false);}};
