@@ -759,7 +759,8 @@ function OceanApp(){
    }
   };
   const handleWindowBlur=()=>endCrossBlockSelection();
-  document.addEventListener("keydown",deleteCrossBlockSelection,true);\n  document.addEventListener("selectionchange",updateSelectionToolbar);
+  document.addEventListener("keydown",deleteCrossBlockSelection,true);
+  document.addEventListener("selectionchange",updateSelectionToolbar);
   document.addEventListener("pointerdown",beginCrossBlockSelection,true);
   document.addEventListener("pointermove",extendCrossBlockSelection,true);
   document.addEventListener("pointerup",endCrossBlockSelection,true);
