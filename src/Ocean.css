@@ -1087,3 +1087,30 @@
 .ocean-share-notion .ocean-share-advanced-link{padding-bottom:8px}
 .ocean-share-notion .ocean-share-advanced-link>button{padding:11px 0}
 .ocean-shell[data-theme="dark"] .ocean-share-trigger{--ocean-panel:#252a30;--ocean-text:#e6ebf0;--ocean-border:#414850;--ocean-soft:#343b43}
+
+/* The Share control must override the compact icon-button toolbar rule. */
+.ocean-top-actions>button.ocean-share-trigger{
+  display:inline-flex!important;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  width:auto!important;
+  min-width:68px;
+  height:30px;
+  padding:0 9px!important;
+  border:1px solid var(--ocean-border,#dce2e8)!important;
+  border-radius:7px!important;
+  background:var(--ocean-panel,#fff);
+  color:var(--ocean-text,#17202a)!important;
+  font-size:12px;
+  font-weight:600;
+  line-height:1;
+  white-space:nowrap;
+}
+.ocean-top-actions>button.ocean-share-trigger:hover{
+  background:var(--ocean-soft,#f0f3f6)!important;
+  color:var(--ocean-text,#17202a)!important;
+}
+.ocean-shell[data-theme="dark"] .ocean-top-actions>button.ocean-share-trigger{
+  --ocean-panel:#252a30;--ocean-text:#e6ebf0;--ocean-border:#414850;--ocean-soft:#343b43;
+}
