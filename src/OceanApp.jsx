@@ -298,8 +298,39 @@ function OceanDatabaseBlock({block,updateBlock,allBlocks=[]}){
    const toggle=option=>{if(meta.type==="multi_select"){const next=selected.includes(option)?selected.filter(x=>x!==option):[...selected,option];onChange(JSON.stringify(next));}else{onChange(value===option?"":option);setCellPicker(null);}};
    return <div className="ocean-db-option-cell"><button type="button" className={"ocean-db-option-trigger "+(meta.type==="status"?"is-status":"")} disabled={!canEdit} onClick={()=>{setCellPicker(open?null:{row:rowIndex,col});setCellSearch("");}}>{selected.length?selected.map(v=><span key={v} className={"ocean-db-option-tag tone-"+Number(meta.optionColors?.[v]??(Math.max(0,options.indexOf(v))%6))}>{v}</span>):<span className="ocean-db-empty-value">Empty</span>}</button>{open&&<div className="ocean-db-option-popover"><input autoFocus placeholder="Search or add an option…" value={cellSearch} onChange={e=>setCellSearch(e.target.value)}/><div className="ocean-db-option-list">{options.filter(o=>o.toLowerCase().includes(cellSearch.toLowerCase())).map(option=><button type="button" key={option} onClick={()=>toggle(option)}><span className={"ocean-db-option-tag tone-"+Number(meta.optionColors?.[option]??(Math.max(0,options.indexOf(option))%6))}>{option}</span><span>{selected.includes(option)?"✓":""}</span></button>)}</div>{cellSearch.trim()&&!options.some(o=>o.toLowerCase()===cellSearch.trim().toLowerCase())&&<button type="button" className="ocean-db-option-create" onClick={()=>{const next=[...options,cellSearch.trim()];updateProperty(col,{options:next});if(meta.type==="multi_select")onChange(JSON.stringify([...selected,cellSearch.trim()]));else onChange(cellSearch.trim());setCellPicker(null);}}>+ Create “{cellSearch.trim()}”</button>}<button type="button" className="ocean-db-option-clear" onClick={()=>{onChange(meta.type==="multi_select"?"[]":"");if(meta.type!=="multi_select")setCellPicker(null);}}>Clear</button></div>}</div>;
   }
-  if(["formula","rollup","created_time","edited_time","created_by","edited_by","id"].includes(meta.type))return <span className="ocean-db-computed-value">{meta.type==="id"?(value||String(rowIndex)):value||"—"}</span>;
-  if(["person","files","relation","place"].includes(meta.type))return <input type="text" value={value} disabled={!canEdit} onChange={e=>onChange(e.target.value)} placeholder={meta.type==="person"?"Assign a person…":meta.type==="files"?"File name or URL…":meta.type==="relation"?"Related page…":"Add a place…"}/>;
+  if(meta.type==="formula"){
+   const result=evaluateOceanFormula(meta.formula||"",rows[rowIndex]||[],headers);
+   return <span className="ocean-db-computed-value" title={result.error||String(meta.formula||"Formula not configured")}>{result.error?"⚠ "+result.error:result.value===null||result.value===undefined||result.value===""?"—":String(result.value)}</span>;
+  }
+  if(meta.type==="relation"){
+   const targetDb=allBlocks.find(item=>item.id===meta.targetDatabaseId&&item.type==="database");
+   const targetRows=Array.isArray(targetDb?.rows)?targetDb.rows.slice(1):[];
+   let selected=[];try{selected=JSON.parse(value||"[]");if(!Array.isArray(selected))selected=[String(selected)];}catch{selected=value?[String(value)]:[];}
+   if(!targetDb)return <span className="ocean-db-computed-value">Choose a related database in property settings</span>;
+   return <select multiple aria-label={"Related records for "+meta.name} disabled={!canEdit} value={selected} onChange={e=>onChange(JSON.stringify(Array.from(e.target.selectedOptions).map(option=>option.value)))} style={{minWidth:130,maxWidth:220,minHeight:36}}>{targetRows.map((record,index)=><option key={index} value={String(record[0]??"")}>{String(record[0]||"Untitled record")}</option>)}</select>;
+  }
+  if(meta.type==="rollup"){
+   const relation=properties[Number(meta.relationPropertyIndex)||0]||{};
+   const targetDb=allBlocks.find(item=>item.id===(meta.targetDatabaseId||relation.targetDatabaseId)&&item.type==="database");
+   const targetRows=Array.isArray(targetDb?.rows)?targetDb.rows.slice(1):[];
+   const relationValue=rows[rowIndex]?.[Number(meta.relationPropertyIndex)||0]||"";
+   let names=[];try{names=JSON.parse(relationValue||"[]");if(!Array.isArray(names))names=[String(names)];}catch{names=relationValue?[String(relationValue)]:[];}
+   const targetHeaders=targetDb?.rows?.[0]||[];
+   const targetIndex=Number(meta.targetPropertyIndex)||0;
+   const values=targetRows.filter(record=>names.includes(String(record[0]??""))).map(record=>record[targetIndex]).filter(v=>v!==""&&v!==null&&v!==undefined);
+   const nums=values.map(Number).filter(Number.isFinite);
+   const operation=meta.aggregation||"Count";
+   let result="—";
+   if(operation==="Count")result=values.length;
+   else if(operation==="Sum")result=nums.reduce((a,b)=>a+b,0);
+   else if(operation==="Average")result=nums.length?(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(2):"—";
+   else if(operation==="Min")result=nums.length?Math.min(...nums):"—";
+   else if(operation==="Max")result=nums.length?Math.max(...nums):"—";
+   else if(operation==="Show original")result=values.join(", ");
+   return <span className="ocean-db-computed-value" title={"Rollup · "+operation}>{String(result)}</span>;
+  }
+  if(["created_time","edited_time","created_by","edited_by","id"].includes(meta.type))return <span className="ocean-db-computed-value">{meta.type==="id"?(value||String(rowIndex)):value||"—"}</span>;
+  if(["person","files","place"].includes(meta.type))return <input type="text" value={value} disabled={!canEdit} onChange={e=>onChange(e.target.value)} placeholder={meta.type==="person"?"Assign a person…":meta.type==="files"?"File name or URL…":"Add a place…"}/>;
   if(meta.type==="button")return <button type="button" className="ocean-db-cell-action" disabled={!canEdit} onClick={()=>window.alert(meta.buttonLabel||"Button property")}>{meta.buttonLabel||"Run"}</button>;
   if(meta.type==="number")return <input type="text" inputMode="decimal" value={value} disabled={!canEdit} onChange={e=>{const raw=e.target.value;const negative=raw.startsWith("-");const cleaned=raw.replace(/[^0-9.]/g,"");const parts=cleaned.split(".");const numeric=(negative?"-":"")+parts.shift()+(parts.length?"."+parts.join(""):"");onChange(numeric);}} placeholder="0"/>;
   const inputType=({date:"date",url:"url",email:"email",phone:"tel"})[meta.type]||"text";
