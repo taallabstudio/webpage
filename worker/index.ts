@@ -794,10 +794,10 @@ async function googleAuthStart(req: Request, env: Env) {
   url.searchParams.set("state", state);
   url.searchParams.set("prompt", "select_account");
   url.searchParams.set("include_granted_scopes", "true");
-  return new Response(null, {
-    status: 302,
-    headers: { location: url.toString(), "set-cookie": [cookie("google_login_state", state, 600, req), cookie("google_login_return", returnTo, 600, req)] },
-  });
+  const response = new Response(null, { status: 302, headers: { location: url.toString() } });
+  response.headers.append("set-cookie", cookie("google_login_state", state, 600, req));
+  response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req));
+  return response;
 }
 
 async function googleAuthCallback(req: Request, env: Env) {
@@ -910,6 +910,7 @@ async function googleAuthCallback(req: Request, env: Env) {
   const sid = await createUserSession(env, user.id);
   const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, {}, returnTo).toString() } });
   response.headers.append("set-cookie", clearStateCookie);
+  response.headers.append("set-cookie", clearReturnCookie);
   response.headers.append("set-cookie", cookie("taallab_session", sid, 7 * 86400, req));
   return response;
 }
