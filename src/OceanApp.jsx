@@ -770,7 +770,8 @@ function OceanApp(){
   try{await api("/ocean/pages/"+page.id+"/shares/"+encodeURIComponent(userId),{method:"DELETE"});setPageShares(old=>old.filter(x=>x.user_id!==userId));}
   catch(e){setShareError(e.message);}
  };
-\n const updatePage=(patch)=>setPage(old=>old?{...old,...patch}:old);
+
+ const updatePage=(patch)=>setPage(old=>old?{...old,...patch}:old);
  const updateBlock=(id,patch)=>setPage(old=>old?{...old,blocks:(old.blocks||[]).map(b=>b.id===id?{...b,...patch}:b)}:old);
  const buildBlock=(type)=>{
   let block=blankBlock(type);
