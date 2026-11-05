@@ -1075,3 +1075,15 @@
 .ocean-share-advanced select{max-width:190px}
 @media(max-width:600px){.ocean-share-dialog{top:50%;left:50%;right:auto;transform:translate(-50%,-50%);max-height:85vh}.ocean-share-invite{flex-wrap:wrap}.ocean-share-invite input{flex-basis:100%}.ocean-share-top .ocean-share-help{font-size:11px}}
 .ocean-shell[data-theme="dark"] .ocean-share-notion{--ocean-panel:#252a30;--ocean-text:#e6ebf0;--ocean-muted:#9ba5af;--ocean-border:#414850;--ocean-soft:#343b43}
+
+/* Match the reference sharing entry point and popup placement */
+.ocean-top-actions .ocean-share-trigger{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1px solid var(--ocean-border,#dce2e8);border-radius:7px;background:var(--ocean-panel,#fff);color:var(--ocean-text,#17202a);font-size:12px;font-weight:600;cursor:pointer}
+.ocean-top-actions .ocean-share-trigger:hover{background:var(--ocean-soft,#f0f3f6)}
+.ocean-share-notion{width:min(460px,calc(100vw - 28px));top:38px;right:42px;border-radius:12px;padding:0}
+.ocean-share-notion .ocean-share-top{min-height:42px}
+.ocean-share-notion .ocean-share-invite{padding:14px 16px 12px}
+.ocean-share-notion .ocean-share-owner{padding-top:4px;padding-bottom:12px}
+.ocean-share-notion .ocean-share-section{padding-top:12px;padding-bottom:12px}
+.ocean-share-notion .ocean-share-advanced-link{padding-bottom:8px}
+.ocean-share-notion .ocean-share-advanced-link>button{padding:11px 0}
+.ocean-shell[data-theme="dark"] .ocean-share-trigger{--ocean-panel:#252a30;--ocean-text:#e6ebf0;--ocean-border:#414850;--ocean-soft:#343b43}
