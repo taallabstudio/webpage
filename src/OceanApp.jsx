@@ -924,6 +924,32 @@ function OceanApp(){
  };
  const handleEditorKeyDown=(e,block,index)=>{
  const element=e.currentTarget;
+ // Each OCEAN paragraph is its own contentEditable host. Browsers do not
+ // naturally move the caret between sibling hosts with vertical arrows.
+ if((e.key==="ArrowUp"||e.key==="ArrowDown")&&!e.altKey&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey){
+  const selection=window.getSelection();
+  if(selection?.isCollapsed&&selection.rangeCount){
+   const caret=selection.getRangeAt(0).getBoundingClientRect();
+   const host=element.getBoundingClientRect();
+   const styles=window.getComputedStyle(element);
+   const lineHeight=parseFloat(styles.lineHeight)||parseFloat(styles.fontSize)*1.65||24;
+   const atFirstLine=caret.height===0?caret.top<=host.top+lineHeight*.7:caret.top<=host.top+lineHeight*.7;
+   const atLastLine=caret.height===0?caret.top>=host.bottom-lineHeight*1.7:caret.bottom>=host.bottom-lineHeight*.7;
+   const targetIndex=e.key==="ArrowUp"&&atFirstLine?index-1:e.key==="ArrowDown"&&atLastLine?index+1:-1;
+   const targetBlock=targetIndex>=0?page.blocks[targetIndex]:null;
+   const target=targetBlock?blockRefs.current[targetBlock.id]:null;
+   if(target?.isContentEditable){
+    e.preventDefault();
+    target.focus();
+    const range=document.createRange();
+    range.selectNodeContents(target);
+    range.collapse(e.key==="ArrowDown");
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return;
+   }
+  }
+ }
  if(pageLinkSuggestion?.blockId===block.id){
   const matches=getPageLinkMatches(pageLinkSuggestion.query);
   if(e.key==="ArrowDown"&&matches.length){e.preventDefault();setPageLinkSuggestion(s=>({...s,activeIndex:((s.activeIndex||0)+1)%matches.length}));return;}
