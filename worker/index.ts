@@ -202,7 +202,12 @@ async function ensureSupportSchema(env: Env) {
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_2fa_challenges_user ON two_factor_challenges(user_id)").run();
   const twoFactorColumns: any = await env.DB.prepare("PRAGMA table_info(two_factor_challenges)").all();
   if (!(twoFactorColumns.results || []).some((col: any) => col.name === "method")) {
-    await env.DB.prepare("ALTER TABLE two_factor_challenges ADD COLUMN method TEXT NOT NULL DEFAULT 'email'").run();
+    try {
+      await env.DB.prepare("ALTER TABLE two_factor_challenges ADD COLUMN method TEXT NOT NULL DEFAULT 'email'").run();
+    } catch (error) {
+      const check: any = await env.DB.prepare("PRAGMA table_info(two_factor_challenges)").all();
+      if (!(check.results || []).some((col: any) => col.name === "method")) throw error;
+    }
   }
 
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS booking_rate_limits (
