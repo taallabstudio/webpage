@@ -1,0 +1,17 @@
+{
+  "name": "OCEAN — Your workspace",
+  "short_name": "OCEAN",
+  "start_url": "/ocean.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f8",
+  "theme_color": "#f4f6f8",
+  "icons": [
+    {
+      "src": "/ocean-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
