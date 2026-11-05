@@ -1581,7 +1581,9 @@ async function ensureOceanSchema(env: Env) {
     "ALTER TABLE ocean_pages ADD COLUMN general_access TEXT NOT NULL DEFAULT 'private'",
     "ALTER TABLE ocean_pages ADD COLUMN public_token TEXT",
     "ALTER TABLE ocean_pages ADD COLUMN agent_grant_policy TEXT NOT NULL DEFAULT 'anyone_with_access'",
-    "ALTER TABLE ocean_pages ADD COLUMN cover_credit TEXT NOT NULL DEFAULT ''"
+    "ALTER TABLE ocean_pages ADD COLUMN cover_credit TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE ocean_pages ADD COLUMN cover_credit_url TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE ocean_pages ADD COLUMN cover_source_url TEXT NOT NULL DEFAULT ''"
   ]) { try { await env.DB.prepare(statement).run(); } catch { /* Column already exists. */ } }
 }
 
@@ -2041,6 +2043,8 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       updates.push("cover=?"); values.push(cover);
     }
     if (Object.prototype.hasOwnProperty.call(body,"cover_credit")) { updates.push("cover_credit=?"); values.push(String(body.cover_credit||"").slice(0,1000)); }
+    if (Object.prototype.hasOwnProperty.call(body,"cover_credit_url")) { updates.push("cover_credit_url=?"); values.push(String(body.cover_credit_url||"").slice(0,1000)); }
+    if (Object.prototype.hasOwnProperty.call(body,"cover_source_url")) { updates.push("cover_source_url=?"); values.push(String(body.cover_source_url||"").slice(0,1000)); }
     if (Object.prototype.hasOwnProperty.call(body,"blocks")) {
       if (!Array.isArray(body.blocks) || body.blocks.length > 500) return json({error:"Invalid page content."},{status:400});
       const blocks = JSON.stringify(body.blocks);
