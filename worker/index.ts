@@ -1974,15 +1974,18 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       updates.push("blocks_json=?"); values.push(blocks);
     }
     if (Object.prototype.hasOwnProperty.call(body,"is_favorite")) { updates.push("is_favorite=?"); values.push(body.is_favorite ? 1 : 0); }
-    if (Object.prototype.hasOwnProperty.call(body,"is_shared")) {\n      if (!oceanCanManageSharing(page)) return json({error:"Only the owner can change workspace sharing."},{status:403});
+    if (Object.prototype.hasOwnProperty.call(body,"is_shared")) {
+      if (!oceanCanManageSharing(page)) return json({error:"Only the owner can change workspace sharing."},{status:403});
       if (String(page.user_id)!==String(user.id)) return json({error:"Only the owner can change sharing."},{status:403});
       updates.push("is_shared=?"); values.push(body.is_shared ? 1 : 0);
     }
-    if (Object.prototype.hasOwnProperty.call(body,"is_folder")) {\n      if (!oceanCanManageSharing(page)) return json({error:"Only the owner can change folders."},{status:403});
+    if (Object.prototype.hasOwnProperty.call(body,"is_folder")) {
+      if (!oceanCanManageSharing(page)) return json({error:"Only the owner can change folders."},{status:403});
       if (String(page.user_id)!==String(user.id)) return json({error:"Only the owner can change folders."},{status:403});
       updates.push("is_folder=?"); values.push(body.is_folder ? 1 : 0);
     }
-    if (Object.prototype.hasOwnProperty.call(body,"parent_id")) {\n      if (!oceanCanManageSharing(page)) return json({error:"Only the owner can move this page."},{status:403});
+    if (Object.prototype.hasOwnProperty.call(body,"parent_id")) {
+      if (!oceanCanManageSharing(page)) return json({error:"Only the owner can move this page."},{status:403});
       const parentId = String(body.parent_id || "").trim() || null;
       if (parentId === pageId) return json({error:"A page cannot be its own parent."},{status:400});
       if (parentId && !(await oceanPageForUser(env,user.id,parentId))) return json({error:"Parent page not found."},{status:404});
