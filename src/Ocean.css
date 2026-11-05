@@ -1122,3 +1122,31 @@
 .ocean-login-divider{display:flex;align-items:center;gap:12px;margin:0 0 17px;color:#888;font-size:11px}
 .ocean-login-divider:before,.ocean-login-divider:after{content:"";height:1px;flex:1;background:#414141}
 .ocean-auth-card .ocean-google-login{font-family:inherit}
+
+
+/* Android and narrow-screen OCEAN layout fixes */
+@media(max-width:760px){
+ .ocean-shell{height:100dvh;min-height:100dvh}
+ .ocean-topbar{height:calc(48px + env(safe-area-inset-top,0px));padding-top:env(safe-area-inset-top,0px);box-sizing:border-box;flex-shrink:0}
+ .ocean-top-actions{gap:3px;flex-shrink:0}
+ .ocean-top-actions>button{width:32px;height:34px;min-width:32px;touch-action:manipulation}
+ .ocean-mobile-backdrop{position:fixed;inset:0;z-index:19;background:rgba(12,20,29,.38);border:0;padding:0;touch-action:manipulation}
+ .ocean-sidebar{z-index:30;top:0;bottom:0;padding-top:env(safe-area-inset-top,0px);height:100dvh;max-height:100dvh}
+ .ocean-sidebar-top>button{width:36px;height:36px}
+ .ocean-db-calendar-grid{display:none!important}
+ .ocean-db-calendar-mobile-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 12px}
+ .ocean-db-calendar-mobile-toolbar>strong{font-size:14px;color:var(--ocean-text,#1d2229)}
+ .ocean-db-calendar-mobile-toolbar>div{display:flex;gap:5px}
+ .ocean-db-calendar-mobile-toolbar button{min-width:34px;height:34px;padding:0 9px;border:1px solid #dce4ec!important;border-radius:7px!important;background:#fff!important;color:#536373!important;font-size:12px;font-weight:600}
+ .ocean-db-calendar-week-view{display:grid;gap:8px}
+ .ocean-db-calendar-week-day{display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:start;gap:10px;min-height:68px;padding:10px;border:1px solid #e3e9ef;border-radius:9px;background:#fff}
+ .ocean-db-calendar-week-day.today{border-color:#9ac8f5;background:#f5f9ff}
+ .ocean-db-calendar-week-date{display:grid;justify-items:center;gap:4px;color:#687787}
+ .ocean-db-calendar-week-date span{font-size:10px;font-weight:650}
+ .ocean-db-calendar-week-date strong{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;font-size:14px}
+ .ocean-db-calendar-week-day.today .ocean-db-calendar-week-date strong{background:#0878e8;color:#fff}
+ .ocean-db-calendar-week-day .ocean-db-calendar-items{min-width:0}
+ .ocean-db-calendar-week-day .ocean-db-calendar-items button{font-size:12px;padding:7px 9px}
+ .ocean-db-calendar-week-add{display:flex;align-items:center;gap:3px;padding:6px 5px;color:#647586!important;font-size:11px;white-space:nowrap}
+}
+@media(min-width:761px){.ocean-db-calendar-mobile-toolbar,.ocean-db-calendar-week-view{display:none}}
