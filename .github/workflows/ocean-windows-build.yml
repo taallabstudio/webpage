@@ -2,12 +2,6 @@ name: Build OCEAN for Windows
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'src-tauri/**'
-      - '.github/workflows/ocean-windows-build.yml'
 
 permissions:
   contents: read
@@ -29,6 +23,10 @@ jobs:
 
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2.0.0" --locked
+
+      - name: Generate OCEAN app icons
+        working-directory: src-tauri
+        run: cargo tauri icon icons/three-waves.svg
 
       - name: Build OCEAN installer
         working-directory: src-tauri
