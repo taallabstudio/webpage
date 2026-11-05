@@ -645,6 +645,10 @@ function OceanApp(){
  const [coverResults,setCoverResults]=useState([]);
  const [coverSearching,setCoverSearching]=useState(false);
  const [coverError,setCoverError]=useState("");
+ const [pendingCover,setPendingCover]=useState(null);
+ const [coverZoom,setCoverZoom]=useState(100);
+ const [coverX,setCoverX]=useState(50);
+ const [coverY,setCoverY]=useState(50);
  const [textFormatToolbar,setTextFormatToolbar]=useState(null),[pageLinkSuggestion,setPageLinkSuggestion]=useState(null);
  const editorRef=useRef(null),slashInput=useRef(null),saveTimer=useRef(null),blockRefs=useRef({}),localDirty=useRef(false),skipNextSave=useRef(false),lastSyncedAt=useRef(0);
  const [activeView,setActiveView]=useState("Table");
@@ -812,12 +816,28 @@ function OceanApp(){
   catch(error){setCoverError(error.message||"Unable to search Unsplash.");}finally{setCoverSearching(false);}
  };
  const chooseUnsplashPhoto=async(photo)=>{
-  try{
-   await api("/ocean/unsplash/track",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({photo_id:photo.id})});
-   await savePagePatch({cover:photo.url,cover_credit:"Photo by "+photo.photographer+" on Unsplash",cover_credit_url:photo.photographer_url+"?utm_source=taal_lab_ocean&utm_medium=referral",cover_source_url:photo.unsplash_url+"?utm_source=taal_lab_ocean&utm_medium=referral"});
-   setMediaPicker("");
-  }catch(error){setCoverError(error.message||"Could not apply this photo.");}
+  setPendingCover(photo);
+  setCoverZoom(100);setCoverX(50);setCoverY(50);
+  setCoverError("");
+  setMediaPicker("cover-adjust");
  };
+ const applyAdjustedCover=async()=>{
+  if(!pendingCover)return;
+  setCoverSearching(true);setCoverError("");
+  try{
+   await api("/ocean/unsplash/track",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({photo_id:pendingCover.id})});
+   await savePagePatch({
+    cover:pendingCover.url,
+    cover_credit:"Photo by "+pendingCover.photographer+" on Unsplash",
+    cover_credit_url:pendingCover.photographer_url+"?utm_source=taal_lab_ocean&utm_medium=referral",
+    cover_source_url:pendingCover.unsplash_url+"?utm_source=taal_lab_ocean&utm_medium=referral",
+    cover_position_x:coverX,cover_position_y:coverY,cover_zoom:coverZoom
+   });
+   setPendingCover(null);setMediaPicker("");
+  }catch(error){setCoverError(error.message||"Could not apply this photo.");}
+  finally{setCoverSearching(false);}
+ };
+
 
  const updateBlock=(id,patch)=>setPage(old=>old?{...old,blocks:(old.blocks||[]).map(b=>b.id===id?{...b,...patch}:b)}:old);
  const buildBlock=(type)=>{
@@ -1098,7 +1118,7 @@ function OceanApp(){
  </>}
  {calendarConnection.connected&&<div className="ocean-access-note"><ShieldCheck size={18}/><div><strong>Secure, account-specific connection</strong><span>Your refresh token is encrypted and stored against your OCEAN user account. Other OCEAN users cannot access this calendar connection.</span></div></div>}
 </section></div>:activePanel==="access"?<div className="ocean-admin-scroll"><section className="ocean-admin-content"><div className="ocean-admin-heading"><div><span className="ocean-admin-eyebrow">ADMINISTRATION</span><h1>Workspace access</h1><p>Choose which accounts can enter OCEAN. Only Admin and Super User roles are allowed.</p></div><span className="ocean-role-pill admin">Admin</span></div><div className="ocean-access-card"><div className="ocean-access-card-head"><div><strong>Account permissions</strong><span>Changes take effect on the next sign-in.</span></div><button onClick={()=>{setAdminLoading(true);api("/ocean/admin/users").then(d=>setAdminUsers(d.users||[])).catch(e=>setAdminError(e.message)).finally(()=>setAdminLoading(false));}}><Activity size={15}/> Refresh</button></div>{adminError&&<div className="ocean-admin-error">{adminError}</div>}{adminLoading?<div className="ocean-admin-empty">Loading accounts…</div>:<div className="ocean-user-list">{adminUsers.map(u=><div className="ocean-managed-user" key={u.id}><div className="ocean-managed-avatar">{(u.display_name||u.email||"U").slice(0,1).toUpperCase()}</div><div className="ocean-managed-info"><strong>{u.display_name||u.email}</strong><span>{u.email}</span></div><span className={"ocean-role-pill "+(u.role==="admin"?"admin":u.role==="super_user"?"super":"user")}>{u.role==="admin"?"Admin":u.role==="super_user"?"Super User":"User"}</span>{u.role==="admin"?<span className="ocean-protected-label">Protected</span>:<select aria-label={"OCEAN access for "+u.email} value={u.role==="super_user"?"super_user":"user"} onChange={e=>changeOceanRole(u.id,e.target.value)}><option value="user">User — no access</option><option value="super_user">Super User — allow access</option></select>}</div>)}</div>}</div><div className="ocean-access-note"><ShieldCheck size={18}/><div><strong>Access is enforced by the server</strong><span>Changing the role also invalidates the account's current sessions. Admin accounts are protected from changes in this panel.</span></div></div></section></div>:loading?<div className="ocean-loading">Opening page…</div>:page?<div className="ocean-page-scroll" ref={editorRef}>
-    {page.cover&&<div className="ocean-cover"><img src={page.cover} alt="" referrerPolicy="no-referrer" onError={e=>{e.currentTarget.style.display="none";}}/>{page.cover_credit&&<div className="ocean-cover-credit">Photo by <a href={page.cover_credit_url||"https://unsplash.com"} target="_blank" rel="noreferrer">{page.cover_credit.replace(/^Photo by | on Unsplash$/g,"")}</a> on <a href={page.cover_source_url||"https://unsplash.com"} target="_blank" rel="noreferrer">Unsplash</a></div>}</div>}
+    {page.cover&&<div className="ocean-cover"><img src={page.cover} alt="" referrerPolicy="no-referrer" style={{objectPosition:(page.cover_position_x??50)+"% "+(page.cover_position_y??50)+"%",transform:"scale("+(page.cover_zoom??100)/100+")"}} onError={e=>{e.currentTarget.style.display="none";}}/>{page.cover_credit&&<div className="ocean-cover-credit">Photo by <a href={page.cover_credit_url||"https://unsplash.com"} target="_blank" rel="noreferrer">{page.cover_credit.replace(/^Photo by | on Unsplash$/g,"")}</a> on <a href={page.cover_source_url||"https://unsplash.com"} target="_blank" rel="noreferrer">Unsplash</a></div>}</div>}
     <article className="ocean-editor">
      <div className="ocean-page-controls"><button onClick={()=>{setIconSearch("");setMediaPicker("icon");}}><Smile size={14}/> {page.icon?"Change icon":"Add icon"}</button><button onClick={()=>{setCoverSearch("");setCoverResults([]);setCoverError("");setMediaPicker("cover");}}><ImageIcon size={14}/> {page.cover?"Change cover":"Add cover"}</button><button onClick={()=>setShowComments(true)}><MessageCircle size={14}/> Add comment</button></div>
      <div className="ocean-title-row">{page.icon&&<span className="ocean-title-icon">{page.icon}</span>}<input className="ocean-title" value={page.title||""} placeholder="New page" disabled={!canEditPage} onChange={e=>updatePage({title:e.target.value})}/></div>
@@ -1123,13 +1143,23 @@ function OceanApp(){
  <div className="ocean-share-advanced-link"><button onClick={()=>setShowShareAdvanced(v=>!v)}><SlidersHorizontal size={15}/> Advanced <span>{showShareAdvanced?"−":"›"}</span></button>{showShareAdvanced&&<div className="ocean-share-advanced"><strong>Agent access settings</strong><p>Choose who can grant connected agents access to this page.</p><label>Who can grant agents access<select value={shareSettings.agent_grant_policy} disabled={!canManageShare} onChange={e=>updateShareSettings({agent_grant_policy:e.target.value})}><option value="anyone_with_access">Anyone with access</option><option value="owner_only">Page owner only</option></select></label><small>This controls who may authorize agents. It does not grant an agent access by itself.</small></div>}</div>
  </section></>}
   {showComments&&<><button className="ocean-drawer-scrim" onClick={()=>setShowComments(false)} aria-label="Close comments"/><aside className="ocean-comments"><header><strong>Comments</strong><button onClick={()=>setShowComments(false)}><X size={18}/></button></header><div className="ocean-comment-list">{comments.map(c=><article key={c.id}><span className="ocean-avatar">{(c.display_name||c.email||"U").slice(0,1).toUpperCase()}</span><div><strong>{c.display_name||c.email}</strong><p>{c.body}</p><small>{new Date(c.created_at*1000).toLocaleString()}</small></div></article>)}{!comments.length&&<p className="ocean-muted">No comments yet. Start the conversation.</p>}</div><form onSubmit={addComment}><textarea value={comment} onChange={e=>setComment(e.target.value)} placeholder="Add a comment…" rows={3}/><button className="ocean-primary" disabled={!comment.trim()}>Comment</button></form></aside></>}
-  {mediaPicker&&<div className="ocean-media-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setMediaPicker("");}}>
-   <section className="ocean-media-modal" role="dialog" aria-modal="true" aria-label={mediaPicker==="cover"?"Choose a page cover":"Choose a page icon"}>
-    <header><div><span className="ocean-media-eyebrow">OCEAN • PAGE PERSONALIZATION</span><h2>{mediaPicker==="cover"?(page.cover?"Change cover":"Add cover"):(page.icon?"Change icon":"Add icon")}</h2></div><button className="ocean-media-close" onClick={()=>setMediaPicker("")} aria-label="Close"><X size={19}/></button></header>
-    {mediaPicker==="icon"?<><p className="ocean-media-description">Choose an emoji to give this page its own identity.</p><input className="ocean-media-search" value={iconSearch} onChange={e=>setIconSearch(e.target.value)} placeholder="Search icons or emoji…"/><div className="ocean-icon-grid">{EMOJIS.filter(x=>!iconSearch||x.toLowerCase().includes(iconSearch.toLowerCase())).map((emoji,i)=><button key={i} onClick={()=>{savePagePatch({icon:emoji});setMediaPicker("");}}>{emoji}</button>)}</div><div className="ocean-media-footer"><button className="ocean-media-secondary" onClick={()=>{savePagePatch({icon:""});setMediaPicker("");}}>Remove icon</button></div></>:<>
+  {mediaPicker&&<div className="ocean-media-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget){setMediaPicker("");setPendingCover(null);}}}>
+   <section className="ocean-media-modal" role="dialog" aria-modal="true" aria-label={mediaPicker==="cover-adjust"?"Adjust page cover":mediaPicker==="cover"?"Choose a page cover":"Choose a page icon"}>
+    <header><div><span className="ocean-media-eyebrow">OCEAN • PAGE PERSONALIZATION</span><h2>{mediaPicker==="cover-adjust"?"Adjust cover":mediaPicker==="cover"?(page.cover?"Change cover":"Add cover"):(page.icon?"Change icon":"Add icon")}</h2></div><button className="ocean-media-close" onClick={()=>{setMediaPicker("");setPendingCover(null);}} aria-label="Close"><X size={19}/></button></header>
+    {mediaPicker==="icon"?<><p className="ocean-media-description">Choose an emoji to give this page its own identity.</p><input className="ocean-media-search" value={iconSearch} onChange={e=>setIconSearch(e.target.value)} placeholder="Search icons or emoji…"/><div className="ocean-icon-grid">{EMOJIS.filter(x=>!iconSearch||x.toLowerCase().includes(iconSearch.toLowerCase())).map((emoji,i)=><button key={i} onClick={()=>{savePagePatch({icon:emoji});setMediaPicker("");}}>{emoji}</button>)}</div><div className="ocean-media-footer"><button className="ocean-media-secondary" onClick={()=>{savePagePatch({icon:""});setMediaPicker("");}}>Remove icon</button></div></>:mediaPicker==="cover-adjust"?<>
+     <p className="ocean-media-description">Position and size your image before applying it to the page.</p>
+     {pendingCover&&<div className="ocean-cover-crop-preview"><img src={pendingCover.url} alt={pendingCover.description} style={{objectPosition:coverX+"% "+coverY+"%",transform:"scale("+(coverZoom/100)+")"}}/><span>PAGE COVER PREVIEW</span></div>}
+     <div className="ocean-cover-adjust-controls">
+      <label><span>Zoom <b>{coverZoom}%</b></span><input type="range" min="100" max="200" step="1" value={coverZoom} onChange={e=>setCoverZoom(Number(e.target.value))}/></label>
+      <label><span>Horizontal position <b>{coverX}%</b></span><input type="range" min="0" max="100" step="1" value={coverX} onChange={e=>setCoverX(Number(e.target.value))}/></label>
+      <label><span>Vertical position <b>{coverY}%</b></span><input type="range" min="0" max="100" step="1" value={coverY} onChange={e=>setCoverY(Number(e.target.value))}/></label>
+     </div>
+     {coverError&&<p className="ocean-media-error">{coverError}</p>}
+     <div className="ocean-media-footer"><button className="ocean-media-secondary" onClick={()=>{setPendingCover(null);setMediaPicker("cover");}}>Back to photos</button><button className="ocean-cover-apply" disabled={coverSearching} onClick={applyAdjustedCover}>{coverSearching?"Applying…":"Apply cover"}</button></div>
+    </>:<>
      <p className="ocean-media-description">Search Unsplash and choose a landscape photo for your page.</p><form className="ocean-cover-search" onSubmit={e=>{e.preventDefault();searchUnsplash();}}><Search size={17}/><input value={coverSearch} onChange={e=>setCoverSearch(e.target.value)} placeholder="Search photos, e.g. ocean, studio, minimal…"/><button disabled={!coverSearch.trim()||coverSearching}>{coverSearching?"Searching…":"Search"}</button></form>
      {coverError&&<p className="ocean-media-error">{coverError}</p>}<div className="ocean-cover-results">{coverSearching?<div className="ocean-cover-empty"><strong>Finding photos…</strong><small>Searching the Unsplash library</small></div>:coverResults.length?coverResults.map(photo=><button className="ocean-cover-result" key={photo.id} aria-label={"Use photo by "+photo.photographer} onClick={()=>chooseUnsplashPhoto(photo)}><img src={photo.thumb} alt={photo.description} loading="lazy"/><span><b>{photo.description}</b><small>Photo by {photo.photographer} on Unsplash</small></span></button>):<div className="ocean-cover-empty"><strong>Find the right cover</strong><small>Search for a place, mood, instrument or idea to get started</small></div>}</div>
-     <div className="ocean-media-footer"><span>Photos provided by Unsplash</span><button className="ocean-media-secondary" onClick={()=>{savePagePatch({cover:"",cover_credit:"",cover_credit_url:"",cover_source_url:""});setMediaPicker("");}}>Remove cover</button></div>
+     <div className="ocean-media-footer"><span>Photos provided by Unsplash</span><button className="ocean-media-secondary" onClick={()=>{savePagePatch({cover:"",cover_credit:"",cover_credit_url:"",cover_source_url:"",cover_position_x:50,cover_position_y:50,cover_zoom:100});setMediaPicker("");}}>Remove cover</button></div>
     </>}
    </section>
   </div>}
