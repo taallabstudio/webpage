@@ -1192,7 +1192,7 @@ html{scroll-behavior:smooth}
 @media(max-width:420px){.otp-inputs{gap:6px}.otp-digit{height:49px;border-radius:9px;font-size:21px}}
 
 
-/* Google Sign-In on TrackDeliver */
+/* Google Sign-In on TaalLab */
 .google-login-btn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:48px;margin:20px 0 0;padding:11px 16px;border:1px solid #d7dde5;border-radius:10px;background:#fff;color:#202124;font:600 14px/1.2 inherit;cursor:pointer;transition:background .16s,border-color .16s,box-shadow .16s}
 .google-login-btn:hover{background:#f8faff;border-color:#b9c8dc;box-shadow:0 2px 7px rgba(20,40,70,.07)}
 .google-login-btn:focus-visible{outline:3px solid rgba(37,132,244,.22);outline-offset:2px}
