@@ -664,43 +664,62 @@ function OceanApp(){
  useEffect(()=>{const saved=localStorage.getItem("ocean-theme");if(saved==="dark"||saved==="light")setTheme(saved);},[]);
  useEffect(()=>{localStorage.setItem("ocean-theme",theme);},[theme]);
  useEffect(()=>{
+  const blockForNode=node=>{
+   const element=node?.nodeType===1?node:node?.parentElement;
+   return element?.closest?.('.ocean-block-text[contenteditable="true"]')||null;
+  };
   const updateSelectionToolbar=()=>{
    const selection=window.getSelection();
    if(!selection||selection.isCollapsed||!selection.toString().trim()){setTextFormatToolbar(null);return;}
-   const range=selection.getRangeAt(0);
-   const node=range.commonAncestorContainer;
-   const element=node.nodeType===1?node:node.parentElement;
-   const editable=element?.closest?.('.ocean-block-text[contenteditable="true"]');
-   if(!editable||!editable.closest(".ocean-blocks")){setTextFormatToolbar(null);return;}
-   const rect=range.getBoundingClientRect();
+   const startBlock=blockForNode(selection.anchorNode),endBlock=blockForNode(selection.focusNode);
+   if(!startBlock||!endBlock||startBlock!==endBlock){setTextFormatToolbar(null);return;}
+   const range=selection.getRangeAt(0),rect=range.getBoundingClientRect();
    if(!rect.width&&!rect.height){setTextFormatToolbar(null);return;}
-   setTextFormatToolbar({blockId:editable.getAttribute("data-ocean-block-id"),left:Math.max(12,Math.min(rect.left+rect.width/2-145,window.innerWidth-310)),top:Math.max(10,rect.top-54),text:selection.toString()});
+   setTextFormatToolbar({blockId:startBlock.getAttribute("data-ocean-block-id"),left:Math.max(12,Math.min(rect.left+rect.width/2-145,window.innerWidth-310)),top:Math.max(10,rect.top-54),text:selection.toString()});
   };
-  // Temporarily make sibling editor blocks non-editable while a drag selection
-  // is in progress. This lets the browser extend one native selection across
-  // the separate contentEditable paragraph hosts.
-  let dragHosts=[];
+  // Manually extend the browser selection using caret hit-testing. This
+  // avoids native selection stopping at separate contentEditable block edges.
+  let dragSelection=null;
+  const caretAtPoint=(x,y)=>{
+   if(document.caretPositionFromPoint){const p=document.caretPositionFromPoint(x,y);return p?{node:p.offsetNode,offset:p.offset}:null;}
+   if(document.caretRangeFromPoint){const r=document.caretRangeFromPoint(x,y);return r?{node:r.startContainer,offset:r.startOffset}:null;}
+   return null;
+  };
   const beginCrossBlockSelection=e=>{
    if(e.button!==0)return;
    const active=e.target?.closest?.('.ocean-block-text[contenteditable="true"]');
    if(!active||!active.closest(".ocean-blocks"))return;
-   dragHosts=Array.from(active.closest(".ocean-blocks").querySelectorAll('.ocean-block-text[contenteditable="true"]'))
-    .filter(host=>host!==active);
-   dragHosts.forEach(host=>host.setAttribute("contenteditable","false"));
+   const point=caretAtPoint(e.clientX,e.clientY);
+   if(!point||!active.contains(point.node))return;
+   dragSelection={pointerId:e.pointerId,anchorNode:point.node,anchorOffset:point.offset,blocks:active.closest(".ocean-blocks")};
+   active.focus({preventScroll:true});
+   window.getSelection()?.setBaseAndExtent(point.node,point.offset,point.node,point.offset);
+   e.preventDefault();
   };
-  const endCrossBlockSelection=()=>{
-   if(!dragHosts.length)return;
-   const hosts=dragHosts;dragHosts=[];
-   requestAnimationFrame(()=>hosts.forEach(host=>host.setAttribute("contenteditable","true")));
+  const extendCrossBlockSelection=e=>{
+   if(!dragSelection||e.pointerId!==dragSelection.pointerId)return;
+   const point=caretAtPoint(e.clientX,e.clientY);
+   if(!point||!dragSelection.blocks.contains(point.node))return;
+   const selection=window.getSelection();
+   if(!selection)return;
+   try{selection.setBaseAndExtent(dragSelection.anchorNode,dragSelection.anchorOffset,point.node,point.offset);}catch(error){return;}
+   e.preventDefault();
+  };
+  const endCrossBlockSelection=e=>{
+   if(!dragSelection||(e&&e.pointerId!==dragSelection.pointerId))return;
+   dragSelection=null;
    setTimeout(updateSelectionToolbar,0);
   };
+  const handleWindowBlur=()=>endCrossBlockSelection();
   document.addEventListener("selectionchange",updateSelectionToolbar);
   document.addEventListener("pointerdown",beginCrossBlockSelection,true);
+  document.addEventListener("pointermove",extendCrossBlockSelection,true);
   document.addEventListener("pointerup",endCrossBlockSelection,true);
-  window.addEventListener("blur",endCrossBlockSelection);
+  document.addEventListener("pointercancel",endCrossBlockSelection,true);
+  window.addEventListener("blur",handleWindowBlur);
   window.addEventListener("scroll",updateSelectionToolbar,true);
   window.addEventListener("resize",updateSelectionToolbar);
-  return()=>{document.removeEventListener("selectionchange",updateSelectionToolbar);document.removeEventListener("pointerdown",beginCrossBlockSelection,true);document.removeEventListener("pointerup",endCrossBlockSelection,true);window.removeEventListener("blur",endCrossBlockSelection);window.removeEventListener("scroll",updateSelectionToolbar,true);window.removeEventListener("resize",updateSelectionToolbar);};
+  return()=>{document.removeEventListener("selectionchange",updateSelectionToolbar);document.removeEventListener("pointerdown",beginCrossBlockSelection,true);document.removeEventListener("pointermove",extendCrossBlockSelection,true);document.removeEventListener("pointerup",endCrossBlockSelection,true);document.removeEventListener("pointercancel",endCrossBlockSelection,true);window.removeEventListener("blur",handleWindowBlur);window.removeEventListener("scroll",updateSelectionToolbar,true);window.removeEventListener("resize",updateSelectionToolbar);};
  },[]);
  const [activePanel,setActivePanel]=useState("page"),[adminUsers,setAdminUsers]=useState([]),[adminLoading,setAdminLoading]=useState(false),[adminError,setAdminError]=useState("");
  const [calendarConnection,setCalendarConnection]=useState({connected:false,email:""});
