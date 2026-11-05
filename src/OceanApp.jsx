@@ -838,7 +838,31 @@ function OceanApp(){
   if(status){setActivePanel("calendar");if(status==="connected")setToast("Google Calendar connected successfully.");else if(status==="error")setCalendarError(params.get("calendar_error")||"Google Calendar connection failed.");window.history.replaceState({},document.title,window.location.pathname);}
  },[]);
 
- useEffect(()=>{const onKey=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();setShowSearch(v=>!v);}if(e.key==="Escape"){setShowSearch(false);setShowPageMenu(false);setShowSlash(false);setSlashFromTyping(false);}};window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);},[]);
+ useEffect(()=>{const onKey=e=>{
+  const key=e.key.toLowerCase();
+  if((e.ctrlKey||e.metaKey)&&key==="k"){e.preventDefault();setShowSearch(v=>!v);return;}
+  // Handle history at window level so shortcuts still work after an undo
+  // causes the contentEditable node to be reconciled or focus to move.
+  if((e.ctrlKey||e.metaKey)&&key==="z"){
+   e.preventDefault();e.stopPropagation();
+   const redo=e.shiftKey;
+   const active=document.activeElement?.closest?.('.ocean-block-text[contenteditable="true"]');
+   const blockId=active?.getAttribute("data-ocean-block-id");
+   const saved=blockId?(page?.blocks||[]).find(b=>b.id===blockId):null;
+   if(!redo&&active&&saved){
+    const liveText=readEditorText(active),liveHtml=editorHtml(active);
+    const savedHtml=saved.html||formatPageLinks(saved.text||"");
+    if(liveText!==saved.text||liveHtml!==savedHtml){
+     updateBlock(blockId,{text:liveText,html:liveHtml});
+     window.setTimeout(()=>undoBlocks(),0);
+     return;
+    }
+   }
+   if(redo)redoBlocks();else undoBlocks();
+   return;
+  }
+  if(e.key==="Escape"){setShowSearch(false);setShowPageMenu(false);setShowSlash(false);setSlashFromTyping(false);}
+ };window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);},[page?.id,page?.blocks]);
 
  useEffect(()=>{if(showComments&&page)api("/ocean/pages/"+page.id+"/comments").then(d=>setComments(d.comments||[])).catch(()=>{});},[showComments,page?.id]);
  useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(""),2800);return()=>clearTimeout(t);},[toast]);
@@ -1068,15 +1092,6 @@ function OceanApp(){
  };
  const handleEditorKeyDown=(e,block,index)=>{
  const element=e.currentTarget;
- if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){
-  e.preventDefault();e.stopPropagation();
-  const liveText=readEditorText(element),liveHtml=editorHtml(element),saved=page.blocks[index];
-  const savedHtml=saved?.html||formatPageLinks(saved?.text||"");
-  const runHistory=()=>{if(e.shiftKey)redoBlocks();else undoBlocks();};
-  if(saved&&(liveText!==saved.text||liveHtml!==savedHtml)){updateBlock(block.id,{text:liveText,html:liveHtml});window.setTimeout(runHistory,0);}else runHistory();
-  return;
- }
- if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();e.stopPropagation();redoBlocks();return;}
  // Each OCEAN paragraph is its own contentEditable host. Browsers do not
  // naturally move the caret between sibling hosts with vertical arrows.
  if((e.key==="ArrowUp"||e.key==="ArrowDown")&&!e.altKey&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey){
