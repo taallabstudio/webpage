@@ -1959,7 +1959,8 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     if (!updates.length) return json({ok:true});
     updates.push("updated_at=?"); values.push(now());
     values.push(pageId,user.id);
-    values.push(user.id);\n    await env.DB.prepare(`UPDATE ocean_pages SET ${updates.join(",")} WHERE id=? AND (user_id=? OR EXISTS(SELECT 1 FROM ocean_page_shares s WHERE s.page_id=ocean_pages.id AND s.user_id=?))`).bind(...values).run();
+    values.push(user.id);
+    await env.DB.prepare(`UPDATE ocean_pages SET ${updates.join(",")} WHERE id=? AND (user_id=? OR EXISTS(SELECT 1 FROM ocean_page_shares s WHERE s.page_id=ocean_pages.id AND s.user_id=?))`).bind(...values).run();
     return json({ok:true});
   }
   if (req.method === "DELETE") {
