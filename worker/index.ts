@@ -52,7 +52,7 @@ function attachSessionCookie(response: Response, sid: string, req: Request) {
   // Clear an older host-only cookie before setting the shared parent-domain cookie.
   // Otherwise browsers may send duplicate names and the stale session can be read first.
   response.headers.append("set-cookie", "taallab_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax");
-  attachSessionCookie(response, sid, req);
+  response.headers.append("set-cookie", cookie("taallab_session", sid, 7 * 86400, req));
   response.headers.set("cache-control", "no-store");
   return response;
 }
