@@ -1525,7 +1525,10 @@ async function ensureOceanSchema(env: Env) {
   ]);
   for (const statement of [
     "ALTER TABLE ocean_pages ADD COLUMN is_folder INTEGER NOT NULL DEFAULT 0",
-    "ALTER TABLE ocean_pages ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 0"
+    "ALTER TABLE ocean_pages ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE ocean_pages ADD COLUMN general_access TEXT NOT NULL DEFAULT 'private'",
+    "ALTER TABLE ocean_pages ADD COLUMN public_token TEXT",
+    "ALTER TABLE ocean_pages ADD COLUMN agent_grant_policy TEXT NOT NULL DEFAULT 'anyone_with_access'"
   ]) { try { await env.DB.prepare(statement).run(); } catch { /* Column already exists. */ } }
 }
 
@@ -1539,6 +1542,9 @@ async function oceanPageForUser(env: Env, userId: string, pageId: string) {
 }
 function oceanCanEdit(page: any) { return page?.access_permission === "owner" || page?.access_permission === "full_access" || page?.access_permission === "edit" || page?.access_permission === "edit_content"; }
 function oceanCanManageSharing(page: any) { return page?.access_permission === "owner" || page?.access_permission === "full_access"; }
+async function oceanPublicPage(env: Env, token: string) {
+  return env.DB.prepare("SELECT id,title,icon,cover,blocks_json,updated_at FROM ocean_pages WHERE public_token=? AND general_access='public' AND is_archived=0 LIMIT 1").bind(token).first<any>();
+}
 
 
 async function requireOceanUser(req: Request, env: Env) {
@@ -1815,9 +1821,9 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     let rows = await env.DB.prepare(`SELECT p.id,p.user_id,p.parent_id,p.title,p.icon,p.cover,p.blocks_json,p.is_favorite,p.is_folder,
       CASE WHEN p.user_id=? THEN 0 ELSE 1 END AS is_shared,p.created_at,p.updated_at
       FROM ocean_pages p LEFT JOIN ocean_page_shares s ON s.page_id=p.id AND s.user_id=?
-      WHERE (p.user_id=? OR s.user_id=?) AND p.is_archived=0
+      WHERE (p.user_id=? OR s.user_id=? OR (p.general_access='workspace' AND ? IN ('admin','super_user'))) AND p.is_archived=0
       ORDER BY is_shared DESC,p.is_favorite DESC,p.updated_at DESC`)
-      .bind(user.id,user.id,user.id,user.id).all();
+      .bind(user.id,user.id,user.id,user.id,user.role).all();
     if (!rows.results?.length) {
       const created = now(), id = oceanId();
       const starter = [
@@ -1833,7 +1839,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       rows = await env.DB.prepare(`SELECT p.id,p.user_id,p.parent_id,p.title,p.icon,p.cover,p.blocks_json,p.is_favorite,p.is_folder,
         CASE WHEN p.user_id=? THEN 0 ELSE 1 END AS is_shared,p.created_at,p.updated_at
         FROM ocean_pages p LEFT JOIN ocean_page_shares s ON s.page_id=p.id AND s.user_id=?
-        WHERE (p.user_id=? OR s.user_id=?) AND p.is_archived=0
+        WHERE (p.user_id=? OR s.user_id=? OR (p.general_access='workspace' AND ? IN ('admin','super_user'))) AND p.is_archived=0
         ORDER BY is_shared DESC,p.is_favorite DESC,p.updated_at DESC`)
         .bind(user.id,user.id,user.id,user.id).all();
     }
@@ -1867,7 +1873,26 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     if (req.method === "GET") {
       const shares = await env.DB.prepare(`SELECT s.user_id,s.permission,s.created_at,u.email,u.display_name
         FROM ocean_page_shares s JOIN users u ON u.id=s.user_id WHERE s.page_id=? ORDER BY s.created_at ASC`).bind(pageId).all();
-      return json({shares:shares.results||[]});
+      return json({shares:shares.results||[],settings:{general_access:page.general_access||"private",public_token:page.public_token||"",agent_grant_policy:page.agent_grant_policy||"anyone_with_access"}});
+    }
+    if (req.method === "PATCH") {
+      const body:any=await req.json().catch(()=>({}));
+      const updates:string[]=[];const values:any[]=[];
+      if(body.general_access!==undefined){
+        const access=String(body.general_access);
+        if(!["private","workspace","public"].includes(access))return json({error:"Choose a valid general access setting."},{status:400});
+        updates.push("general_access=?");values.push(access);
+        if(access==="public"&&!page.public_token){updates.push("public_token=?");values.push(randomToken(24));}
+        if(access!=="public")updates.push("public_token=NULL");
+      }
+      if(body.agent_grant_policy!==undefined){
+        const policy=String(body.agent_grant_policy);
+        if(!["anyone_with_access","owner_only"].includes(policy))return json({error:"Choose a valid agent access policy."},{status:400});
+        updates.push("agent_grant_policy=?");values.push(policy);
+      }
+      if(updates.length){updates.push("updated_at=?");values.push(now(),pageId);await env.DB.prepare("UPDATE ocean_pages SET "+updates.join(",")+" WHERE id=?").bind(...values).run();}
+      const updated:any=await oceanPageForUser(env,user.id,pageId);
+      return json({ok:true,settings:{general_access:updated.general_access,public_token:updated.public_token||"",agent_grant_policy:updated.agent_grant_policy||"anyone_with_access"}});
     }
     if (req.method === "POST") {
       const body:any=await req.json().catch(()=>({}));
