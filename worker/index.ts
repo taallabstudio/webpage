@@ -1937,7 +1937,8 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       WHERE c.page_id=? ORDER BY c.created_at ASC`).bind(pageId).all();
     return json({comments:comments.results || []});
   }
-  if (commentsRoute && req.method === "POST") {\n    if (!["owner","full_access","edit","edit_content","comment"].includes(String((page as any).access_permission))) return json({error:"You do not have permission to comment on this page."},{status:403});\n    if (!["owner","full_access","edit","edit_content","comment"].includes(String((page as any).access_permission))) return json({error:"You do not have permission to comment on this page."},{status:403});
+  if (commentsRoute && req.method === "POST") {
+    if (!["owner","full_access","edit","edit_content","comment"].includes(String((page as any).access_permission))) return json({error:"You do not have permission to comment on this page."},{status:403});
     const body = await req.json().catch(() => ({}));
     const comment = String(body.body || "").trim().slice(0,4000);
     if (!comment) return json({error:"Write a comment first."},{status:400});
