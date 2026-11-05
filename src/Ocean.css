@@ -1261,3 +1261,47 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
   line-height:1.65;
   letter-spacing:0;
 }
+
+
+/* OCEAN touch-first layout */
+@media (hover:none) and (pointer:coarse){
+  .ocean-block-gutter{opacity:1;width:28px;margin-left:-30px}
+  .ocean-block-gutter button{width:28px;min-height:36px;display:grid;place-items:center}
+  .ocean-page-controls{opacity:1}
+  .ocean-top-actions>button,.ocean-sidebar-top>button{width:40px;height:40px}
+  .ocean-page-link{min-height:40px}
+  .ocean-inline-add{min-height:42px}
+  .ocean-db-toolbar button{min-height:38px;padding:6px}
+  .ocean-table input{min-height:42px}
+  .ocean-shell button,.ocean-auth button{touch-action:manipulation}
+}
+@media (max-width:760px){
+  .ocean-shell{height:100dvh;min-height:100dvh}
+  .ocean-sidebar{position:fixed;inset:0 auto 0 0;width:min(86vw,310px);height:100dvh;z-index:100;box-shadow:18px 0 48px #0008}
+  .ocean-sidebar.collapsed{width:0;transform:translateX(-100%);pointer-events:none}
+  .ocean-main{width:100%;min-width:0}
+  .ocean-topbar{height:48px;padding:0 12px}
+  .ocean-editor{width:100%;padding:24px 22px 100px 36px}
+  .ocean-page-scroll:has(.ocean-cover) .ocean-editor{padding-top:12px}
+  .ocean-title-row{gap:8px;margin:20px 0}
+  .ocean-title{font-size:clamp(28px,8vw,38px)}
+  .ocean-title-icon{font-size:30px;min-width:34px}
+  .ocean-cover{aspect-ratio:2.5/1}
+  .ocean-block-row{gap:5px}
+  .ocean-block-gutter{width:22px;margin-left:-27px}
+  .ocean-block-text.heading1{font-size:27px}
+  .ocean-block-text.heading2{font-size:22px}
+  .ocean-database-block,.ocean-table-wrap{max-width:calc(100vw - 32px)}
+  .ocean-db-toolbar{gap:8px;flex-wrap:wrap}
+  .ocean-top-actions{gap:2px}
+  .ocean-save-state{display:none}
+}
+@media (max-width:480px){
+  .ocean-editor{padding-left:31px;padding-right:14px}
+  .ocean-topbar{padding:0 8px}
+  .ocean-crumb{gap:4px}
+  .ocean-crumb strong{max-width:42vw}
+  .ocean-top-actions>button{width:32px;height:34px}
+  .ocean-title{font-size:29px}
+  .ocean-cover{aspect-ratio:2/1}
+}
