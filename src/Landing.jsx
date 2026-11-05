@@ -59,9 +59,9 @@ function ProgressiveImage({src, previewSrc, alt, className="", priority=false}) 
 }
 
 function Logo({studioOnly=false}) {
-  return <div className="brand" aria-label={studioOnly ? "TaalLab" : "TrackDeliver by TaalLab"}>
+  return <div className="brand" aria-label={"TaalLab"}>
     <span className="brand-logo" aria-hidden="true"><img src="/logo.png" alt="" /></span>
-    <span>{studioOnly ? "TaalLab" : <>TrackDeliver <small>by TaalLab</small></>}</span>
+    <span>{"TaalLab"}</span>
   </div>;
 }
 
