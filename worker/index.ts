@@ -2044,11 +2044,12 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       updates.push("parent_id=?"); values.push(parentId);
     }
     if (!updates.length) return json({ok:true});
-    updates.push("updated_at=?"); values.push(now());
+    const updatedAt=Math.max(now(),Number(page.updated_at||0)+1);
+    updates.push("updated_at=?"); values.push(updatedAt);
     values.push(pageId,user.id);
     values.push(user.id);
     await env.DB.prepare(`UPDATE ocean_pages SET ${updates.join(",")} WHERE id=? AND (user_id=? OR EXISTS(SELECT 1 FROM ocean_page_shares s WHERE s.page_id=ocean_pages.id AND s.user_id=?))`).bind(...values).run();
-    return json({ok:true});
+    return json({ok:true,updated_at:updatedAt});
   }
   if (req.method === "DELETE") {
     if (String(page.user_id)!==String(user.id)) return json({error:"Only the owner can delete this shared page."},{status:403});
