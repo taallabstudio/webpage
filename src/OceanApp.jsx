@@ -1071,8 +1071,9 @@ function OceanApp(){
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){
   e.preventDefault();e.stopPropagation();
   const liveText=readEditorText(element),liveHtml=editorHtml(element),saved=page.blocks[index];
+  const savedHtml=saved?.html||formatPageLinks(saved?.text||"");
   const runHistory=()=>{if(e.shiftKey)redoBlocks();else undoBlocks();};
-  if(saved&&(liveText!==saved.text||liveHtml!==saved.html)){updateBlock(block.id,{text:liveText,html:liveHtml});window.setTimeout(runHistory,0);}else runHistory();
+  if(saved&&(liveText!==saved.text||liveHtml!==savedHtml)){updateBlock(block.id,{text:liveText,html:liveHtml});window.setTimeout(runHistory,0);}else runHistory();
   return;
  }
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();e.stopPropagation();redoBlocks();return;}
