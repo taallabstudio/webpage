@@ -45,7 +45,7 @@ const COLORS=[["Default",""],["Gray","gray"],["Brown","brown"],["Orange","orange
 const VIEWS=["Table","Board","Gallery","List","Feed","Calendar","Timeline","Map","Vertical bar chart","Horizontal bar chart","Line chart","Donut chart","Number chart"];
 const escapeHtml=(value="")=>String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 const evaluateOceanFormula=(expression,row,headers)=>{
- const tokens=String(expression||"").match(/\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\d+(?:\.\d+)?|[A-Za-z_][A-Za-z0-9_]*|===|!==|>=|<=|==|!=|&&|\\|\\||[()+*/%,<>!-])\s*/g)||[];
+ const tokens=String(expression||"").match(/\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\d+(?:\.\d+)?|[A-Za-z_][A-Za-z0-9_]*|===|!==|>=|<=|==|!=|&&|\|\||[()+*/%,<>!-])\s*/g)||[];
  let cursor=0;
  const peek=()=>tokens[cursor]?.trim()||"";
  const take=()=>tokens[cursor++]?.trim()||"";
@@ -53,6 +53,9 @@ const evaluateOceanFormula=(expression,row,headers)=>{
  const parsePrimary=()=>{
   const token=take();
   if(!token)throw new Error("Unexpected end of formula");
+  if(token==="-")return -Number(parsePrimary());
+  if(token==="+")return Number(parsePrimary());
+  if(token==="!")return !parsePrimary();
   if(token==="("){const value=parseExpression(0);if(take()!==")")throw new Error("Missing closing parenthesis");return value;}
   if(token.startsWith('"')||token.startsWith("'"))return token.slice(1,-1).replace(/\\(["'\\])/g,"$1");
   if(/^\d/.test(token))return Number(token);
