@@ -636,10 +636,31 @@ function OceanApp(){
    if(!rect.width&&!rect.height){setTextFormatToolbar(null);return;}
    setTextFormatToolbar({blockId:editable.getAttribute("data-ocean-block-id"),left:Math.max(12,Math.min(rect.left+rect.width/2-145,window.innerWidth-310)),top:Math.max(10,rect.top-54),text:selection.toString()});
   };
+  // Temporarily make sibling editor blocks non-editable while a drag selection
+  // is in progress. This lets the browser extend one native selection across
+  // the separate contentEditable paragraph hosts.
+  let dragHosts=[];
+  const beginCrossBlockSelection=e=>{
+   if(e.button!==0)return;
+   const active=e.target?.closest?.('.ocean-block-text[contenteditable="true"]');
+   if(!active||!active.closest(".ocean-blocks"))return;
+   dragHosts=Array.from(active.closest(".ocean-blocks").querySelectorAll('.ocean-block-text[contenteditable="true"]'))
+    .filter(host=>host!==active);
+   dragHosts.forEach(host=>host.setAttribute("contenteditable","false"));
+  };
+  const endCrossBlockSelection=()=>{
+   if(!dragHosts.length)return;
+   const hosts=dragHosts;dragHosts=[];
+   requestAnimationFrame(()=>hosts.forEach(host=>host.setAttribute("contenteditable","true")));
+   setTimeout(updateSelectionToolbar,0);
+  };
   document.addEventListener("selectionchange",updateSelectionToolbar);
+  document.addEventListener("pointerdown",beginCrossBlockSelection,true);
+  document.addEventListener("pointerup",endCrossBlockSelection,true);
+  window.addEventListener("blur",endCrossBlockSelection);
   window.addEventListener("scroll",updateSelectionToolbar,true);
   window.addEventListener("resize",updateSelectionToolbar);
-  return()=>{document.removeEventListener("selectionchange",updateSelectionToolbar);window.removeEventListener("scroll",updateSelectionToolbar,true);window.removeEventListener("resize",updateSelectionToolbar);};
+  return()=>{document.removeEventListener("selectionchange",updateSelectionToolbar);document.removeEventListener("pointerdown",beginCrossBlockSelection,true);document.removeEventListener("pointerup",endCrossBlockSelection,true);window.removeEventListener("blur",endCrossBlockSelection);window.removeEventListener("scroll",updateSelectionToolbar,true);window.removeEventListener("resize",updateSelectionToolbar);};
  },[]);
  const [activePanel,setActivePanel]=useState("page"),[adminUsers,setAdminUsers]=useState([]),[adminLoading,setAdminLoading]=useState(false),[adminError,setAdminError]=useState("");
  const [calendarConnection,setCalendarConnection]=useState({connected:false,email:""});
@@ -693,7 +714,13 @@ function OceanApp(){
 
  useEffect(()=>{if(showComments&&page)api("/ocean/pages/"+page.id+"/comments").then(d=>setComments(d.comments||[])).catch(()=>{});},[showComments,page?.id]);
  useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(""),2800);return()=>clearTimeout(t);},[toast]);
- const filteredPages=useMemo(()=>pages.filter(p=>!query||p.title.toLowerCase().includes(query.toLowerCase())),[pages,query]);
+ const filteredPages=useMemo(()=>pages.filter(p=>{
+  if(!query)return true;
+  const needle=query.toLowerCase();
+  let body="";
+  try{body=JSON.parse(p.blocks_json||"[]").map(block=>String(block.text||block.children||"")).join(" ");}catch{}
+  return String(p.title||"").toLowerCase().includes(needle)||body.toLowerCase().includes(needle);
+ }),[pages,query]);
  const favoritePages=filteredPages.filter(p=>p.is_favorite&&!p.is_shared&&!p.is_folder);
  const privatePages=filteredPages.filter(p=>!p.is_shared&&!p.is_favorite);
  const sharedPages=filteredPages.filter(p=>!!p.is_shared);
