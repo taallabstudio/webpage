@@ -1529,3 +1529,34 @@ html, body, body * { font-family: "Roboto", sans-serif !important; }
   .security-method-card{flex-direction:column}
   .security-recovery-grid{grid-template-columns:1fr}
 }
+
+
+/* Shared tactile button interaction across the public site and OCEAN. */
+button:not(:disabled){
+  transform:translateY(0);
+  transition:transform .18s cubic-bezier(.2,.75,.25,1),box-shadow .18s ease,filter .18s ease,background-color .18s ease,border-color .18s ease;
+  will-change:transform;
+}
+button:not(:disabled):hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 14px rgba(25,45,65,.13);
+  filter:brightness(1.035);
+}
+button:not(:disabled):active{
+  transform:translateY(1px) scale(.98);
+  box-shadow:0 1px 3px rgba(20,35,50,.12);
+  transition-duration:.07s;
+}
+button.button-click-feedback{
+  filter:grayscale(.82) brightness(.91)!important;
+  animation:taal-button-press .42s cubic-bezier(.2,.8,.25,1);
+}
+@keyframes taal-button-press{
+  0%{transform:translateY(-2px) scale(1)}
+  28%{transform:translateY(1px) scale(.975)}
+  62%{transform:translateY(-2px) scale(1.012)}
+  100%{transform:translateY(-2px) scale(1)}
+}
+@media(prefers-reduced-motion:reduce){
+  button:not(:disabled),button.button-click-feedback{transition:none!important;animation:none!important}
+}
