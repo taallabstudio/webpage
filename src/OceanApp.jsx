@@ -710,8 +710,56 @@ function OceanApp(){
    dragSelection=null;
    setTimeout(updateSelectionToolbar,0);
   };
+  // A browser selection can span sibling contentEditable hosts, but the
+  // browser's native Backspace/Delete handling is inconsistent for that case.
+  // Delete the selected DOM range ourselves, merge the surviving suffix into
+  // the first block, and persist the resulting block list in one state update.
+  const deleteCrossBlockSelection=e=>{
+   if((e.key!=="Backspace"&&e.key!=="Delete")||e.altKey||e.ctrlKey||e.metaKey)return;
+   const selection=window.getSelection();
+   if(!selection||selection.isCollapsed||!selection.rangeCount)return;
+   const range=selection.getRangeAt(0);
+   const startHost=blockForNode(range.startContainer),endHost=blockForNode(range.endContainer);
+   if(!startHost||!endHost||startHost===endHost)return;
+   const blocksRoot=startHost.closest(".ocean-blocks");
+   if(!blocksRoot||endHost.closest(".ocean-blocks")!==blocksRoot)return;
+   const startRow=startHost.closest(".ocean-block-row"),endRow=endHost.closest(".ocean-block-row");
+   if(!startRow||!endRow)return;
+   const startId=startHost.getAttribute("data-ocean-block-id");
+   const endId=endHost.getAttribute("data-ocean-block-id");
+   if(!startId||!endId)return;
+   e.preventDefault();
+   e.stopPropagation();
+   try{
+    range.deleteContents();
+    while(endHost.firstChild)startHost.appendChild(endHost.firstChild);
+    startHost.normalize();
+    const rows=Array.from(blocksRoot.querySelectorAll(":scope > .ocean-block-row"));
+    const startIndex=rows.indexOf(startRow),endIndex=rows.indexOf(endRow);
+    if(startIndex<0||endIndex<=startIndex)return;
+    const text=readEditorText(startHost);
+    const html=editorHtml(startHost);
+    const caret=document.createRange();
+    caret.selectNodeContents(startHost);
+    caret.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(caret);
+    startHost.focus({preventScroll:true});
+    setTextFormatToolbar(null);
+    setPage(old=>{
+     if(!old)return old;
+     const from=old.blocks.findIndex(b=>b.id===startId);
+     const to=old.blocks.findIndex(b=>b.id===endId);
+     if(from<0||to<=from)return old;
+     const removedIds=new Set(old.blocks.slice(from+1,to+1).map(b=>b.id));
+     return {...old,blocks:old.blocks.filter((b,i)=>!removedIds.has(b.id)).map(b=>b.id===startId?{...b,...(!text.trim()?{type:"text"}:{}),text,html}:b)};
+    });
+   }catch(error){
+    console.error("Could not delete cross-block selection",error);
+   }
+  };
   const handleWindowBlur=()=>endCrossBlockSelection();
-  document.addEventListener("selectionchange",updateSelectionToolbar);
+  document.addEventListener("keydown",deleteCrossBlockSelection,true);\n  document.addEventListener("selectionchange",updateSelectionToolbar);
   document.addEventListener("pointerdown",beginCrossBlockSelection,true);
   document.addEventListener("pointermove",extendCrossBlockSelection,true);
   document.addEventListener("pointerup",endCrossBlockSelection,true);
@@ -719,7 +767,7 @@ function OceanApp(){
   window.addEventListener("blur",handleWindowBlur);
   window.addEventListener("scroll",updateSelectionToolbar,true);
   window.addEventListener("resize",updateSelectionToolbar);
-  return()=>{document.removeEventListener("selectionchange",updateSelectionToolbar);document.removeEventListener("pointerdown",beginCrossBlockSelection,true);document.removeEventListener("pointermove",extendCrossBlockSelection,true);document.removeEventListener("pointerup",endCrossBlockSelection,true);document.removeEventListener("pointercancel",endCrossBlockSelection,true);window.removeEventListener("blur",handleWindowBlur);window.removeEventListener("scroll",updateSelectionToolbar,true);window.removeEventListener("resize",updateSelectionToolbar);};
+  return()=>{document.removeEventListener("keydown",deleteCrossBlockSelection,true);document.removeEventListener("selectionchange",updateSelectionToolbar);document.removeEventListener("pointerdown",beginCrossBlockSelection,true);document.removeEventListener("pointermove",extendCrossBlockSelection,true);document.removeEventListener("pointerup",endCrossBlockSelection,true);document.removeEventListener("pointercancel",endCrossBlockSelection,true);window.removeEventListener("blur",handleWindowBlur);window.removeEventListener("scroll",updateSelectionToolbar,true);window.removeEventListener("resize",updateSelectionToolbar);};
  },[]);
  const [activePanel,setActivePanel]=useState("page"),[adminUsers,setAdminUsers]=useState([]),[adminLoading,setAdminLoading]=useState(false),[adminError,setAdminError]=useState("");
  const [calendarConnection,setCalendarConnection]=useState({connected:false,email:""});
