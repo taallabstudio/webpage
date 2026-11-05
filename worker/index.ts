@@ -1488,6 +1488,16 @@ async function ensureOceanSchema(env: Env) {
     )`),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_pages_user_updated ON ocean_pages(user_id,is_archived,updated_at DESC)"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_pages_parent ON ocean_pages(user_id,parent_id)"),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS ocean_page_shares (
+      page_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      permission TEXT NOT NULL CHECK(permission IN ('full_access','edit','edit_content','comment','view')),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY(page_id,user_id),
+      FOREIGN KEY(page_id) REFERENCES ocean_pages(id) ON DELETE CASCADE
+    )`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_page_shares_user ON ocean_page_shares(user_id,page_id)"),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS ocean_comments (
       id TEXT PRIMARY KEY,
       page_id TEXT NOT NULL,
@@ -1522,9 +1532,14 @@ async function ensureOceanSchema(env: Env) {
 function oceanId() { return randomToken(12); }
 
 async function oceanPageForUser(env: Env, userId: string, pageId: string) {
-  return env.DB.prepare("SELECT * FROM ocean_pages WHERE id=? AND is_archived=0 AND (user_id=? OR is_shared=1) LIMIT 1")
-    .bind(pageId, userId).first();
+  return env.DB.prepare(`SELECT p.*,CASE WHEN p.user_id=? THEN 'owner' ELSE COALESCE(s.permission,'') END AS access_permission
+    FROM ocean_pages p LEFT JOIN ocean_page_shares s ON s.page_id=p.id AND s.user_id=?
+    WHERE p.id=? AND p.is_archived=0 AND (p.user_id=? OR s.user_id=?) LIMIT 1`)
+    .bind(userId,userId,pageId,userId,userId).first();
 }
+function oceanCanEdit(page: any) { return page?.access_permission === "owner" || page?.access_permission === "full_access" || page?.access_permission === "edit" || page?.access_permission === "edit_content"; }
+function oceanCanManageSharing(page: any) { return page?.access_permission === "owner" || page?.access_permission === "full_access"; }
+
 
 async function requireOceanUser(req: Request, env: Env) {
   const user = await requireUser(req, env);
@@ -1796,9 +1811,12 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
   if (assetMatch && req.method === "GET") return streamOceanAsset(req,env,user,assetMatch[1]);
 
   if (pathname === "/api/ocean/pages" && req.method === "GET") {
-    let rows = await env.DB.prepare(`SELECT id,user_id,parent_id,title,icon,cover,blocks_json,is_favorite,is_folder,is_shared,created_at,updated_at
-      FROM ocean_pages WHERE (user_id=? OR is_shared=1) AND is_archived=0 ORDER BY is_shared DESC,is_favorite DESC,updated_at DESC`)
-      .bind(user.id).all();
+    let rows = await env.DB.prepare(`SELECT p.id,p.user_id,p.parent_id,p.title,p.icon,p.cover,p.blocks_json,p.is_favorite,p.is_folder,
+      CASE WHEN p.user_id=? THEN 0 ELSE 1 END AS is_shared,p.created_at,p.updated_at
+      FROM ocean_pages p LEFT JOIN ocean_page_shares s ON s.page_id=p.id AND s.user_id=?
+      WHERE (p.user_id=? OR s.user_id=?) AND p.is_archived=0
+      ORDER BY is_shared DESC,p.is_favorite DESC,p.updated_at DESC`)
+      .bind(user.id,user.id,user.id,user.id).all();
     if (!rows.results?.length) {
       const created = now(), id = oceanId();
       const starter = [
@@ -1811,9 +1829,12 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       ];
       await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,icon,cover,blocks_json,created_at,updated_at) VALUES(?,?,NULL,?,?,?,?,?,?)")
         .bind(id,user.id,"Getting started","🌊","",JSON.stringify(starter),created,created).run();
-      rows = await env.DB.prepare(`SELECT id,user_id,parent_id,title,icon,cover,blocks_json,is_favorite,is_folder,is_shared,created_at,updated_at
-        FROM ocean_pages WHERE (user_id=? OR is_shared=1) AND is_archived=0 ORDER BY is_shared DESC,is_favorite DESC,updated_at DESC`)
-        .bind(user.id).all();
+      rows = await env.DB.prepare(`SELECT p.id,p.user_id,p.parent_id,p.title,p.icon,p.cover,p.blocks_json,p.is_favorite,p.is_folder,
+        CASE WHEN p.user_id=? THEN 0 ELSE 1 END AS is_shared,p.created_at,p.updated_at
+        FROM ocean_pages p LEFT JOIN ocean_page_shares s ON s.page_id=p.id AND s.user_id=?
+        WHERE (p.user_id=? OR s.user_id=?) AND p.is_archived=0
+        ORDER BY is_shared DESC,p.is_favorite DESC,p.updated_at DESC`)
+        .bind(user.id,user.id,user.id,user.id).all();
     }
     return json({ pages: rows.results || [] });
   }
@@ -1836,9 +1857,47 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
 
   const match = pathname.match(/^\/api\/ocean\/pages\/([a-f0-9]+)(?:\/(comments))?$/i);
   if (!match) return json({error:"OCEAN endpoint not found."},{status:404});
-  const pageId = match[1], commentsRoute = !!match[2];
+  const pageId = match[1], commentsRoute = match[2] === "comments";
   const page = await oceanPageForUser(env,user.id,pageId);
   if (!page) return json({error:"Page not found."},{status:404});
+
+  if (match[2] === "shares") {
+    if (!oceanCanManageSharing(page)) return json({error:"Only the owner or a full-access collaborator can manage sharing."},{status:403});
+    if (req.method === "GET") {
+      const shares = await env.DB.prepare(`SELECT s.user_id,s.permission,s.created_at,u.email,u.display_name
+        FROM ocean_page_shares s JOIN users u ON u.id=s.user_id WHERE s.page_id=? ORDER BY s.created_at ASC`).bind(pageId).all();
+      return json({shares:shares.results||[]});
+    }
+    if (req.method === "POST") {
+      const body:any=await req.json().catch(()=>({}));
+      const email=normalizeEmail(body.email);
+      const permission=String(body.permission||"view");
+      if(!email||!/^\\S+@\\S+\\.\\S+$/.test(email))return json({error:"Enter a valid email address."},{status:400});
+      if(!["full_access","edit","edit_content","comment","view"].includes(permission))return json({error:"Choose a valid access level."},{status:400});
+      const target:any=await env.DB.prepare("SELECT id,email,display_name,role,status FROM users WHERE email=? LIMIT 1").bind(email).first();
+      if(!target||target.status!=="active"||!["admin","super_user"].includes(target.role))return json({error:"That email does not belong to an active OCEAN user yet. Ask them to create or activate their OCEAN account first."},{status:404});
+      if(String(target.id)===String(page.user_id))return json({error:"The page owner already has full access."},{status:400});
+      const timestamp=now();
+      await env.DB.prepare(`INSERT INTO ocean_page_shares(page_id,user_id,permission,created_at,updated_at) VALUES(?,?,?,?,?)
+        ON CONFLICT(page_id,user_id) DO UPDATE SET permission=excluded.permission,updated_at=excluded.updated_at`)
+        .bind(pageId,target.id,permission,timestamp,timestamp).run();
+      return json({ok:true,share:{user_id:target.id,email:target.email,display_name:target.display_name,permission}},{status:201});
+    }
+    const shareUserMatch=pathname.match(/^\\/api\\/ocean\\/pages\\/([a-f0-9]+)\\/shares\\/([^/]+)$/i);
+    if(shareUserMatch&&req.method==="PATCH"){
+      const body:any=await req.json().catch(()=>({}));
+      const permission=String(body.permission||"");
+      if(!["full_access","edit","edit_content","comment","view"].includes(permission))return json({error:"Choose a valid access level."},{status:400});
+      await env.DB.prepare("UPDATE ocean_page_shares SET permission=?,updated_at=? WHERE page_id=? AND user_id=?")
+        .bind(permission,now(),pageId,decodeURIComponent(shareUserMatch[2])).run();
+      return json({ok:true});
+    }
+    if(shareUserMatch&&req.method==="DELETE"){
+      await env.DB.prepare("DELETE FROM ocean_page_shares WHERE page_id=? AND user_id=?").bind(pageId,decodeURIComponent(shareUserMatch[2])).run();
+      return json({ok:true});
+    }
+    return json({error:"Method not allowed."},{status:405});
+  }
 
   if (commentsRoute && req.method === "GET") {
     const comments = await env.DB.prepare(`SELECT c.id,c.page_id,c.user_id,c.body,c.created_at,u.display_name,u.email
@@ -1846,7 +1905,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       WHERE c.page_id=? ORDER BY c.created_at ASC`).bind(pageId).all();
     return json({comments:comments.results || []});
   }
-  if (commentsRoute && req.method === "POST") {
+  if (commentsRoute && req.method === "POST") {\n    if (!["owner","full_access","edit","edit_content","comment"].includes(String((page as any).access_permission))) return json({error:"You do not have permission to comment on this page."},{status:403});
     const body = await req.json().catch(() => ({}));
     const comment = String(body.body || "").trim().slice(0,4000);
     if (!comment) return json({error:"Write a comment first."},{status:400});
@@ -1880,15 +1939,15 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       updates.push("blocks_json=?"); values.push(blocks);
     }
     if (Object.prototype.hasOwnProperty.call(body,"is_favorite")) { updates.push("is_favorite=?"); values.push(body.is_favorite ? 1 : 0); }
-    if (Object.prototype.hasOwnProperty.call(body,"is_shared")) {
+    if (Object.prototype.hasOwnProperty.call(body,"is_shared")) {\n      if (!oceanCanManageSharing(page)) return json({error:"Only the owner can change workspace sharing."},{status:403});
       if (String(page.user_id)!==String(user.id)) return json({error:"Only the owner can change sharing."},{status:403});
       updates.push("is_shared=?"); values.push(body.is_shared ? 1 : 0);
     }
-    if (Object.prototype.hasOwnProperty.call(body,"is_folder")) {
+    if (Object.prototype.hasOwnProperty.call(body,"is_folder")) {\n      if (!oceanCanManageSharing(page)) return json({error:"Only the owner can change folders."},{status:403});
       if (String(page.user_id)!==String(user.id)) return json({error:"Only the owner can change folders."},{status:403});
       updates.push("is_folder=?"); values.push(body.is_folder ? 1 : 0);
     }
-    if (Object.prototype.hasOwnProperty.call(body,"parent_id")) {
+    if (Object.prototype.hasOwnProperty.call(body,"parent_id")) {\n      if (!oceanCanManageSharing(page)) return json({error:"Only the owner can move this page."},{status:403});
       const parentId = String(body.parent_id || "").trim() || null;
       if (parentId === pageId) return json({error:"A page cannot be its own parent."},{status:400});
       if (parentId && !(await oceanPageForUser(env,user.id,parentId))) return json({error:"Parent page not found."},{status:404});
@@ -1897,7 +1956,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     if (!updates.length) return json({ok:true});
     updates.push("updated_at=?"); values.push(now());
     values.push(pageId,user.id);
-    await env.DB.prepare(`UPDATE ocean_pages SET ${updates.join(",")} WHERE id=? AND (user_id=? OR is_shared=1)`).bind(...values).run();
+    await env.DB.prepare(`UPDATE ocean_pages SET ${updates.join(",")} undefined`).bind(...values).run();
     return json({ok:true});
   }
   if (req.method === "DELETE") {
