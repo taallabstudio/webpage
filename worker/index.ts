@@ -1855,13 +1855,13 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     return json({page},{status:201});
   }
 
-  const match = pathname.match(/^\/api\/ocean\/pages\/([a-f0-9]+)(?:\/(comments))?$/i);
+  const match = pathname.match(/^\/api\/ocean\/pages\/([a-f0-9]+)(?:\/(comments|shares(?:\/[^/]+)?))?$/i);
   if (!match) return json({error:"OCEAN endpoint not found."},{status:404});
   const pageId = match[1], commentsRoute = match[2] === "comments";
   const page = await oceanPageForUser(env,user.id,pageId);
   if (!page) return json({error:"Page not found."},{status:404});
 
-  if (match[2] === "shares") {
+  if (match[2]?.startsWith("shares")) {
     if (!oceanCanManageSharing(page)) return json({error:"Only the owner or a full-access collaborator can manage sharing."},{status:403});
     if (req.method === "GET") {
       const shares = await env.DB.prepare(`SELECT s.user_id,s.permission,s.created_at,u.email,u.display_name
@@ -1905,7 +1905,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       WHERE c.page_id=? ORDER BY c.created_at ASC`).bind(pageId).all();
     return json({comments:comments.results || []});
   }
-  if (commentsRoute && req.method === "POST") {\n    if (!["owner","full_access","edit","edit_content","comment"].includes(String((page as any).access_permission))) return json({error:"You do not have permission to comment on this page."},{status:403});
+  if (commentsRoute && req.method === "POST") {\n    if (!["owner","full_access","edit","edit_content","comment"].includes(String((page as any).access_permission))) return json({error:"You do not have permission to comment on this page."},{status:403});\n    if (!["owner","full_access","edit","edit_content","comment"].includes(String((page as any).access_permission))) return json({error:"You do not have permission to comment on this page."},{status:403});
     const body = await req.json().catch(() => ({}));
     const comment = String(body.body || "").trim().slice(0,4000);
     if (!comment) return json({error:"Write a comment first."},{status:400});
@@ -1956,7 +1956,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     if (!updates.length) return json({ok:true});
     updates.push("updated_at=?"); values.push(now());
     values.push(pageId,user.id);
-    await env.DB.prepare(`UPDATE ocean_pages SET ${updates.join(",")} undefined`).bind(...values).run();
+    await env.DB.prepare(`UPDATE ocean_pages SET ${updates.join(",")} WHERE id=? AND user_id=?`).bind(...values).run();
     return json({ok:true});
   }
   if (req.method === "DELETE") {
