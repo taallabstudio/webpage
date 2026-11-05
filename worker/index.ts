@@ -26,6 +26,7 @@ export interface Env {
   GOOGLE_LOGIN_CLIENT_ID?: string;
   GOOGLE_LOGIN_CLIENT_SECRET?: string;
   OCEAN_PREVIEW_MODE?: string;
+  UNSPLASH_ACCESS_KEY?: string;
   RESEND_API_KEY: string;
 }
 
@@ -1579,7 +1580,8 @@ async function ensureOceanSchema(env: Env) {
     "ALTER TABLE ocean_pages ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE ocean_pages ADD COLUMN general_access TEXT NOT NULL DEFAULT 'private'",
     "ALTER TABLE ocean_pages ADD COLUMN public_token TEXT",
-    "ALTER TABLE ocean_pages ADD COLUMN agent_grant_policy TEXT NOT NULL DEFAULT 'anyone_with_access'"
+    "ALTER TABLE ocean_pages ADD COLUMN agent_grant_policy TEXT NOT NULL DEFAULT 'anyone_with_access'",
+    "ALTER TABLE ocean_pages ADD COLUMN cover_credit TEXT NOT NULL DEFAULT ''"
   ]) { try { await env.DB.prepare(statement).run(); } catch { /* Column already exists. */ } }
 }
 
@@ -1857,6 +1859,25 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
   if (!pathname.startsWith("/api/ocean/")) return null;
   const user = await requireOceanUser(req, env);
   await ensureOceanSchema(env);
+  if (pathname === "/api/ocean/unsplash/search" && req.method === "GET") {
+    if (!env.UNSPLASH_ACCESS_KEY) return json({error:"Unsplash is not configured on this Worker."},{status:503});
+    const query = String(new URL(req.url).searchParams.get("query") || "").trim().slice(0,120);
+    if (!query) return json({results:[],total:0});
+    const params = new URLSearchParams({query,per_page:"24",orientation:"landscape"});
+    const response = await fetch("https://api.unsplash.com/search/photos?"+params.toString(), {headers:{"Authorization":"Client-ID "+env.UNSPLASH_ACCESS_KEY,"Accept-Version":"v1"}});
+    const data:any = await response.json().catch(()=>({}));
+    if (!response.ok) return json({error:data.errors?.[0] || "Unsplash search failed."},{status:response.status});
+    return json({total:data.total||0,results:(data.results||[]).map((photo:any)=>({id:photo.id,description:photo.alt_description||photo.description||"Unsplash photo",url:photo.urls?.regular||photo.urls?.small||"",thumb:photo.urls?.small||photo.urls?.thumb||"",photographer:photo.user?.name||"Unsplash photographer",photographer_url:photo.user?.links?.html||"https://unsplash.com",unsplash_url:photo.links?.html||"https://unsplash.com"}))});
+  }
+  if (pathname === "/api/ocean/unsplash/track" && req.method === "POST") {
+    if (!env.UNSPLASH_ACCESS_KEY) return json({error:"Unsplash is not configured on this Worker."},{status:503});
+    const body:any=await req.json().catch(()=>({}));
+    const photoId=String(body.photo_id||"").trim();
+    if(!/^[a-zA-Z0-9_-]{5,80}$/.test(photoId))return json({error:"Invalid Unsplash photo."},{status:400});
+    const response=await fetch("https://api.unsplash.com/photos/"+encodeURIComponent(photoId)+"/download",{headers:{"Authorization":"Client-ID "+env.UNSPLASH_ACCESS_KEY,"Accept-Version":"v1"}});
+    if(!response.ok)return json({error:"Unsplash download tracking failed."},{status:response.status});
+    return json({ok:true});
+  }
   if(pathname.startsWith("/api/ocean/calendar/")){
     const calendarResponse=await handleOceanCalendar(req,env,user,pathname);
     if(calendarResponse)return calendarResponse;
@@ -1869,7 +1890,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
   if (assetMatch && req.method === "GET") return streamOceanAsset(req,env,user,assetMatch[1]);
 
   if (pathname === "/api/ocean/pages" && req.method === "GET") {
-    let rows = await env.DB.prepare(`SELECT p.id,p.user_id,p.parent_id,p.title,p.icon,p.cover,p.blocks_json,p.is_favorite,p.is_folder,
+    let rows = await env.DB.prepare(`SELECT p.id,p.user_id,p.parent_id,p.title,p.icon,p.cover,p.cover_credit,p.blocks_json,p.is_favorite,p.is_folder,
       CASE WHEN p.user_id=? THEN 0 ELSE 1 END AS is_shared,p.created_at,p.updated_at
       FROM ocean_pages p LEFT JOIN ocean_page_shares s ON s.page_id=p.id AND s.user_id=?
       WHERE (p.user_id=? OR s.user_id=? OR (p.general_access='workspace' AND ? IN ('admin','super_user'))) AND p.is_archived=0
@@ -2019,6 +2040,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       }
       updates.push("cover=?"); values.push(cover);
     }
+    if (Object.prototype.hasOwnProperty.call(body,"cover_credit")) { updates.push("cover_credit=?"); values.push(String(body.cover_credit||"").slice(0,1000)); }
     if (Object.prototype.hasOwnProperty.call(body,"blocks")) {
       if (!Array.isArray(body.blocks) || body.blocks.length > 500) return json({error:"Invalid page content."},{status:400});
       const blocks = JSON.stringify(body.blocks);
