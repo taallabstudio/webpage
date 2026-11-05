@@ -725,28 +725,26 @@ function OceanApp(){
    if(!startHost||!endHost||startHost===endHost)return;
    const blocksRoot=startHost.closest(".ocean-blocks");
    if(!blocksRoot||endHost.closest(".ocean-blocks")!==blocksRoot)return;
-   const startRow=startHost.closest(".ocean-block-row"),endRow=endHost.closest(".ocean-block-row");
-   if(!startRow||!endRow)return;
    const startId=startHost.getAttribute("data-ocean-block-id");
    const endId=endHost.getAttribute("data-ocean-block-id");
    if(!startId||!endId)return;
    e.preventDefault();
    e.stopPropagation();
    try{
-    range.deleteContents();
-    while(endHost.firstChild)startHost.appendChild(endHost.firstChild);
-    startHost.normalize();
-    const rows=Array.from(blocksRoot.querySelectorAll(":scope > .ocean-block-row"));
-    const startIndex=rows.indexOf(startRow),endIndex=rows.indexOf(endRow);
-    if(startIndex<0||endIndex<=startIndex)return;
-    const text=readEditorText(startHost);
-    const html=editorHtml(startHost);
-    const caret=document.createRange();
-    caret.selectNodeContents(startHost);
-    caret.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(caret);
-    startHost.focus({preventScroll:true});
+    // Never mutate React-owned contentEditable nodes directly. Build the
+    // surviving prefix/suffix in detached fragments and commit one state update.
+    const prefixRange=document.createRange();
+    prefixRange.selectNodeContents(startHost);
+    prefixRange.setEnd(range.startContainer,range.startOffset);
+    const suffixRange=document.createRange();
+    suffixRange.selectNodeContents(endHost);
+    suffixRange.setStart(range.endContainer,range.endOffset);
+    const merged=document.createElement("div");
+    merged.appendChild(prefixRange.cloneContents());
+    merged.appendChild(suffixRange.cloneContents());
+    merged.normalize();
+    const html=merged.innerHTML;
+    const text=readEditorText(merged);
     setTextFormatToolbar(null);
     setPage(old=>{
      if(!old)return old;
@@ -756,6 +754,17 @@ function OceanApp(){
      const removedIds=new Set(old.blocks.slice(from+1,to+1).map(b=>b.id));
      return {...old,blocks:old.blocks.filter((b,i)=>!removedIds.has(b.id)).map(b=>b.id===startId?{...b,...(!text.trim()?{type:"text"}:{}),text,html}:b)};
     });
+    window.setTimeout(()=>{
+     const target=blockRefs.current[startId];
+     if(!target?.isContentEditable)return;
+     target.focus({preventScroll:true});
+     const caret=document.createRange();
+     caret.selectNodeContents(target);
+     caret.collapse(false);
+     const currentSelection=window.getSelection();
+     currentSelection?.removeAllRanges();
+     currentSelection?.addRange(caret);
+    },0);
    }catch(error){
     console.error("Could not delete cross-block selection",error);
    }
