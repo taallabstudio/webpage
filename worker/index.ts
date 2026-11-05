@@ -1947,12 +1947,13 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     }
     if (req.method === "POST") {
       const body:any=await req.json().catch(()=>({}));
-      const email=normalizeEmail(body.email);
       const permission=String(body.permission||"view");
-      if(!email||!/^\\S+@\\S+\\.\\S+$/.test(email))return json({error:"Enter a valid email address."},{status:400});
       if(!["full_access","edit","edit_content","comment","view"].includes(permission))return json({error:"Choose a valid access level."},{status:400});
-      const emails=String(body.email||"").split(",").map((value:string)=>normalizeEmail(value)).filter(Boolean);
-      if(!emails.length||emails.some((value:string)=>!/^\\S+@\\S+\\.\\S+$/.test(value)))return json({error:"Enter valid email addresses, separated by commas."},{status:400});
+      // OCEAN's invite field accepts one address or a comma-separated list.
+      // Split and normalize before validating; do not validate the entire list as one address.
+      const emails=[...new Set(String(body.email||"").split(",").map((value:string)=>normalizeEmail(value)).filter(Boolean))];
+      const isValidInviteEmail=(value:string)=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)&&value.length<=254;
+      if(!emails.length||emails.some((value:string)=>!isValidInviteEmail(value)))return json({error:"Enter a valid email address. For multiple people, separate addresses with commas."},{status:400});
       const granted:any[]=[];
       for(const inviteEmail of emails){
         const target:any=await env.DB.prepare("SELECT id,email,display_name,role,status FROM users WHERE email=? LIMIT 1").bind(inviteEmail).first();
