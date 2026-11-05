@@ -1596,7 +1596,7 @@ async function uploadOceanAsset(req: Request, env: Env, user: any) {
   return json({ ok: true, asset: { id, file_name: filename, mime_type: mime, size: bytes.byteLength, url: "/api/ocean/assets/" + id } }, { status: 201 });
 }
 async function streamOceanAsset(req: Request, env: Env, user: any, id: string) {
-  const asset: any = await env.DB.prepare("SELECT * FROM ocean_assets WHERE id=? AND user_id=? LIMIT 1").bind(id,user.id).first();
+  const asset: any = await env.DB.prepare(`SELECT a.* FROM ocean_assets a JOIN ocean_pages p ON p.id=a.page_id LEFT JOIN ocean_page_shares s ON s.page_id=p.id AND s.user_id=? WHERE a.id=? AND p.is_archived=0 AND (p.user_id=? OR s.user_id=?) LIMIT 1`).bind(user.id,id,user.id,user.id).first();
   if (!asset) return json({ error: "File not found." }, { status: 404 });
   if (!env.B2_KEY_ID || !env.B2_APPLICATION_KEY || !env.B2_BUCKET_NAME) return json({ error: "Backblaze B2 storage is not configured." }, { status: 503 });
   const auth = await fetch("https://api.backblazeb2.com/b2api/v3/b2_authorize_account", { headers: { Authorization: "Basic " + btoa(env.B2_KEY_ID + ":" + env.B2_APPLICATION_KEY) } });
@@ -1957,7 +1957,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     if (!updates.length) return json({ok:true});
     updates.push("updated_at=?"); values.push(now());
     values.push(pageId,user.id);
-    await env.DB.prepare(`UPDATE ocean_pages SET ${updates.join(",")} WHERE id=? AND user_id=?`).bind(...values).run();
+    values.push(user.id);\n    await env.DB.prepare(`UPDATE ocean_pages SET ${updates.join(",")} WHERE id=? AND (user_id=? OR EXISTS(SELECT 1 FROM ocean_page_shares s WHERE s.page_id=ocean_pages.id AND s.user_id=?))`).bind(...values).run();
     return json({ok:true});
   }
   if (req.method === "DELETE") {
