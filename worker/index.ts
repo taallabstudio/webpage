@@ -1583,7 +1583,10 @@ async function ensureOceanSchema(env: Env) {
     "ALTER TABLE ocean_pages ADD COLUMN agent_grant_policy TEXT NOT NULL DEFAULT 'anyone_with_access'",
     "ALTER TABLE ocean_pages ADD COLUMN cover_credit TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE ocean_pages ADD COLUMN cover_credit_url TEXT NOT NULL DEFAULT ''",
-    "ALTER TABLE ocean_pages ADD COLUMN cover_source_url TEXT NOT NULL DEFAULT ''"
+    "ALTER TABLE ocean_pages ADD COLUMN cover_source_url TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE ocean_pages ADD COLUMN cover_position_x REAL NOT NULL DEFAULT 50",
+    "ALTER TABLE ocean_pages ADD COLUMN cover_position_y REAL NOT NULL DEFAULT 50",
+    "ALTER TABLE ocean_pages ADD COLUMN cover_zoom REAL NOT NULL DEFAULT 100"
   ]) { try { await env.DB.prepare(statement).run(); } catch { /* Column already exists. */ } }
 }
 
@@ -2045,6 +2048,9 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     if (Object.prototype.hasOwnProperty.call(body,"cover_credit")) { updates.push("cover_credit=?"); values.push(String(body.cover_credit||"").slice(0,1000)); }
     if (Object.prototype.hasOwnProperty.call(body,"cover_credit_url")) { updates.push("cover_credit_url=?"); values.push(String(body.cover_credit_url||"").slice(0,1000)); }
     if (Object.prototype.hasOwnProperty.call(body,"cover_source_url")) { updates.push("cover_source_url=?"); values.push(String(body.cover_source_url||"").slice(0,1000)); }
+    if (Object.prototype.hasOwnProperty.call(body,"cover_position_x")) { const value=Number(body.cover_position_x); if(!Number.isFinite(value)||value<0||value>100)return json({error:"Invalid horizontal cover position."},{status:400}); updates.push("cover_position_x=?"); values.push(value); }
+    if (Object.prototype.hasOwnProperty.call(body,"cover_position_y")) { const value=Number(body.cover_position_y); if(!Number.isFinite(value)||value<0||value>100)return json({error:"Invalid vertical cover position."},{status:400}); updates.push("cover_position_y=?"); values.push(value); }
+    if (Object.prototype.hasOwnProperty.call(body,"cover_zoom")) { const value=Number(body.cover_zoom); if(!Number.isFinite(value)||value<100||value>200)return json({error:"Invalid cover zoom."},{status:400}); updates.push("cover_zoom=?"); values.push(value); }
     if (Object.prototype.hasOwnProperty.call(body,"blocks")) {
       if (!Array.isArray(body.blocks) || body.blocks.length > 500) return json({error:"Invalid page content."},{status:400});
       const blocks = JSON.stringify(body.blocks);
