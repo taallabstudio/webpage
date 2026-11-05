@@ -47,6 +47,15 @@ function cookie(name: string, value: string, maxAge: number, req?: Request) {
   const domain = host === "taallab.work" || host.endsWith(".taallab.work") ? "Domain=.taallab.work; " : "";
   return `${name}=${value}; Max-Age=${maxAge}; ${domain}Path=/; HttpOnly; Secure; SameSite=Lax`;
 }
+ 
+function attachSessionCookie(response: Response, sid: string, req: Request) {
+  // Clear an older host-only cookie before setting the shared parent-domain cookie.
+  // Otherwise browsers may send duplicate names and the stale session can be read first.
+  response.headers.append("set-cookie", "taallab_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax");
+  attachSessionCookie(response, sid, req);
+  response.headers.set("cache-control", "no-store");
+  return response;
+}
 
 function fileKind(mime: string, name: string) {
   const n = name.toLowerCase();
@@ -347,10 +356,9 @@ async function authLogin(req: Request, env: Env) {
   }
 
   const sid = await createUserSession(env, user.id);
-  return json(
+  return attachSessionCookie(json(
     { ok: true, user: { id: user.id, email: user.email, role: user.role } },
-    { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400, req) } },
-  );
+  ), sid, req);
 }
 
 async function requestPasswordReset(req: Request, env: Env) {
@@ -469,10 +477,9 @@ async function verifyTwoFactor(req: Request, env: Env) {
   }
 
   const sid = await createUserSession(env, challenge.user_id);
-  return json(
+  return attachSessionCookie(json(
     { ok: true, user: { id: challenge.user_id, email: challenge.email, role: challenge.role } },
-    { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400, req) } },
-  );
+  ), sid, req);
 }
 
 async function resendTwoFactor(req: Request, env: Env) {
@@ -530,7 +537,10 @@ async function authLogout(req: Request, env: Env) {
     await env.DB.prepare("DELETE FROM sessions WHERE id=?").bind(sid).run();
     await env.DB.prepare("DELETE FROM admin_sessions WHERE id=?").bind(sid).run().catch(() => {});
   }
-  return json({ ok: true }, { headers: { "set-cookie": cookie("taallab_session", "", 0, req) } });
+  const response = json({ ok: true });
+  response.headers.append("set-cookie", "taallab_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax");
+  response.headers.append("set-cookie", cookie("taallab_session", "", 0, req));
+  return response;
 }
 
 async function authSignup(req: Request, env: Env) {
@@ -646,7 +656,7 @@ async function changeOwnPassword(req: Request, env: Env) {
   await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(user.id).run();
 
   const sid = await createUserSession(env, user.id);
-  return json({ ok: true }, { headers: { "set-cookie": cookie("taallab_session", sid, 7 * 86400, req) } });
+  return attachSessionCookie(json({ ok: true }), sid, req);
 }
 
 async function listUsers(env: Env) {
