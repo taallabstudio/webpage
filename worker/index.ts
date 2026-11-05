@@ -1,4 +1,11 @@
 import { handleStoreRequest } from "./store";
+import {
+  ensureAuthMethodsSchema, hasEnabledTotp, verifyTotpOrRecovery,
+  startAuthenticatorSetup, confirmAuthenticatorSetup, disableAuthenticator,
+  getSecurityMethods, regenerateRecoveryCodes, passkeyRegistrationOptions,
+  verifyPasskeyRegistration, deletePasskey, passkeyAuthenticationOptions,
+  verifyPasskeyAuthentication,
+} from "./auth-methods";
 
 export interface Env {
   DB: D1Database;
@@ -193,6 +200,10 @@ async function ensureSupportSchema(env: Env) {
     attempts INTEGER NOT NULL DEFAULT 0
   )`).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_2fa_challenges_user ON two_factor_challenges(user_id)").run();
+  const twoFactorColumns: any = await env.DB.prepare("PRAGMA table_info(two_factor_challenges)").all();
+  if (!(twoFactorColumns.results || []).some((col: any) => col.name === "method")) {
+    await env.DB.prepare("ALTER TABLE two_factor_challenges ADD COLUMN method TEXT NOT NULL DEFAULT 'email'").run();
+  }
 
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS booking_rate_limits (
     identity TEXT PRIMARY KEY,
@@ -292,6 +303,25 @@ If you did not try to sign in, change your password and contact TaalLab.`;
   return sendAuthEmail(env, user.email, "Your TaalLab sign-in code", html, text, `login-2fa:${challengeId}:${await hashText(code)}`);
 }
 
+async function startTwoFactorChallenge(env: Env, user: any) {
+  const method = await hasEnabledTotp(env, user.id) ? "totp" : "email";
+  const challengeId = randomToken(24);
+  const createdAt = now();
+  const code = method === "email" ? randomCode() : "";
+  await env.DB.prepare("DELETE FROM two_factor_challenges WHERE user_id=?").bind(user.id).run();
+  await env.DB.prepare(
+    "INSERT INTO two_factor_challenges(id,user_id,code_hash,created_at,expires_at,attempts,method) VALUES(?,?,?,?,?,0,?)"
+  ).bind(challengeId, user.id, method === "email" ? await hashText(code) : "", createdAt, createdAt + 600, method).run();
+  if (method === "email") {
+    const sent = await sendTwoFactorCode(env, user, challengeId, code);
+    if (!sent.sent) {
+      await env.DB.prepare("DELETE FROM two_factor_challenges WHERE id=?").bind(challengeId).run();
+      return { error: true as const };
+    }
+  }
+  return { challengeId, method };
+}
+
 async function getSessionUser(req: Request, env: Env) {
   const sid = parseCookie(req, "taallab_session");
   if (!sid) return null;
@@ -339,20 +369,12 @@ async function authLogin(req: Request, env: Env) {
   }
 
   if (Number(user.two_factor_enabled) !== 0) {
-    const challengeId = randomToken(24);
-    const code = randomCode();
-    const createdAt = now();
-    await env.DB.prepare("DELETE FROM two_factor_challenges WHERE user_id=?").bind(user.id).run();
-    await env.DB.prepare(
-      "INSERT INTO two_factor_challenges(id,user_id,code_hash,created_at,expires_at,attempts) VALUES(?,?,?,?,?,0)"
-    ).bind(challengeId, user.id, await hashText(code), createdAt, createdAt + 600).run();
-
-    const emailResult = await sendTwoFactorCode(env, user, challengeId, code);
-    if (!emailResult.sent) {
-      await env.DB.prepare("DELETE FROM two_factor_challenges WHERE id=?").bind(challengeId).run();
-      return json({ error: "We could not send the sign-in code. Please try again." }, { status: 502 });
-    }
-    return json({ ok: true, requiresTwoFactor: true, challengeId, email: user.email });
+    const challenge = await startTwoFactorChallenge(env, user);
+    if (challenge.error) return json({ error: "We could not send the sign-in code. Please try again." }, { status: 502 });
+    return json({
+      ok: true, requiresTwoFactor: true, challengeId: challenge.challengeId,
+      method: challenge.method === "totp" ? "authenticator" : "email", email: user.email,
+    });
   }
 
   const sid = await createUserSession(env, user.id);
@@ -449,8 +471,8 @@ async function confirmPasswordReset(req: Request, env: Env) {
 async function verifyTwoFactor(req: Request, env: Env) {
   const body = await req.json().catch(() => ({}));
   const challengeId = String(body.challenge_id || "");
-  const code = String(body.code || "").replace(/\D/g, "");
-  if (!challengeId || code.length !== 6) return json({ error: "Enter the 6-digit sign-in code." }, { status: 400 });
+  const code = String(body.code || "").trim().slice(0, 32);
+  if (!challengeId || !code) return json({ error: "Enter your authenticator or recovery code." }, { status: 400 });
 
   const challenge: any = await env.DB.prepare(
     "SELECT c.*,u.email,u.role,u.status,u.email_verified_at FROM two_factor_challenges c JOIN users u ON u.id=c.user_id WHERE c.id=? LIMIT 1"
@@ -463,10 +485,12 @@ async function verifyTwoFactor(req: Request, env: Env) {
     return json({ error: "Too many incorrect codes. Please sign in again." }, { status: 429 });
   }
 
-  const correct = await hashText(code);
-  if (correct !== String(challenge.code_hash)) {
+  const valid = String(challenge.method || "email") === "totp"
+    ? await verifyTotpOrRecovery(env, challenge.user_id, code)
+    : code.length === 6 && (await hashText(code)) === String(challenge.code_hash);
+  if (!valid) {
     await env.DB.prepare("UPDATE two_factor_challenges SET attempts=attempts+1 WHERE id=?").bind(challengeId).run();
-    return json({ error: "Incorrect sign-in code." }, { status: 401 });
+    return json({ error: String(challenge.method || "email") === "totp" ? "Incorrect authenticator or recovery code." : "Incorrect sign-in code." }, { status: 401 });
   }
 
   const consumed: any = await env.DB.prepare(
@@ -489,6 +513,7 @@ async function resendTwoFactor(req: Request, env: Env) {
     "SELECT c.*,u.email,u.email_verified_at,u.status FROM two_factor_challenges c JOIN users u ON u.id=c.user_id WHERE c.id=? LIMIT 1"
   ).bind(challengeId).first();
   if (!old || !old.email_verified_at || old.status !== "active") return json({ error: "Sign-in challenge not found. Please sign in again." }, { status: 401 });
+  if (String(old.method || "email") !== "email") return json({ error: "Use the code from your authenticator app. Email resend is not available for this sign-in." }, { status: 400 });
   if (now() - Number(old.created_at) < 45) return json({ error: "Please wait before requesting another code.", retryAfter: 45 - (now() - Number(old.created_at)) }, { status: 429 });
 
   const code = randomCode();
@@ -907,21 +932,14 @@ async function googleAuthCallback(req: Request, env: Env) {
   }
 
   if (Number(user.two_factor_enabled) !== 0) {
-    const challengeId = randomToken(24);
-    const code = randomCode();
-    const createdAt = now();
-    await env.DB.prepare("DELETE FROM two_factor_challenges WHERE user_id=?").bind(user.id).run();
-    await env.DB.prepare(
-      "INSERT INTO two_factor_challenges(id,user_id,code_hash,created_at,expires_at,attempts) VALUES(?,?,?,?,?,0)"
-    ).bind(challengeId, user.id, await hashText(code), createdAt, createdAt + 600).run();
-    const sent = await sendTwoFactorCode(env, user, challengeId, code);
-    if (!sent.sent) {
-      await env.DB.prepare("DELETE FROM two_factor_challenges WHERE id=?").bind(challengeId).run();
-      return fail("We could not send your TaalLab sign-in code. Please try again.");
-    }
+    const challenge = await startTwoFactorChallenge(env, user);
+    if (challenge.error) return fail("We could not send your TaalLab sign-in code. Please try again.");
     const response = new Response(null, {
       status: 302,
-      headers: { location: googleLoginRedirect(env, { google_2fa: "1", challenge_id: challengeId, email: user.email }, returnTo).toString(), "cache-control": "no-store" },
+      headers: { location: googleLoginRedirect(env, {
+        google_2fa: "1", challenge_id: challenge.challengeId, email: user.email,
+        method: challenge.method === "totp" ? "authenticator" : "email",
+      }, returnTo).toString(), "cache-control": "no-store" },
     });
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
@@ -2052,6 +2070,7 @@ export default {
         if (sharePage) return sharePage;
       }
       await ensureSupportSchema(env);
+      await ensureAuthMethodsSchema(env);
       const publicPageMatch=url.pathname.match(/^\/p\/([a-f0-9]+)$/i);
       if(publicPageMatch&&req.method==="GET"){
         await ensureOceanSchema(env);
@@ -2116,6 +2135,22 @@ export default {
       if (url.pathname === "/api/auth/password-reset/request" && req.method === "POST") return requestPasswordReset(req, env);
       if (url.pathname === "/api/auth/password-reset/confirm" && req.method === "POST") return confirmPasswordReset(req, env);
       if (url.pathname === "/api/auth/setup" && req.method === "POST") return authSetup(req, env);
+      if (url.pathname === "/api/auth/passkeys/options" && req.method === "POST") return passkeyAuthenticationOptions(env, req);
+      if (url.pathname === "/api/auth/passkeys/verify" && req.method === "POST") {
+        const body = await req.json().catch(() => ({}));
+        const result: any = await verifyPasskeyAuthentication(env, body, req);
+        if (result instanceof Response) return result;
+        const sid = await createUserSession(env, result.user.id);
+        return attachSessionCookie(json({ ok: true, user: { id: result.user.id, email: result.user.email, role: result.user.role } }), sid, req);
+      }
+      if (url.pathname === "/api/account/security/methods" && req.method === "GET") return getSecurityMethods(env, await requireUser(req, env));
+      if (url.pathname === "/api/account/totp/setup" && req.method === "POST") return startAuthenticatorSetup(env, await requireUser(req, env));
+      if (url.pathname === "/api/account/totp/verify" && req.method === "POST") return confirmAuthenticatorSetup(env, await requireUser(req, env), await req.json().catch(() => ({})));
+      if (url.pathname === "/api/account/totp/disable" && req.method === "POST") return disableAuthenticator(env, await requireUser(req, env), await req.json().catch(() => ({})));
+      if (url.pathname === "/api/account/recovery-codes/regenerate" && req.method === "POST") return regenerateRecoveryCodes(env, await requireUser(req, env), await req.json().catch(() => ({})));
+      if (url.pathname === "/api/account/passkeys/register/options" && req.method === "POST") return passkeyRegistrationOptions(env, await requireUser(req, env), req);
+      if (url.pathname === "/api/account/passkeys/register/verify" && req.method === "POST") return verifyPasskeyRegistration(env, await requireUser(req, env), await req.json().catch(() => ({})), req);
+      if (url.pathname === "/api/account/passkeys/delete" && req.method === "POST") return deletePasskey(env, await requireUser(req, env), await req.json().catch(() => ({})));
       if (url.pathname === "/api/auth/2fa/verify" && req.method === "POST") return verifyTwoFactor(req, env);
       if (url.pathname === "/api/auth/2fa/resend" && req.method === "POST") return resendTwoFactor(req, env);
       if (url.pathname === "/api/auth/resend-verification" && req.method === "POST") return resendVerification(req, env);
