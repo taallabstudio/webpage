@@ -27,6 +27,7 @@ export interface Env {
   GOOGLE_LOGIN_CLIENT_SECRET?: string;
   OCEAN_PREVIEW_MODE?: string;
   UNSPLASH_ACCESS_KEY?: string;
+  EMOJI_API_KEY?: string;
   RESEND_API_KEY: string;
 }
 
@@ -1864,6 +1865,21 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
   if (!pathname.startsWith("/api/ocean/")) return null;
   const user = await requireOceanUser(req, env);
   await ensureOceanSchema(env);
+  if (pathname.startsWith("/api/ocean/emoji/") && req.method === "GET") {
+    if (!env.EMOJI_API_KEY) return json({error:"Emoji API is not configured on this Worker."},{status:503});
+    const url = new URL(req.url), action = pathname.slice("/api/ocean/emoji/".length);
+    let endpoint = "";
+    if (action === "categories") endpoint = "https://emoji-api.com/categories";
+    else if (action === "search") { const q=String(url.searchParams.get("query")||"").trim().slice(0,80); if(!q)return json({results:[]}); endpoint="https://emoji-api.com/emojis?search="+encodeURIComponent(q); }
+    else if (action === "category") { const cat=String(url.searchParams.get("name")||"").trim().slice(0,100); if(!cat)return json({results:[]}); endpoint="https://emoji-api.com/categories/"+encodeURIComponent(cat); }
+    else return json({error:"Unknown emoji endpoint."},{status:404});
+    const upstream=new URL(endpoint); upstream.searchParams.set("access_key",env.EMOJI_API_KEY);
+    const response=await fetch(upstream.toString(),{headers:{"Accept":"application/json"}});
+    const data:any=await response.json().catch(()=>null);
+    if(!response.ok||!Array.isArray(data)){console.error("Emoji API request failed",response.status);return json({error:"Emoji service is temporarily unavailable."},{status:response.status>=400&&response.status<500?response.status:502});}
+    const results=data.map((x:any)=>({character:String(x.character||""),name:String(x.unicodeName||x.slug||"Emoji"),slug:String(x.slug||""),group:String(x.group||""),subGroup:String(x.subGroup||"")})).filter((x:any)=>x.character);
+    return json(action==="categories"?{categories:data.map((x:any)=>({name:String(x.name||x.slug||""),slug:String(x.slug||x.name||""),emoji:String(x.emoji||x.character||"")}))}:{results},{headers:{"cache-control":"public, max-age=3600"}});
+  }
   if (pathname === "/api/ocean/unsplash/search" && req.method === "GET") {
     if (!env.UNSPLASH_ACCESS_KEY) return json({error:"Unsplash is not configured on this Worker."},{status:503});
     const query = String(new URL(req.url).searchParams.get("query") || "").trim().slice(0,120);
