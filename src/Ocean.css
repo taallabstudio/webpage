@@ -1011,3 +1011,12 @@
 .ocean-blocks .ocean-block-text {
   cursor: text;
 }
+
+
+/* Light-theme hover states must remain light and readable. */
+.ocean-shell:not([data-theme="dark"]) .ocean-user>button:hover{background:#edf5fd;color:#0878e8}
+.ocean-shell:not([data-theme="dark"]) .ocean-page-controls button:hover{color:#0878e8}
+.ocean-shell:not([data-theme="dark"]) .ocean-top-actions button:hover{background:#edf5fd;color:#0878e8}
+/* Ensure page titles keep strong contrast in dark mode. */
+.ocean-shell[data-theme="dark"] .ocean-title{color:#edf2f7!important}
+.ocean-shell[data-theme="dark"] .ocean-title-row input.ocean-title{color:#edf2f7!important;-webkit-text-fill-color:#edf2f7}
