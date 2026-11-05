@@ -1159,7 +1159,7 @@ function OceanApp(){
        <div className="ocean-crop-tool-group"><button title="Move left" aria-label="Move left" onClick={()=>setCoverX(v=>Math.max(0,v-5))}><ArrowLeft size={16}/></button><button title="Move right" aria-label="Move right" onClick={()=>setCoverX(v=>Math.min(100,v+5))}><ArrowRight size={16}/></button><button title="Move up" aria-label="Move up" onClick={()=>setCoverY(v=>Math.max(0,v-5))}><ArrowUp size={16}/></button><button title="Move down" aria-label="Move down" onClick={()=>setCoverY(v=>Math.min(100,v+5))}><ArrowDown size={16}/></button></div>
        <button className="ocean-crop-reset" onClick={()=>{setCoverZoom(100);setCoverX(50);setCoverY(50);}}><RotateCcw size={15}/> Reset</button>
       </div>
-     </div>
+     </div>}
      {coverError&&<p className="ocean-media-error">{coverError}</p>}
      <div className="ocean-media-footer"><button className="ocean-media-secondary" onClick={()=>{setPendingCover(null);setMediaPicker("cover");}}>Back to photos</button><button className="ocean-cover-apply" disabled={coverSearching} onClick={applyAdjustedCover}>{coverSearching?"Applying…":"Apply cover"}</button></div>
     </>:<>
