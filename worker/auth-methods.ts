@@ -213,6 +213,8 @@ export async function confirmAuthenticatorSetup(env: any, user: any, body: any) 
   const secret = await decryptSecret(env, row.secret_cipher);
   if (!(await verifyTotp(secret, code))) return json({ error: "That authenticator code is incorrect. Check your phone and try again." }, { status: 401 });
   await env.DB.prepare("UPDATE user_totp SET enabled=1,updated_at=?,pending_expires_at=NULL WHERE user_id=?").bind(now(), user.id).run();
+  // Enabling an authenticator also turns on the account's existing 2-step requirement.
+  await env.DB.prepare("UPDATE users SET two_factor_enabled=1,updated_at=? WHERE id=?").bind(now(), user.id).run();
   const recoveryCodes = await issueRecoveryCodes(env, user.id);
   return json({ ok: true, recoveryCodes });
 }
