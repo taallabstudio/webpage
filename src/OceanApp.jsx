@@ -44,6 +44,60 @@ const pageIconNode=(v,f="▤")=>{if(String(v||"").startsWith("/api/ocean/assets/
 const COLORS=[["Default",""],["Gray","gray"],["Brown","brown"],["Orange","orange"],["Yellow","yellow"],["Green","green"],["Blue","blue"],["Purple","purple"],["Pink","pink"],["Red","red"]];
 const VIEWS=["Table","Board","Gallery","List","Feed","Calendar","Timeline","Map","Vertical bar chart","Horizontal bar chart","Line chart","Donut chart","Number chart"];
 const escapeHtml=(value="")=>String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+const evaluateOceanFormula=(expression,row,headers)=>{
+ const tokens=String(expression||"").match(/\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\d+(?:\.\d+)?|[A-Za-z_][A-Za-z0-9_]*|===|!==|>=|<=|==|!=|&&|\\|\\||[()+*/%,<>!-])\s*/g)||[];
+ let cursor=0;
+ const peek=()=>tokens[cursor]?.trim()||"";
+ const take=()=>tokens[cursor++]?.trim()||"";
+ const precedence=op=>({"||":1,"&&":2,"==":3,"===":3,"!=":3,"!==":3,">":4,"<":4,">=":4,"<=":4,"+":5,"-":5,"*":6,"/":6,"%":6}[op]||0);
+ const parsePrimary=()=>{
+  const token=take();
+  if(!token)throw new Error("Unexpected end of formula");
+  if(token==="("){const value=parseExpression(0);if(take()!==")")throw new Error("Missing closing parenthesis");return value;}
+  if(token.startsWith('"')||token.startsWith("'"))return token.slice(1,-1).replace(/\\(["'\\])/g,"$1");
+  if(/^\d/.test(token))return Number(token);
+  if(token==="true")return true;if(token==="false")return false;if(token==="null")return null;
+  if(!/^[A-Za-z_]/.test(token))throw new Error("Unexpected token "+token);
+  if(peek()==="("){
+   take();const args=[];if(peek()!==")"){do{args.push(parseExpression(0));if(peek()!==",")break;take();}while(true);}
+   if(take()!==")")throw new Error("Missing ) after "+token);
+   const name=token.toLowerCase();
+   if(name==="prop"){const index=headers.findIndex(h=>String(h).toLowerCase()===String(args[0]??"").toLowerCase());return index<0?"":row[index]??"";}
+   if(name==="concat")return args.map(v=>v??"").join("");
+   if(name==="if")return args[0]?args[1]:args[2];
+   if(name==="round")return Number(Number(args[0]).toFixed(Math.max(0,Math.min(10,Number(args[1]??0)))));
+   if(name==="abs")return Math.abs(Number(args[0]));
+   if(name==="min")return Math.min(...args.map(Number));
+   if(name==="max")return Math.max(...args.map(Number));
+   if(name==="upper")return String(args[0]??"").toUpperCase();
+   if(name==="lower")return String(args[0]??"").toLowerCase();
+   if(name==="length")return String(args[0]??"").length;
+   if(name==="datediff"||name==="daysbetween"){
+    const start=new Date(args[0]),end=new Date(args[1]);if(Number.isNaN(start.getTime())||Number.isNaN(end.getTime()))return "";
+    const unit=String(args[2]||"days").toLowerCase(),diff=end.getTime()-start.getTime();
+    return unit.startsWith("hour")?diff/3600000:unit.startsWith("minute")?diff/60000:Math.trunc(diff/86400000);
+   }
+   if(name==="today"||name==="now")return new Date().toISOString();
+   throw new Error("Unknown function "+token);
+  }
+  throw new Error("Unknown property or value "+token);
+ };
+ const apply=(op,a,b)=>{
+  if(op==="+")return typeof a==="string"||typeof b==="string"?String(a??"")+String(b??""):Number(a)+Number(b);
+  if(op==="-")return Number(a)-Number(b);if(op==="*")return Number(a)*Number(b);
+  if(op==="/")return Number(b)===0?"":Number(a)/Number(b);if(op==="%")return Number(a)%Number(b);
+  if(op==="== "||op==="=="||op==="===")return a==b;if(op==="!="||op==="!==")return a!=b;
+  if(op===">")return a>b;if(op==="<")return a<b;if(op===">=")return a>=b;if(op==="<=")return a<=b;
+  if(op==="&&")return a&&b;if(op==="||")return a||b;throw new Error("Unsupported operator "+op);
+ };
+ const parseExpression=min=>{
+  let left=parsePrimary();
+  while(precedence(peek())>min){const op=take(),right=parseExpression(precedence(op));left=apply(op,left,right);}
+  return left;
+ };
+ try{const result=parseExpression(0);if(cursor!==tokens.length)throw new Error("Unexpected token "+peek());return {value:result,error:""};}
+ catch(error){return {value:"",error:error.message||"Invalid formula"};}
+};
 const safeLinkUrl=(value="")=>{
  const url=String(value).trim();
  if(/^https?:\/\//i.test(url)||/^mailto:/i.test(url))return url;
