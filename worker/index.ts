@@ -786,8 +786,13 @@ async function setSetting(env: Env, key: string, value: string) {
 
 
 function googleLoginRedirect(env: Env, params: Record<string, string> = {}, returnTo = "/admin") {
-  const safeReturn = returnTo === "/ocean.html" ? returnTo : "/admin";
-  const url = new URL(safeReturn, origin(env));
+  const isOceanReturn = returnTo === "/ocean.html";
+  const safeReturn = isOceanReturn ? "/" : "/admin";
+  // OCEAN is a separate hostname-routed SPA. Returning it to taallab.work
+  // loads the studio/transfer app instead, which cannot render OceanLogin's
+  // Google 2FA challenge and appears as a blank/incorrect page.
+  const redirectOrigin = isOceanReturn ? "https://app.taallab.work" : origin(env);
+  const url = new URL(safeReturn, redirectOrigin);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   return url;
 }
