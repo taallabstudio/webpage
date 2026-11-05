@@ -614,14 +614,14 @@ function SecurityMethods({user}) {
     catch(e){setError(e.message);}
     finally{setBusy(false);}
   }
-  async function disableAuthenticator(e){
-    e.preventDefault();setBusy(true);setError("");setMessage("");
+  async function disableAuthenticator(){
+    setBusy(true);setError("");setMessage("");
     try{await api("/account/totp/disable",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});setCode("");setMessage("Authenticator app disabled. Until you set it up again, email verification will be used as a temporary sign-in fallback.");setRecoveryCodes([]);await refresh();}
     catch(e){setError(e.message);}
     finally{setBusy(false);}
   }
-  async function renewRecoveryCodes(e){
-    e.preventDefault();setBusy(true);setError("");setMessage("");
+  async function renewRecoveryCodes(){
+    setBusy(true);setError("");setMessage("");
     try{const result=await api("/account/recovery-codes/regenerate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});setRecoveryCodes(result.recoveryCodes||[]);setCode("");setMessage("New recovery codes generated. Your previous codes are no longer valid.");await refresh();}
     catch(e){setError(e.message);}
     finally{setBusy(false);}
@@ -662,14 +662,13 @@ function SecurityMethods({user}) {
     </div>}
     {methods.authenticatorEnabled&&<div style={{marginTop:14}}>
       <p className="muted">Unused recovery codes: {methods.recoveryCodesRemaining}. Each code can be used once if you lose access to your authenticator.</p>
-      <form onSubmit={renewRecoveryCodes} style={{marginTop:12}}>
-        <label>Authenticator or recovery code<input value={code} onChange={e=>setCode(e.target.value)} autoComplete="off" placeholder="Enter a code to regenerate recovery codes" required/></label>
-        <button className="ghost-btn" disabled={busy||!code.trim()}>Generate new recovery codes</button>
-      </form>
-      <form onSubmit={disableAuthenticator} style={{marginTop:12}}>
-        <label>Confirm code to disable authenticator<input value={code} onChange={e=>setCode(e.target.value)} autoComplete="off" placeholder="Authenticator or recovery code" required/></label>
-        <button className="ghost-btn" disabled={busy||!code.trim()}>Disable authenticator</button>
-      </form>
+      <div style={{marginTop:12}}>
+        <label>Authenticator or recovery code<input value={code} onChange={e=>setCode(e.target.value)} autoComplete="off" placeholder="Enter a code to confirm a security change"/></label>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button type="button" className="ghost-btn" disabled={busy||!code.trim()} onClick={renewRecoveryCodes}>Generate new recovery codes</button>
+          <button type="button" className="ghost-btn" disabled={busy||!code.trim()} onClick={disableAuthenticator}>Disable authenticator</button>
+        </div>
+      </div>
     </div>}
     {recoveryCodes.length>0&&<div style={{marginTop:18,padding:16,border:"1px solid var(--border-color, #ddd)",borderRadius:12}}>
       <strong>Save your recovery codes</strong>
