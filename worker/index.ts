@@ -250,7 +250,7 @@ async function createEmailVerification(env: Env, user: any) {
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033">
       <h2>Verify your TaalLab email</h2>
-      <p>Confirm that <strong>${safeEmail}</strong> belongs to you so you can access TrackDeliver.</p>
+      <p>Confirm that <strong>${safeEmail}</strong> belongs to you so you can access TaalLab.</p>
       <p style="margin:28px 0"><a href="${link}" style="display:inline-block;background:#147ce5;color:white;text-decoration:none;padding:13px 20px;border-radius:8px;font-weight:600">Verify email address</a></p>
       <p style="font-size:13px;color:#687080">This verification link expires in 24 hours.</p>
       <p style="font-size:13px;color:#687080">If you did not create this account, you can ignore this email.</p>
@@ -857,7 +857,7 @@ async function googleAuthCallback(req: Request, env: Env) {
       "SELECT id,email,role,status,email_verified_at,two_factor_enabled FROM users WHERE email=? LIMIT 1"
     ).bind(email).first();
 
-    if (user && user.status !== "active") return fail("This TrackDeliver account is disabled. Contact TaalLab for help.");
+    if (user && user.status !== "active") return fail("This TaalLab account is disabled. Contact TaalLab for help.");
 
     if (!user) {
       const id = randomToken(16);
@@ -881,7 +881,7 @@ async function googleAuthCallback(req: Request, env: Env) {
     }
   }
 
-  if (!user || user.status !== "active") return fail("This TrackDeliver account is unavailable. Contact TaalLab for help.");
+  if (!user || user.status !== "active") return fail("This TaalLab account is unavailable. Contact TaalLab for help.");
   if (!user.email_verified_at) {
     await env.DB.prepare("UPDATE users SET email_verified_at=?,updated_at=? WHERE id=?").bind(now(), now(), user.id).run();
     user.email_verified_at = now();
@@ -898,7 +898,7 @@ async function googleAuthCallback(req: Request, env: Env) {
     const sent = await sendTwoFactorCode(env, user, challengeId, code);
     if (!sent.sent) {
       await env.DB.prepare("DELETE FROM two_factor_challenges WHERE id=?").bind(challengeId).run();
-      return fail("We could not send your TrackDeliver sign-in code. Please try again.");
+      return fail("We could not send your TaalLab sign-in code. Please try again.");
     }
     const response = new Response(null, {
       status: 302,
@@ -1461,8 +1461,8 @@ async function transferSharePage(req: Request, env: Env, transferId: string) {
   const fileLabel = names.length === 1 ? names[0] : names.length === 2 ? names.join(" and ") : names[0] + " and " + (names.length - 1) + " more files";
   const title = fileLabel + " | TaalLab";
   const description = names.length === 1
-    ? "A file has been shared with you through TaalLab TrackDeliver."
-    : names.length + " files have been shared with you through TaalLab TrackDeliver.";
+    ? "A file has been shared with you through TaalLab."
+    : names.length + " files have been shared with you through TaalLab.";
   const pageUrl = new URL(req.url).href;
   const page = await env.ASSETS.fetch(new Request(new URL("/", req.url), { headers: req.headers }));
   if (!page.ok) return page;
