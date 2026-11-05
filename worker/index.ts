@@ -796,30 +796,33 @@ async function googleAuthStart(req: Request, env: Env) {
   const requestedReturn = new URL(req.url).searchParams.get("return_to") || "/admin";
   const returnTo = requestedReturn === "/ocean.html" ? "/ocean.html" : "/admin";
   if (!env.GOOGLE_LOGIN_CLIENT_ID || !env.GOOGLE_LOGIN_CLIENT_SECRET) {
-    return new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: "Google sign-in is not configured yet." }, returnTo).toString() } });
+    return new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: "Google sign-in is not configured yet." }, returnTo).toString(), "cache-control": "no-store" } });
   }
   const state = randomToken(24);
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", env.GOOGLE_LOGIN_CLIENT_ID);
+  // Both supported site hosts share this canonical OAuth callback.
   url.searchParams.set("redirect_uri", `${origin(env)}/api/auth/google/callback`);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", "openid email profile");
   url.searchParams.set("state", state);
   url.searchParams.set("prompt", "select_account");
   url.searchParams.set("include_granted_scopes", "true");
-  const response = new Response(null, { status: 302, headers: { location: url.toString() } });
-  response.headers.append("set-cookie", cookie("google_login_state", state, 600, req));
-  response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req));
+  const response = new Response(null, { status: 302, headers: { location: url.toString(), "cache-control": "no-store" } });
+  // The flow can begin on app.taallab.work and finish on taallab.work.
+  // State and return cookies must therefore be valid on both hosts.
+  response.headers.append("set-cookie", cookie("google_login_state", state, 600, req).replace("Path=/;", "Domain=.taallab.work; Path=/;"));
+  response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req).replace("Path=/;", "Domain=.taallab.work; Path=/;"));
   return response;
 }
 
 async function googleAuthCallback(req: Request, env: Env) {
   const url = new URL(req.url);
-  const clearStateCookie = "google_login_state=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax";
-  const clearReturnCookie = "google_login_return=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const clearStateCookie = "google_login_state=; Max-Age=0; Domain=.taallab.work; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const clearReturnCookie = "google_login_return=; Max-Age=0; Domain=.taallab.work; Path=/; HttpOnly; Secure; SameSite=Lax";
   const returnTo = parseCookie(req, "google_login_return") === "/ocean.html" ? "/ocean.html" : "/admin";
   const fail = (message: string) => {
-    const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: message }, returnTo).toString() } });
+    const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: message }, returnTo).toString(), "cache-control": "no-store" } });
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
     return response;
@@ -913,7 +916,7 @@ async function googleAuthCallback(req: Request, env: Env) {
     }
     const response = new Response(null, {
       status: 302,
-      headers: { location: googleLoginRedirect(env, { google_2fa: "1", challenge_id: challengeId, email: user.email }, returnTo).toString() },
+      headers: { location: googleLoginRedirect(env, { google_2fa: "1", challenge_id: challengeId, email: user.email }, returnTo).toString(), "cache-control": "no-store" },
     });
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
@@ -921,13 +924,12 @@ async function googleAuthCallback(req: Request, env: Env) {
   }
 
   const sid = await createUserSession(env, user.id);
-  const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, {}, returnTo).toString() } });
+  const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, {}, returnTo).toString(), "cache-control": "no-store" } });
   response.headers.append("set-cookie", clearStateCookie);
   response.headers.append("set-cookie", clearReturnCookie);
   attachSessionCookie(response, sid, req);
   return response;
 }
-
 async function googleLogin(req: Request, env: Env) {
   await requireAdmin(req, env);
   const state = randomToken(24);
