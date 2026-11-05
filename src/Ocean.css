@@ -1150,3 +1150,19 @@
  .ocean-db-calendar-week-add{display:flex;align-items:center;gap:3px;padding:6px 5px;color:#647586!important;font-size:11px;white-space:nowrap}
 }
 @media(min-width:761px){.ocean-db-calendar-mobile-toolbar,.ocean-db-calendar-week-view{display:none}}
+
+@media(max-width:760px){
+ .ocean-topbar{gap:5px;padding-left:8px;padding-right:8px}
+ .ocean-crumb{flex:1;min-width:0;font-size:11px}
+ .ocean-crumb>span{display:none}
+ .ocean-top-actions{gap:1px}
+ .ocean-top-actions>button:not(.ocean-share-trigger){width:30px;min-width:30px;height:34px;padding:0!important}
+ .ocean-top-actions .ocean-save-state{display:none}
+ .ocean-top-actions>button.ocean-share-trigger{min-width:30px;width:30px!important;height:32px;padding:0!important;border:0!important;background:transparent!important}
+ .ocean-top-actions>button.ocean-share-trigger span{display:none}
+ .ocean-top-actions>button.ocean-share-trigger svg{width:17px;height:17px}
+ .ocean-db-calendar-toolbar>div:last-child>button:nth-child(-n+3){display:none}
+ .ocean-db-calendar-toolbar>div:last-child{justify-content:flex-start}
+ .ocean-db-calendar-toolbar>div:last-child>button{min-height:34px}
+ .ocean-db-calendar-week-view{margin-bottom:8px}
+}
