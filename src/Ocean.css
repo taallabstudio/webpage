@@ -41,7 +41,7 @@
 .ocean-crumb{display:flex;align-items:center;gap:7px;min-width:0}.ocean-crumb strong{font-weight:500;color:#c9c9c9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ocean-top-actions{display:flex;align-items:center;gap:5px}.ocean-save-state{font-size:11px;color:#777;margin-right:9px}
 .ocean-page-scroll{overflow:auto;flex:1;position:relative}
-.ocean-cover{height:220px;background-position:center;background-size:cover;opacity:.85}
+.ocean-cover{height:220px;position:relative;overflow:hidden;background:#e9ebef}.ocean-cover img{display:block;width:100%;height:100%;object-fit:cover;object-position:center;opacity:.92}
 .ocean-editor{width:min(900px,100%);padding:32px 64px 100px;margin:0 auto;position:relative}
 .ocean-page-scroll:has(.ocean-cover) .ocean-editor{padding-top:18px}
 .ocean-page-controls{height:27px;display:flex;align-items:center;gap:14px;opacity:0;transition:opacity .15s}
