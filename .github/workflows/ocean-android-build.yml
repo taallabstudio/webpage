@@ -2,11 +2,6 @@ name: Build OCEAN for Android
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'src-tauri/**'
 
 permissions:
   contents: read
