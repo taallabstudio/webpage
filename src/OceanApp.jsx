@@ -649,6 +649,7 @@ function OceanApp(){
  const [coverZoom,setCoverZoom]=useState(100);
  const [coverX,setCoverX]=useState(50);
  const [coverY,setCoverY]=useState(50);
+ const cropDrag=useRef(null);
  const [textFormatToolbar,setTextFormatToolbar]=useState(null),[pageLinkSuggestion,setPageLinkSuggestion]=useState(null);
  const editorRef=useRef(null),slashInput=useRef(null),saveTimer=useRef(null),blockRefs=useRef({}),localDirty=useRef(false),skipNextSave=useRef(false),lastSyncedAt=useRef(0);
  const [activeView,setActiveView]=useState("Table");
@@ -1148,11 +1149,16 @@ function OceanApp(){
     <header><div><span className="ocean-media-eyebrow">OCEAN • PAGE PERSONALIZATION</span><h2>{mediaPicker==="cover-adjust"?"Adjust cover":mediaPicker==="cover"?(page.cover?"Change cover":"Add cover"):(page.icon?"Change icon":"Add icon")}</h2></div><button className="ocean-media-close" onClick={()=>{setMediaPicker("");setPendingCover(null);}} aria-label="Close"><X size={19}/></button></header>
     {mediaPicker==="icon"?<><p className="ocean-media-description">Choose an emoji to give this page its own identity.</p><input className="ocean-media-search" value={iconSearch} onChange={e=>setIconSearch(e.target.value)} placeholder="Search icons or emoji…"/><div className="ocean-icon-grid">{EMOJIS.filter(x=>!iconSearch||x.toLowerCase().includes(iconSearch.toLowerCase())).map((emoji,i)=><button key={i} onClick={()=>{savePagePatch({icon:emoji});setMediaPicker("");}}>{emoji}</button>)}</div><div className="ocean-media-footer"><button className="ocean-media-secondary" onClick={()=>{savePagePatch({icon:""});setMediaPicker("");}}>Remove icon</button></div></>:mediaPicker==="cover-adjust"?<>
      <p className="ocean-media-description">Position and size your image before applying it to the page.</p>
-     {pendingCover&&<div className="ocean-cover-crop-preview"><img src={pendingCover.url} alt={pendingCover.description} style={{objectPosition:coverX+"% "+coverY+"%",transform:"scale("+(coverZoom/100)+")"}}/><span>PAGE COVER PREVIEW</span></div>}
-     <div className="ocean-cover-adjust-controls">
-      <label><span>Zoom <b>{coverZoom}%</b></span><input type="range" min="100" max="200" step="1" value={coverZoom} onChange={e=>setCoverZoom(Number(e.target.value))}/></label>
-      <label><span>Horizontal position <b>{coverX}%</b></span><input type="range" min="0" max="100" step="1" value={coverX} onChange={e=>setCoverX(Number(e.target.value))}/></label>
-      <label><span>Vertical position <b>{coverY}%</b></span><input type="range" min="0" max="100" step="1" value={coverY} onChange={e=>setCoverY(Number(e.target.value))}/></label>
+     {pendingCover&&<div className="ocean-crop-workspace">
+      <div className="ocean-cover-crop-preview" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);cropDrag.current={x:e.clientX,y:e.clientY,cx:coverX,cy:coverY,w:e.currentTarget.clientWidth,h:e.currentTarget.clientHeight};}} onPointerMove={e=>{if(!cropDrag.current)return;const d=cropDrag.current;setCoverX(Math.max(0,Math.min(100,d.cx-(e.clientX-d.x)/d.w*100)));setCoverY(Math.max(0,Math.min(100,d.cy-(e.clientY-d.y)/d.h*100)));}} onPointerUp={()=>{cropDrag.current=null;}} onPointerCancel={()=>{cropDrag.current=null;}}>
+       <img src={pendingCover.url} alt={pendingCover.description} draggable="false" style={{objectPosition:coverX+"% "+coverY+"%",transform:"scale("+(coverZoom/100)+")"}}/>
+       <div className="ocean-crop-grid"><i/><i/></div><span>DRAG TO REPOSITION</span>
+      </div>
+      <div className="ocean-crop-toolbar">
+       <div className="ocean-crop-tool-group"><button title="Zoom out" aria-label="Zoom out" onClick={()=>setCoverZoom(v=>Math.max(100,v-10))}><Minus size={16}/></button><span>{coverZoom}%</span><button title="Zoom in" aria-label="Zoom in" onClick={()=>setCoverZoom(v=>Math.min(200,v+10))}><Plus size={16}/></button></div>
+       <div className="ocean-crop-tool-group"><button title="Move left" aria-label="Move left" onClick={()=>setCoverX(v=>Math.max(0,v-5))}><ArrowLeft size={16}/></button><button title="Move right" aria-label="Move right" onClick={()=>setCoverX(v=>Math.min(100,v+5))}><ArrowRight size={16}/></button><button title="Move up" aria-label="Move up" onClick={()=>setCoverY(v=>Math.max(0,v-5))}><ArrowUp size={16}/></button><button title="Move down" aria-label="Move down" onClick={()=>setCoverY(v=>Math.min(100,v+5))}><ArrowDown size={16}/></button></div>
+       <button className="ocean-crop-reset" onClick={()=>{setCoverZoom(100);setCoverX(50);setCoverY(50);}}><RotateCcw size={15}/> Reset</button>
+      </div>
      </div>
      {coverError&&<p className="ocean-media-error">{coverError}</p>}
      <div className="ocean-media-footer"><button className="ocean-media-secondary" onClick={()=>{setPendingCover(null);setMediaPicker("cover");}}>Back to photos</button><button className="ocean-cover-apply" disabled={coverSearching} onClick={applyAdjustedCover}>{coverSearching?"Applying…":"Apply cover"}</button></div>
