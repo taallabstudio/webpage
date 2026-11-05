@@ -3,13 +3,13 @@ import {createPortal} from "react-dom";
 import "./Ocean.css";
 import { startAuthentication } from "@simplewebauthn/browser";
 import {
-  Activity,AlignLeft,Archive,ArrowDown,ArrowLeft,AudioLines,BarChart3,Bell,BookOpen,
+  Activity,AlignLeft,Archive,ArrowDown,ArrowLeft,ArrowRight,ArrowUp,AudioLines,BarChart3,Bell,BookOpen,
   Bookmark,Calendar,Check,CheckSquare,ChevronDown,ChevronRight,ChevronsUpDown,
   CircleHelp,Code,Columns3,Command,Copy,Database,File,FileAudio,FileImage,FilePlus,
   FileText,Film,Folder,FolderPlus,GalleryHorizontal,Globe,Grid2X2,Hash,Heart,
-  Image as ImageIcon,Inbox,Link,LogOut,Lock,Map,Menu,MessageCircle,MoreHorizontal,
+  Image as ImageIcon,Inbox,Link,LogOut,Lock,Map,Menu,MessageCircle,Minus,MoreHorizontal,
   PanelLeftClose,PanelLeftOpen,Plus,Palette,Search,Settings,Share2,ShieldCheck,SlidersHorizontal,
-  Smile,Table2,Text,Trash2,Upload,User,Users,Video,X,Moon,Sun
+  Smile,Table2,Text,Trash2,Upload,User,Users,Video,X,Moon,Sun,RotateCcw
 } from "lucide-react";
 
 const api=async(path,options={})=>{
