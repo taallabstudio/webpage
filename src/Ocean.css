@@ -1337,3 +1337,16 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 .ocean-db-cards>.ocean-db-board-card{position:relative}
 .ocean-db-cards>button{display:inline-flex;align-items:center;gap:7px;margin:8px;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:inherit;cursor:pointer;font:inherit}
 .ocean-db-cards>button:hover{background:rgba(120,140,160,.12)}
+
+
+/* Stable database table sizing and drag-resizable property columns */
+.ocean-db-table{width:max-content;min-width:0;table-layout:fixed}
+.ocean-db-table th.ocean-db-row-select,.ocean-db-table td.ocean-db-row-select{width:34px;min-width:34px;max-width:34px}
+.ocean-db-table thead th:last-child{width:150px;min-width:150px;max-width:150px}
+.ocean-db-table td.ocean-db-row-actions,.ocean-db-table th.ocean-db-row-actions{width:34px;min-width:34px;max-width:34px}
+.ocean-db-property-head{position:relative}
+.ocean-db-property-head>button{overflow:hidden}
+.ocean-db-column-resizer{position:absolute;z-index:5;top:0;right:-1px;width:8px;height:100%;cursor:col-resize;touch-action:none}
+.ocean-db-column-resizer::after{content:"";position:absolute;top:25%;bottom:25%;left:3px;width:2px;border-radius:2px;background:transparent}
+.ocean-db-table th:hover .ocean-db-column-resizer::after,.ocean-db-column-resizer:focus-visible::after{background:#2583d8}
+.ocean-db-table-scroll:has(.ocean-db-column-resizer:active){user-select:none;cursor:col-resize}
