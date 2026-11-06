@@ -1341,7 +1341,6 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 
 /* Stable database table sizing and drag-resizable property columns */
 .ocean-db-table{width:max-content;min-width:0;table-layout:fixed}
-.ocean-db-table th.ocean-db-row-select,.ocean-db-table td.ocean-db-row-select{width:34px;min-width:34px;max-width:34px}
 .ocean-db-table thead th:last-child{width:150px;min-width:150px;max-width:150px}
 .ocean-db-table td.ocean-db-row-actions,.ocean-db-table th.ocean-db-row-actions{width:34px;min-width:34px;max-width:34px}
 .ocean-db-property-head{position:relative}
@@ -1358,3 +1357,19 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 .ocean-db-table th.ocean-db-row-select .ocean-db-select-resizer{right:0;z-index:8}
 .ocean-db-table th.ocean-db-row-select:hover .ocean-db-select-resizer::after,.ocean-db-table th.ocean-db-row-select .ocean-db-select-resizer:focus-visible::after{background:#2583d8}
 .ocean-db-table td.ocean-db-row-select input{display:inline-block;width:15px!important;height:15px;min-width:15px!important;margin:0;padding:0;vertical-align:middle}
+
+
+/* Selection column: its width is controlled by the saved database setting */
+.ocean-db-table th.ocean-db-row-select,.ocean-db-table td.ocean-db-row-select{box-sizing:border-box;padding:0!important}
+.ocean-db-table th.ocean-db-row-select{position:relative;overflow:visible}
+.ocean-db-table th.ocean-db-row-select .ocean-db-select-resizer{position:absolute;top:0;right:-5px;width:14px;height:100%;z-index:20;display:block;cursor:col-resize;touch-action:none;pointer-events:auto}
+.ocean-db-table th.ocean-db-row-select .ocean-db-select-resizer::after{content:"";position:absolute;top:20%;bottom:20%;left:6px;width:2px;border-radius:2px;background:transparent}
+.ocean-db-table th.ocean-db-row-select:hover .ocean-db-select-resizer::after,.ocean-db-table th.ocean-db-row-select .ocean-db-select-resizer:focus-visible::after{background:#2583d8}
+.ocean-db-table td.ocean-db-row-select input,.ocean-db-table th.ocean-db-row-select input{display:block;width:15px!important;height:15px;min-width:15px!important;margin:0 auto;padding:0;vertical-align:middle}
+.ocean-db-table th.ocean-db-row-select .ocean-db-select-resizer:active{cursor:col-resize}
+.ocean-db-add-property-head{min-width:170px}
+.ocean-db-add-property-controls{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%}
+.ocean-db-add-property-controls>button:first-child{display:inline-flex;align-items:center;gap:6px}
+.ocean-db-add-property-controls .ocean-db-remove-property{display:inline-flex;align-items:center;justify-content:center;width:25px;height:25px;min-width:25px;padding:0;border:1px solid #d7e0e9;border-radius:5px;background:transparent;color:#bd4242;font-size:19px;line-height:1;cursor:pointer}
+.ocean-db-add-property-controls .ocean-db-remove-property:hover:not(:disabled){background:#fff0f0;border-color:#e7bcbc}
+.ocean-db-add-property-controls .ocean-db-remove-property:disabled{opacity:.35;cursor:not-allowed}
