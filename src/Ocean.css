@@ -1373,3 +1373,13 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 .ocean-db-add-property-controls .ocean-db-remove-property{display:inline-flex;align-items:center;justify-content:center;width:25px;height:25px;min-width:25px;padding:0;border:1px solid #d7e0e9;border-radius:5px;background:transparent;color:#bd4242;font-size:19px;line-height:1;cursor:pointer}
 .ocean-db-add-property-controls .ocean-db-remove-property:hover:not(:disabled){background:#fff0f0;border-color:#e7bcbc}
 .ocean-db-add-property-controls .ocean-db-remove-property:disabled{opacity:.35;cursor:not-allowed}
+
+
+/* Selection column sizing: drag the far-right edge of the checkbox header */
+.ocean-db-table col:first-child{width:32px}
+.ocean-db-table th.ocean-db-row-select,.ocean-db-table td.ocean-db-row-select{width:32px;min-width:32px;max-width:32px;box-sizing:border-box;padding:0!important}
+.ocean-db-table th.ocean-db-row-select{cursor:col-resize;overflow:visible;position:relative}
+.ocean-db-table th.ocean-db-row-select input{cursor:pointer}
+.ocean-db-table th.ocean-db-row-select .ocean-db-select-resizer{right:-6px;width:16px;z-index:30;cursor:col-resize}
+.ocean-db-table th.ocean-db-row-select .ocean-db-select-resizer::after{left:7px}
+.ocean-db-table td.ocean-db-row-select input,.ocean-db-table th.ocean-db-row-select input{width:14px!important;height:14px;min-width:14px!important;margin:0 auto}
