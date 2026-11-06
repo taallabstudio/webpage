@@ -223,7 +223,7 @@ function OceanDatabaseBlock({block,updateBlock,allBlocks=[]}){
    setPropertyTypeMenu(false);
    setCalculationMenu(null);
   };
-  const closeOnScroll=()=>setPropertyMenu(null);
+  const closeOnScroll=event=>{if(propertyMenuRef.current?.contains(event.target))return;setPropertyMenu(null);};
   document.addEventListener("pointerdown",closeOutside,true);
   document.addEventListener("scroll",closeOnScroll,true);
   window.addEventListener("resize",closeOnScroll);
@@ -376,7 +376,7 @@ function OceanDatabaseBlock({block,updateBlock,allBlocks=[]}){
  const addRecordComment=()=>{const text=commentDraft.trim();if(!text||activeRecordIndex===null)return;const comments={...(block.recordComments||{})};comments[activeRecordIndex]=[...(comments[activeRecordIndex]||[]),{id:uid(),text,createdAt:new Date().toISOString()}];updateBlock(block.id,{recordComments:comments});setCommentDraft("");};
  const deleteRecord=(rowIndex)=>{const comments={};Object.entries(block.recordComments||{}).forEach(([key,value])=>{const index=Number(key);if(index<rowIndex)comments[index]=value;else if(index>rowIndex)comments[index-1]=value;});saveRows(rows.filter((_,i)=>i!==rowIndex));updateBlock(block.id,{recordComments:comments});setActiveRecordIndex(null);};
  const editCell=(row,col,value)=>{if(locked)return;const next=rows.map(r=>[...r]);next[row][col]=value;saveRows(next);};
- const addRow=(groupValue="")=>{if(locked)return;const row=Array(width).fill("");row[0]="Untitled";const statusColumn=headers.findIndex(name=>/status/i.test(String(name)));if(statusColumn>=0&&properties[statusColumn]?.type==="status")row[statusColumn]=properties[statusColumn]?.options?.[0]||"Not started";if(groupValue&&groupBy<width)row[groupBy]=groupValue;saveRows([...rows,row]);setActiveRecordIndex(rows.length);setCommentDraft("");};
+ const addRow=(groupValue="")=>{if(locked)return;const row=Array(width).fill("");row[0]="Untitled";const statusColumn=headers.findIndex(name=>/status/i.test(String(name)));if(statusColumn>=0&&properties[statusColumn]?.type==="status")row[statusColumn]=properties[statusColumn]?.options?.[0]||"Not started";if(groupValue&&groupBy<width)row[groupBy]=groupValue;saveRows([...rows,row]);setActiveRecordIndex(null);setCommentDraft("");};
  const addRowOnDate=day=>{if(locked)return;const baseRows=detectedDateCol<0?rows.map((r,i)=>i===0?[...r,"Date"]:[...r,""]):rows;const targetDateCol=detectedDateCol<0?width:dateCol;const row=Array(Math.max(width,targetDateCol+1)).fill("");row[targetDateCol]=dateKey(day);saveRows([...baseRows,row]);};
  const resetQuickAdd=()=>{setQuickAddDate("");setQuickAddTitle("");setQuickAddAllDay(false);setQuickAddStart("10:00");setQuickAddEnd("11:00");setQuickAddLocation("");setQuickAddDescription("");setQuickAddReminder(true);setQuickAddReminderMinutes(10);setQuickAddColorId("");setQuickAddError("");};
  const openQuickAdd=day=>{setQuickAddDate(dateKey(day));setQuickAddTitle("");setQuickAddAllDay(false);setQuickAddStart("10:00");setQuickAddEnd("11:00");setQuickAddError("");};
