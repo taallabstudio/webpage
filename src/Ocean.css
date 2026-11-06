@@ -1322,3 +1322,18 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 .ocean-db-popover[data-open-menu]{max-height:min(72vh,600px);overflow:auto}
 .ocean-shell[data-theme="dark"] .ocean-db-rule{border-color:#414c58}
 .ocean-shell[data-theme="dark"] .ocean-db-rule input,.ocean-shell[data-theme="dark"] .ocean-db-rule select{background:#20252c;border-color:#414c58;color:#e1e8ef}
+
+
+/* Database record actions and restored New page rows */
+.ocean-db-row-actions{width:34px;min-width:34px;text-align:center}
+.ocean-db-row-actions button{opacity:0;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:0;border-radius:5px;background:transparent;color:#d04444;cursor:pointer}
+.ocean-db-table tbody tr:hover .ocean-db-row-actions button,.ocean-db-row-actions button:focus-visible{opacity:1}
+.ocean-db-new-page-row td{height:36px;background:transparent}
+.ocean-db-new-page-row button{display:inline-flex;align-items:center;gap:7px;padding:7px 9px;border:0;background:transparent;color:inherit;cursor:pointer;font:inherit}
+.ocean-db-new-page-row button:hover{color:#1683e8}
+.ocean-db-board-card{position:relative}
+.ocean-db-card-delete{position:absolute;right:7px;top:7px;z-index:2;opacity:0;width:25px;height:25px;border:0;border-radius:5px;background:rgba(255,255,255,.92);color:#c33;cursor:pointer}
+.ocean-db-board-card:hover .ocean-db-card-delete,.ocean-db-card-delete:focus-visible{opacity:1}
+.ocean-db-cards>.ocean-db-board-card{position:relative}
+.ocean-db-cards>button{display:inline-flex;align-items:center;gap:7px;margin:8px;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:inherit;cursor:pointer;font:inherit}
+.ocean-db-cards>button:hover{background:rgba(120,140,160,.12)}
