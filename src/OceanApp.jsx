@@ -267,7 +267,7 @@ function OceanDatabaseBlock({block,updateBlock,allBlocks=[]}){
   document.addEventListener("pointerup",finish,{once:true});
  };
  const propertyWidth=index=>resizingWidths[index]||Number(properties[index]?.width)||160;
- const selectColumnWidth=resizingWidths.select??Number(block.databaseSettings?.selectColumnWidth)||40;
+ const selectColumnWidth=resizingWidths.select??(Number(block.databaseSettings?.selectColumnWidth)||40);
  const beginSelectColumnResize=event=>{
   if(locked)return;event.preventDefault();event.stopPropagation();
   const startX=event.clientX,startWidth=selectColumnWidth,minWidth=34,maxWidth=120;
