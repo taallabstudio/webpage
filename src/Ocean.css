@@ -1305,3 +1305,20 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
   .ocean-title{font-size:29px}
   .ocean-cover{aspect-ratio:2/1}
 }
+
+
+/* OCEAN database toolbar: coordinated rule builders and property controls */
+.ocean-db-rule{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid #edf0f3}
+.ocean-db-rule input,.ocean-db-rule select{min-width:0;width:100%;max-width:100%;padding:7px 8px;border:1px solid #dce4ec;border-radius:6px;background:#fff;color:#344454;font:inherit;font-size:12px}
+.ocean-db-rule input{grid-column:1/-1}
+.ocean-db-rule button{min-width:26px;justify-content:center;padding:5px!important}
+.ocean-db-menu-hint{margin:3px 7px 7px;color:#81909e;font-size:11px;line-height:1.4}
+.ocean-db-property-visibility-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ocean-db-property-visibility-row>label{flex:1;min-width:0}
+.ocean-db-property-visibility-row>span{display:flex;gap:2px}
+.ocean-db-property-visibility-row>span button{padding:3px 6px!important;min-width:24px;justify-content:center}
+.ocean-db-property-visibility-row>span button:disabled{opacity:.3;cursor:not-allowed}
+.ocean-db-view-settings{max-height:min(70vh,560px);overflow:auto}
+.ocean-db-popover[data-open-menu]{max-height:min(72vh,600px);overflow:auto}
+.ocean-shell[data-theme="dark"] .ocean-db-rule{border-color:#414c58}
+.ocean-shell[data-theme="dark"] .ocean-db-rule input,.ocean-shell[data-theme="dark"] .ocean-db-rule select{background:#20252c;border-color:#414c58;color:#e1e8ef}
