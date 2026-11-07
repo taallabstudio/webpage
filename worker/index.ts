@@ -664,6 +664,7 @@ async function authSignup(req: Request, env: Env) {
     .bind(id, email, hash, "user", createdAt, createdAt, "active", null, 1).run();
 
   await recordPolicyAcceptance(env, id, "email_signup");
+  if (body.marketingConsent === true) await recordMarketingConsent(env, id, email, true);
   const verification = await createEmailVerification(env, { id, email });
   if (!verification.sent) {
     return json({ error: "Your account was created, but the verification email could not be sent. Use Resend verification email below.", needsVerification: true, verificationSent: false }, { status: 502 });
@@ -712,12 +713,13 @@ async function exportAccountData(req: Request, env: Env) {
     privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
   )`).run();
 
-  const [account, transfers, files, acceptances, privacyRequests, googleIdentity, pages, shares, comments, assets, calendar] = await Promise.all([
+  const [account, transfers, files, acceptances, privacyRequests, marketingPreference, googleIdentity, pages, shares, comments, assets, calendar] = await Promise.all([
     env.DB.prepare("SELECT id,email,role,status,created_at,updated_at,email_verified_at,two_factor_enabled,display_name,avatar_data FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT f.id,f.transfer_id,f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT id,request_type,status,created_at,updated_at,completed_at FROM privacy_requests WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
+    (async()=>{await ensureMarketingSchema(env);return env.DB.prepare("SELECT subscribed,consented_at,unsubscribed_at,updated_at FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(user.id).first();})(),
     env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT id,parent_id,title,icon,cover,blocks_json,is_favorite,is_archived,created_at,updated_at,is_folder,is_shared,general_access,cover_credit,cover_credit_url,cover_source_url FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
     env.DB.prepare("SELECT s.page_id,s.user_id,s.permission,s.created_at,s.updated_at FROM ocean_page_shares s JOIN ocean_pages p ON p.id=s.page_id WHERE p.user_id=? OR s.user_id=? ORDER BY s.created_at").bind(user.id, user.id).all(),
@@ -731,7 +733,7 @@ async function exportAccountData(req: Request, env: Env) {
     service: "TAAL LAB",
     notice: "This export contains account and workspace records available in the TaalLab databases. It excludes passwords, session secrets, OAuth refresh tokens, private storage keys and download tokens.",
     account, transfers: transfers.results || [], files: files.results || [],
-    policy_acceptances: acceptances.results || [], privacy_requests: privacyRequests.results || [], google_identity: googleIdentity || null,
+    policy_acceptances: acceptances.results || [], privacy_requests: privacyRequests.results || [], marketing_preference: marketingPreference || null, google_identity: googleIdentity || null,
     ocean: { pages: pages.results || [], page_shares: shares.results || [], comments: comments.results || [], assets: assets.results || [], google_calendar_connection: calendar || null },
   }, null, 2), {
     headers: {
@@ -741,6 +743,35 @@ async function exportAccountData(req: Request, env: Env) {
       "x-content-type-options": "nosniff",
     },
   });
+}
+
+async function getMarketingPreference(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  await ensureMarketingSchema(env);
+  const row: any = await env.DB.prepare("SELECT subscribed,consented_at,unsubscribed_at,updated_at FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(user.id).first();
+  return json({
+    subscribed: Number(row?.subscribed || 0) === 1,
+    consented_at: row?.consented_at || null,
+    unsubscribed_at: row?.unsubscribed_at || null,
+  });
+}
+
+async function updateMarketingPreference(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  const body = await req.json().catch(() => ({}));
+  if (typeof body.subscribed !== "boolean") return json({ error: "Choose whether you want to receive marketing emails." }, { status: 400 });
+  await recordMarketingConsent(env, user.id, user.email, body.subscribed);
+  return json({ ok: true, subscribed: body.subscribed, message: body.subscribed ? "Marketing email consent saved." : "You have been unsubscribed from marketing emails." });
+}
+
+async function unsubscribeMarketing(req: Request, env: Env) {
+  const body = await req.json().catch(() => ({}));
+  const userId = await verifyMarketingUnsubscribeToken(env, String(body.token || ""));
+  if (!userId) return json({ error: "This unsubscribe link is invalid. Please manage your email preferences from Account Settings." }, { status: 400 });
+  await ensureMarketingSchema(env);
+  const row: any = await env.DB.prepare("SELECT email FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(userId).first();
+  if (row?.email) await recordMarketingConsent(env, userId, String(row.email), false);
+  return json({ ok: true, message: "You have been unsubscribed from TaalLab marketing emails. Essential account and security emails will continue." });
 }
 
 async function requestAccountDeletion(req: Request, env: Env) {
@@ -756,6 +787,7 @@ async function requestAccountDeletion(req: Request, env: Env) {
   const createdAt = now();
   await env.DB.prepare("INSERT INTO privacy_requests(id,user_id,email,request_type,status,created_at,updated_at) VALUES(?,?,?,'deletion','pending',?,?)")
     .bind(id, user.id, user.email, createdAt, createdAt).run();
+  await recordMarketingConsent(env, user.id, user.email, false);
 
   const safeEmail = escapeHtml(String(user.email || ""));
   const adminMessage = await sendAuthEmail(env, "contact@taallab.in", "Account deletion request — TaalLab", 
@@ -2427,6 +2459,9 @@ export default {
       if ((url.pathname === "/api/auth/logout" || url.pathname === "/api/admin/logout") && req.method === "POST") return authLogout(req, env);
       if (url.pathname === "/api/auth/me" && req.method === "GET") return currentUser(env, req);
       if (url.pathname === "/api/account/data-export" && req.method === "GET") return exportAccountData(req, env);
+      if (url.pathname === "/api/account/marketing-preference" && req.method === "GET") return getMarketingPreference(req, env);
+      if (url.pathname === "/api/account/marketing-preference" && req.method === "PUT") return updateMarketingPreference(req, env);
+      if (url.pathname === "/api/marketing/unsubscribe" && req.method === "POST") return unsubscribeMarketing(req, env);
       if (url.pathname === "/api/account/privacy-request" && req.method === "POST") return requestAccountDeletion(req, env);
       if (url.pathname === "/api/account/profile" && req.method === "PATCH") return updateAccountProfile(req, env);
       if (url.pathname === "/api/account/password" && req.method === "POST") return changeOwnPassword(req, env);
