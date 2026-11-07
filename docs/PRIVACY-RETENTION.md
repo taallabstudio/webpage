@@ -26,6 +26,8 @@ This schedule records the retention behaviour implemented in the application. It
 | Parent-link invitations | Single-use token expires after 24 hours; invitation metadata is deleted 30 days after expiry | Hourly Worker cleanup |
 | Parent-child link and parental-consent history | While the link is active; revoked link rows, withdrawn consent records and associated events are retained for up to two years after withdrawal unless a legal hold or other legal obligation requires longer | Hourly Worker cleanup removes eligible revoked links, consent records and events |
 | Child permission settings | Stored only while the parent-child link is active; deleted on withdrawal | Withdrawal endpoint deletes the settings row; missing settings always mean all permissions are off |
+| Marketing preference state | While the account is active so the current opt-in/opt-out choice can be honoured | Updated on each choice; exported with the account data |
+| Withdrawn marketing preference events and used unsubscribe tokens | Up to two years after withdrawal or token use | Hourly Worker cleanup removes old events and used tokens; active opt-out state is retained |
 | Booking enquiry emails | In the business mailbox while needed to respond to the enquiry and manage any resulting engagement | Mailbox review and management; automatic mailbox deletion is not configured in this repository |
 | Provider backups and external service records | According to the relevant provider's actual retention/deletion settings and agreements | Verify in each provider console and applicable DPA; do not assume application deletion immediately removes provider backups |
 
