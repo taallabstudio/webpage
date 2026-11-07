@@ -667,7 +667,7 @@ async function ensurePrivacyTables(env: Env) {
 async function accountPrivacyExport(req: Request, env: Env) {
   const user = await requireUser(req, env);
   await ensurePrivacyTables(env);
-  const profile: any = await env.DB.prepare("SELECT id,email,role,status,created_at,updated_at,email_verified_at,display_name FROM users WHERE id=? LIMIT 1").bind(user.id).first();
+  const profile: any = await env.DB.prepare("SELECT id,email,role,status,created_at,updated_at,email_verified_at,display_name,avatar_data,two_factor_enabled FROM users WHERE id=? LIMIT 1").bind(user.id).first();
   const transfers = await env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all();
   const files = await env.DB.prepare(`SELECT f.id,f.transfer_id,f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status
     FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC`).bind(user.id).all();
