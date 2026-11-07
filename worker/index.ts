@@ -681,7 +681,7 @@ async function saveDateOfBirth(req: Request, env: Env) {
   if (user.date_of_birth) return json({ error: "Your date of birth has already been saved. Contact support if it needs correcting." }, { status: 409 });
   const body = await req.json().catch(() => ({}));
   const dob = String(body.dateOfBirth || "");
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dob)) return json({ error: "Enter a valid date of birth." }, { status: 400 });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) return json({ error: "Enter a valid date of birth." }, { status: 400 });
   const parsed = new Date(dob + "T00:00:00.000Z");
   const today = new Date();
   const todayIso = today.toISOString().slice(0, 10);
