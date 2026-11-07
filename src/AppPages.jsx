@@ -513,7 +513,7 @@ function UserPortal({user}) {
               </tr>)}
             </tbody></table></div>}
         </section>
-      </div> : page==="parent" ? <ParentDashboard user={user}/> : <AccountSettings user={user} onPasswordChanged={()=>{}}/>
+      </div> : page==="parent" ? <ParentDashboard user={user}/> : <AccountSettings user={user} onPasswordChanged={()=>{}}/>}
     </main>
   </div>;
 }
