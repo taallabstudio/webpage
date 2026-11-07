@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Unsubscribe | TAAL LAB</title>
+  <style>
+    :root{color-scheme:light;--ink:#1d2229;--muted:#5e6874;--line:#e1e6eb;--blue:#0068cc}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#f4f6f8;color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
+    main{width:min(520px,100%);padding:34px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 16px 48px rgba(30,50,70,.08)}
+    h1{font-size:28px;line-height:1.15;letter-spacing:-.04em;margin:0 0 12px}p{color:var(--muted)}
+    button{min-height:44px;padding:0 18px;border:0;border-radius:9px;background:#1d2229;color:#fff;font:700 13px system-ui;cursor:pointer}
+    button:disabled{opacity:.6;cursor:wait}a{color:var(--blue)}:focus-visible{outline:3px solid #0068cc;outline-offset:3px}
+    #message{margin-top:16px;min-height:24px}
+  </style>
+  <script src="/privacy-controls.js" defer></script>
+</head>
+<body>
+  <main>
+    <p><strong>TAAL LAB · EMAIL PREFERENCES</strong></p>
+    <h1>Unsubscribe from marketing emails</h1>
+    <p>Confirm below to stop optional product news and promotional emails from TaalLab. Essential account, security and purchase messages will continue.</p>
+    <button id="unsubscribe" type="button">Unsubscribe</button>
+    <p id="message" role="status" aria-live="polite"></p>
+    <p><a href="/privacy.html">Privacy Policy</a> · <a href="/account/settings">Manage account preferences</a></p>
+  </main>
+  <script>
+    const button=document.getElementById("unsubscribe");
+    const message=document.getElementById("message");
+    const token=new URLSearchParams(location.search).get("token")||"";
+    button.addEventListener("click",async()=>{
+      if(!token){message.textContent="This unsubscribe link is missing or invalid. Sign in and update your email preferences instead.";button.disabled=true;return;}
+      button.disabled=true;message.textContent="Processing your request…";
+      try{
+        const response=await fetch("/api/marketing/unsubscribe?token="+encodeURIComponent(token),{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"List-Unsubscribe=One-Click"});
+        const result=await response.json().catch(()=>({}));
+        if(!response.ok)throw new Error(result.error||"Could not process this unsubscribe link.");
+        message.textContent=result.message||"You have been unsubscribed.";
+        button.textContent="Unsubscribed";
+      }catch(error){message.textContent=error.message||"Could not process this request.";button.disabled=false;}
+    });
+    if(!token){button.disabled=true;message.textContent="This page needs the personal unsubscribe link from a TaalLab email.";}
+  </script>
+</body>
+</html>
