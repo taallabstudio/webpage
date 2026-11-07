@@ -496,6 +496,36 @@ function UserPortal({user}) {
   </div>;
 }
 
+function PrivacyRequestManager(){
+  const [requests,setRequests]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  const [saving,setSaving]=useState("");
+  async function load(){
+    setLoading(true);setError("");
+    try{const d=await api("/admin/privacy-requests");setRequests(d.requests||[]);}
+    catch(e){setError(e.message||"Could not load privacy requests.");}
+    finally{setLoading(false);}
+  }
+  useEffect(()=>{load()},[]);
+  async function changeStatus(request,status){
+    setSaving(request.id);setError("");
+    try{
+      await api(`/admin/privacy-requests/${request.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});
+      await load();
+    }catch(e){setError(e.message||"Could not update the request.");}
+    finally{setSaving("");}
+  }
+  return <div className="admin-content">
+    <div className="page-head"><div><span className="eyebrow">PRIVACY OPERATIONS</span><h1>Privacy requests</h1><p>Review account deletion requests and record their processing status.</p></div><button className="ghost-btn" onClick={load}><RefreshCw size={16}/> Refresh</button></div>
+    <div className="panel" style={{padding:20}}>
+      <p className="muted">Only mark a deletion request completed after the account, connected content and applicable personal data have actually been handled. Preserve records that must legally remain, and document the reason.</p>
+      {error&&<div className="error-box" role="alert">{error}</div>}
+      {loading?<div className="loading">Loading privacy requests…</div>:requests.length===0?<div className="empty-state"><ShieldCheck/><h3>No privacy requests</h3><p>New account deletion requests will appear here.</p></div>:<div className="table-wrap"><table><thead><tr><th>Account</th><th>Request</th><th>Details</th><th>Submitted</th><th>Status</th></tr></thead><tbody>{requests.map(r=><tr key={r.id}><td><strong>{r.email}</strong><small>{r.id}</small></td><td>{r.request_type}</td><td>{r.details||"—"}</td><td>{fmtDate(r.created_at)}</td><td><select aria-label={`Status for request ${r.id}`} value={r.status} disabled={saving===r.id} onChange={e=>changeStatus(r,e.target.value)}><option value="received">Received</option><option value="in_review">In review</option><option value="completed">Completed</option><option value="rejected">Rejected</option></select></td></tr>)}</tbody></table></div>}
+    </div>
+  </div>;
+}
+
 function Admin({initialUpload=false}) {
   const [authed,setAuthed]=useState(null);
   const [user,setUser]=useState(null);
@@ -527,6 +557,7 @@ function Admin({initialUpload=false}) {
       <button className={page==="products"?"active":""} onClick={()=>setPage("products")}><HardDrive/> Store Products</button>
       <button className={page==="upload"?"active":""} onClick={()=>setPage("upload")}><UploadCloud/> New Transfer</button>
       <button className={page==="users"?"active":""} onClick={()=>setPage("users")}><UserRound/> Users</button>
+      <button className={page==="privacy"?"active":""} onClick={()=>setPage("privacy")}><ShieldCheck/> Privacy requests</button>
       <button className={page==="settings"?"active":""} onClick={()=>setPage("settings")}><Settings/> Account</button>
     </div><div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div><button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
     <main className="admin-main">
@@ -536,6 +567,7 @@ function Admin({initialUpload=false}) {
       {page==="products"&&<StoreProductManager/>}
       {page==="upload"&&<Upload onDone={()=>{setPage("dashboard");refresh()}}/>}
       {page==="users"&&<UserManagement currentUser={user}/>}
+      {page==="privacy"&&<PrivacyRequestManager/>}
       {page==="settings"&&<AccountSettings user={user} onPasswordChanged={refresh} showGoogleDrive/>}
       {selected&&<TransferDetail transfer={selected} onClose={()=>setSelected(null)} onChanged={refresh}/>}
     </main>
@@ -678,6 +710,26 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [profileSaving,setProfileSaving]=useState(false);
   const [profileError,setProfileError]=useState("");
   const [profileMessage,setProfileMessage]=useState("");
+  const [privacyRequests,setPrivacyRequests]=useState([]);
+  const [privacyLoading,setPrivacyLoading]=useState(true);
+  const [privacyBusy,setPrivacyBusy]=useState(false);
+  const [privacyError,setPrivacyError]=useState("");
+  const [privacyMessage,setPrivacyMessage]=useState("");
+  const [deleteConfirmation,setDeleteConfirmation]=useState("");
+  const [deleteDetails,setDeleteDetails]=useState("");
+  useEffect(()=>{
+    api("/account/privacy-requests").then(d=>setPrivacyRequests(d.requests||[])).catch(e=>setPrivacyError(e.message)).finally(()=>setPrivacyLoading(false));
+  },[user?.id]);
+  async function requestAccountDeletion(e){
+    e.preventDefault();setPrivacyError("");setPrivacyMessage("");setPrivacyBusy(true);
+    try{
+      const result=await api("/account/privacy-requests/deletion",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmation:deleteConfirmation,details:deleteDetails})});
+      setPrivacyMessage(`Your deletion request was recorded (reference ${result.requestId}). TaalLab will review it before processing.`);
+      setDeleteConfirmation("");setDeleteDetails("");
+      const updated=await api("/account/privacy-requests");setPrivacyRequests(updated.requests||[]);
+    }catch(e){setPrivacyError(e.message||"Could not submit your request.");}
+    finally{setPrivacyBusy(false);}
+  }
   useEffect(()=>{setDisplayName(user?.display_name || user?.email?.split("@")[0] || "");setAvatarData(user?.avatar_data || "")},[user?.id,user?.display_name,user?.avatar_data]);
 
   async function chooseAvatar(file) {
@@ -731,6 +783,24 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
       {error&&<div className="error-box">{error}</div>}{message&&<div className="success-pill">{message}</div>}
       <button className="primary-btn">Change password</button>
     </form></section>
+    <section className="panel" style={{maxWidth:720,padding:24,marginTop:18}}>
+      <h2>Privacy and personal data</h2>
+      <p className="muted" style={{marginTop:6}}>You can download a copy of the account information currently associated with your TaalLab account or submit an account deletion request.</p>
+      <a className="primary-btn" href="/api/account/data-export" style={{display:"inline-flex",width:"auto",marginTop:12}}>Download my data</a>
+      <div style={{borderTop:"1px solid var(--line)",marginTop:22,paddingTop:18}}>
+        <h3>Request account deletion</h3>
+        <p className="muted">Submitting this request does not immediately delete your account. TaalLab will review linked transfers, shared OCEAN content, purchases and records that may need to be retained by law. You can check the request status below.</p>
+        <form onSubmit={requestAccountDeletion}>
+          <label>Additional details (optional)<textarea rows={3} maxLength={1000} value={deleteDetails} onChange={e=>setDeleteDetails(e.target.value)} placeholder="Tell us if there is anything specific we should know."/></label>
+          <label>Type DELETE to confirm<input value={deleteConfirmation} onChange={e=>setDeleteConfirmation(e.target.value)} autoComplete="off" required/></label>
+          <button className="danger-btn" type="submit" disabled={privacyBusy||deleteConfirmation!=="DELETE"}>{privacyBusy?"Submitting request…":"Submit deletion request"}</button>
+        </form>
+        {privacyError&&<div className="error-box" role="alert" style={{marginTop:12}}>{privacyError}</div>}
+        {privacyMessage&&<div className="success-pill" role="status" style={{marginTop:12}}>{privacyMessage}</div>}
+        <h3 style={{marginTop:22}}>Your privacy requests</h3>
+        {privacyLoading?<p className="muted">Loading requests…</p>:privacyRequests.length===0?<p className="muted">You have no open or previous privacy requests.</p>:<div className="table-wrap"><table><thead><tr><th>Request</th><th>Status</th><th>Submitted</th></tr></thead><tbody>{privacyRequests.map(r=><tr key={r.id}><td><strong>{r.request_type==="deletion"?"Account deletion":"Data request"}</strong><small>Reference: {r.id}</small></td><td><span className={`status ${r.status==="completed"?"active":r.status==="rejected"?"deleted":""}`}>{r.status.replace("_"," ")}</span></td><td>{fmtDate(r.created_at)}</td></tr>)}</tbody></table></div>}
+      </div>
+    </section>
     {showGoogleDrive&&<section className="panel" style={{maxWidth:620,padding:24,marginTop:18}}>
       <div className="panel-head" style={{padding:0,border:0}}>
         <div><h2>Google Drive</h2><p>Files uploaded by TaalLab are stored in the connected Google Drive.</p></div>
