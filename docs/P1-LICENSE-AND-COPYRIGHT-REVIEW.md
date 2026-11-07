@@ -33,7 +33,7 @@ The API key/account must remain controlled by Taal Lab, and the production appli
 
 ### Upload-time rights confirmation
 
-The TrackDeliver administrator upload form now requires the uploader to affirm that they own the rights to each selected file or have permission from the rights holder to upload and share it with the intended recipient. The control is required before transfer creation and is also checked by the client-side upload handler. This is an uploader attestation, not independent verification of ownership, a licence, model/property releases, or lawful content. Keep the wording and workflow under review as upload surfaces are added; the control currently applies to the TrackDeliver admin transfer uploader, not automatically to product cover management or OCEAN cover selection.
+The TrackDeliver administrator upload form now requires the uploader to affirm that they own the rights to each selected file or have permission from the rights holder to upload and share it with the intended recipient. The control is required before transfer creation, enforced again by the Worker API (so a direct API request cannot bypass it), and the confirmation timestamp and admin user ID are stored on the transfer record. This is an uploader attestation, not independent verification of ownership, a licence, model/property releases, or lawful content. Keep the wording and workflow under review as upload surfaces are added; the control currently applies to the TrackDeliver admin transfer uploader, not automatically to product cover management or OCEAN cover selection.
 
 The uploader must not upload material they are not authorised to distribute. The public Terms now provide a copyright/content complaint route at `contact@taallab.in`, with the information requested to identify the work and disputed material. This is an intake route, not a designated DMCA agent registration. Taal Lab still needs an operational review/takedown/repeat-infringer process and counsel's assessment of applicable Indian intermediary duties or U.S. DMCA safe-harbour eligibility.
 
@@ -91,7 +91,7 @@ For India, counsel should separately assess the Information Technology Act, 2000
 
 ## 6. Children and parental consent — product decision required
 
-The Digital Personal Data Protection Act, 2023 defines a child as an individual under 18 and section 9 provides for verifiable parental consent before processing a child's personal data. The Act's commencement is phased; the official text records an 18-month commencement period for section 9 from 13 November 2025, so its scheduled commencement is 13 May 2027.
+The Digital Personal Data Protection Act, 2023 defines a child as an individual under 18. The commencement notification places sections 3–17, including section 9, in the 18-month group from 13 November 2025 (scheduled for 13 May 2027). Rule 10 of the DPDP Rules, 2025 describes the due diligence for verifying that the parent is an identifiable adult; an email OTP or self-declaration alone is not sufficient. Confirm the precise commencement and Taal Lab's obligations with Indian counsel before launch.
 
 Official text: https://www.indiacode.nic.in/bitstream/123456789/22037/2/a2023-22.pdf
 
