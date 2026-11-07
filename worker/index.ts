@@ -35,8 +35,8 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const SETTINGS_REFRESH = "google_refresh_token";
 const SETTINGS_FOLDER = "google_drive_folder_id";
 const now = () => Math.floor(Date.now() / 1000);
-const TERMS_VERSION = "2026-11-07.1";
-const PRIVACY_VERSION = "2026-11-07.5";
+const TERMS_VERSION = "2026-11-07.2";
+const PRIVACY_VERSION = "2026-11-07.6";
 const POLICY_CONSENT_VERSION = TERMS_VERSION + ":" + PRIVACY_VERSION;
 
 async function recordPolicyAcceptance(env: Env, userId: string, method: string) {
@@ -1923,7 +1923,7 @@ async function ensureOceanSchema(env: Env) {
     "ALTER TABLE ocean_pages ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE ocean_pages ADD COLUMN general_access TEXT NOT NULL DEFAULT 'private'",
     "ALTER TABLE ocean_pages ADD COLUMN public_token TEXT",
-    "ALTER TABLE ocean_pages ADD COLUMN agent_grant_policy TEXT NOT NULL DEFAULT 'anyone_with_access'",
+    "ALTER TABLE ocean_pages ADD COLUMN agent_grant_policy TEXT NOT NULL DEFAULT 'owner_only'",
     "ALTER TABLE ocean_pages ADD COLUMN cover_credit TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE ocean_pages ADD COLUMN cover_credit_url TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE ocean_pages ADD COLUMN cover_source_url TEXT NOT NULL DEFAULT ''",
@@ -1931,6 +1931,13 @@ async function ensureOceanSchema(env: Env) {
     "ALTER TABLE ocean_pages ADD COLUMN cover_position_y REAL NOT NULL DEFAULT 50",
     "ALTER TABLE ocean_pages ADD COLUMN cover_zoom REAL NOT NULL DEFAULT 100"
   ]) { try { await env.DB.prepare(statement).run(); } catch { /* Column already exists. */ } }
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS ocean_schema_migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)").run();
+  // One-time migration: existing pages default to owner-only agent authorization.
+  // Owners can explicitly opt into broader delegation from Advanced settings.
+  await env.DB.batch([
+    env.DB.prepare("UPDATE ocean_pages SET agent_grant_policy='owner_only' WHERE agent_grant_policy='anyone_with_access' AND NOT EXISTS (SELECT 1 FROM ocean_schema_migrations WHERE id='agent-grant-owner-only-v1')"),
+    env.DB.prepare("INSERT OR IGNORE INTO ocean_schema_migrations(id,applied_at) VALUES('agent-grant-owner-only-v1',?)").bind(now()),
+  ]);
 }
 
 function oceanId() { return randomToken(12); }
@@ -2269,7 +2276,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
         { id: oceanId(), type: "todo", text: "Create your first page", checked: false },
         { id: oceanId(), type: "callout", text: "Your OCEAN pages are private to your account." }
       ];
-      await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,icon,cover,blocks_json,created_at,updated_at) VALUES(?,?,NULL,?,?,?,?,?,?)")
+      await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,icon,cover,blocks_json,agent_grant_policy,created_at,updated_at) VALUES(?,?,NULL,?,?,?,?,?,'owner_only',?,?)")
         .bind(id,user.id,"Getting started","🌊","",JSON.stringify(starter),created,created).run();
       rows = await env.DB.prepare(`SELECT p.id,p.user_id,p.parent_id,p.title,p.icon,p.cover,p.blocks_json,p.is_favorite,p.is_folder,
         CASE WHEN p.user_id=? THEN 0 ELSE 1 END AS is_shared,p.created_at,p.updated_at
@@ -2291,7 +2298,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     const isShared = body.is_shared || parent?.is_shared ? 1 : 0;
     const id = oceanId(), created = now();
     const starter = isFolder ? [] : [{id:oceanId(),type:"text",text:""}];
-    await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,blocks_json,is_folder,is_shared,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
+    await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,blocks_json,is_folder,is_shared,agent_grant_policy,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'owner_only',?,?)")
       .bind(id,user.id,parentId,title,JSON.stringify(starter),isFolder,isShared,created,created).run();
     const page = await oceanPageForUser(env,user.id,id);
     return json({page},{status:201});
@@ -2308,7 +2315,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     if (req.method === "GET") {
       const shares = await env.DB.prepare(`SELECT s.user_id,s.permission,s.created_at,u.email,u.display_name
         FROM ocean_page_shares s JOIN users u ON u.id=s.user_id WHERE s.page_id=? ORDER BY s.created_at ASC`).bind(pageId).all();
-      return json({shares:shares.results||[],settings:{general_access:page.general_access||"private",public_token:page.public_token||"",agent_grant_policy:page.agent_grant_policy||"anyone_with_access"}});
+      return json({shares:shares.results||[],settings:{general_access:page.general_access||"private",public_token:page.public_token||"",agent_grant_policy:page.agent_grant_policy||"owner_only"}});
     }
     if (req.method === "PATCH") {
       const body:any=await req.json().catch(()=>({}));
@@ -2327,7 +2334,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
       }
       if(updates.length){updates.push("updated_at=?");values.push(now(),pageId);await env.DB.prepare("UPDATE ocean_pages SET "+updates.join(",")+" WHERE id=?").bind(...values).run();}
       const updated:any=await oceanPageForUser(env,user.id,pageId);
-      return json({ok:true,settings:{general_access:updated.general_access,public_token:updated.public_token||"",agent_grant_policy:updated.agent_grant_policy||"anyone_with_access"}});
+      return json({ok:true,settings:{general_access:updated.general_access,public_token:updated.public_token||"",agent_grant_policy:updated.agent_grant_policy||"owner_only"}});
     }
     if (req.method === "POST") {
       const body:any=await req.json().catch(()=>({}));
