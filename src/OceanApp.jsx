@@ -1092,7 +1092,7 @@ function OceanApp(){
   if(!pendingCover)return;
   setCoverSearching(true);setCoverError("");
   try{
-   await api("/ocean/unsplash/track",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({photo_id:pendingCover.id})});
+   await api("/ocean/unsplash/track",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({photo_id:pendingCover.id,download_location:pendingCover.download_location})});
    await savePagePatch({
     cover:pendingCover.url,
     cover_credit:"Photo by "+pendingCover.photographer+" on Unsplash",
