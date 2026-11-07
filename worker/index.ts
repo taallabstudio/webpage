@@ -1650,8 +1650,8 @@ async function cleanup(env: Env) {
   const failedFileIds: string[] = [];
   for (const f of files.results as any[]) {
     const refs: any = await env.DB.prepare(
-      "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND id!=?"
-    ).bind(f.storage_key, f.id).first();
+      "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND expires_at>? AND id!=?"
+    ).bind(f.storage_key, cutoff, f.id).first();
 
     if (Number(refs?.n || 0) > 0) continue;
 
@@ -2789,8 +2789,8 @@ export default {
         const files = await env.DB.prepare("SELECT id,storage_key FROM files WHERE transfer_id=?").bind(id).all();
         for (const f of files.results as any[]) {
           const refs: any = await env.DB.prepare(
-            "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND transfer_id!=?"
-          ).bind(f.storage_key, id).first();
+            "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND expires_at>? AND transfer_id!=?"
+          ).bind(f.storage_key, now(), id).first();
           if (Number(refs?.n || 0) === 0) {
             const deleted = await deleteDriveFilePermanently(env, f.storage_key);
             if (!deleted) return json({ error: "A file could not be permanently deleted from storage. The transfer was not marked deleted; please retry." }, { status: 502 });
