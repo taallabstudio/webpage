@@ -673,13 +673,19 @@ async function accountPrivacyExport(req: Request, env: Env) {
     FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC`).bind(user.id).all();
   let consents: any[] = [];
   try { const rows = await env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method,marketing_consent FROM user_consents WHERE user_id=? ORDER BY accepted_at").bind(user.id).all(); consents = rows.results || []; } catch {}
+  const ocean: any = { pages: [], comments: [], shares: [], assets: [], calendarConnection: null };
+  try { const rows = await env.DB.prepare("SELECT * FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(user.id).all(); ocean.pages = rows.results || []; } catch {}
+  try { const rows = await env.DB.prepare("SELECT id,page_id,body,created_at FROM ocean_comments WHERE user_id=? ORDER BY created_at").bind(user.id).all(); ocean.comments = rows.results || []; } catch {}
+  try { const rows = await env.DB.prepare("SELECT page_id,permission,created_at,updated_at FROM ocean_page_shares WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(user.id,user.id).all(); ocean.shares = rows.results || []; } catch {}
+  try { const rows = await env.DB.prepare("SELECT id,page_id,file_name,mime_type,size,created_at FROM ocean_assets WHERE user_id=? ORDER BY created_at").bind(user.id).all(); ocean.assets = rows.results || []; } catch {}
+  try { ocean.calendarConnection = await env.DB.prepare("SELECT email,scope,connected_at,updated_at FROM ocean_google_calendar WHERE user_id=? LIMIT 1").bind(user.id).first(); } catch {}
   let orders: any[] = [], savedProfile: any = null;
   try {
     const rows = await env.DBStore.prepare("SELECT order_number,product_id,amount,currency,status,customer_name,customer_phone,address_line1,address_line2,city,state,pincode,country,coupon_code,discount_amount,created_at,paid_at,download_count,last_downloaded_at FROM store_orders WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all();
     orders = rows.results || [];
   } catch {}
   try { savedProfile = await env.DBStore.prepare("SELECT full_name,phone,address_line1,address_line2,city,state,pincode,country,updated_at FROM store_customer_profiles WHERE user_id=? LIMIT 1").bind(user.id).first(); } catch {}
-  const payload = { exportedAt: new Date().toISOString(), account: profile, transfers: transfers.results || [], files: files.results || [], purchases: orders, savedCustomerProfile: savedProfile, consentHistory: consents };
+  const payload = { exportedAt: new Date().toISOString(), account: profile, transfers: transfers.results || [], files: files.results || [], purchases: orders, savedCustomerProfile: savedProfile, consentHistory: consents, ocean };
   return new Response(JSON.stringify(payload, null, 2), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "content-disposition": "attachment; filename=taallab-personal-data.json", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
 }
 
