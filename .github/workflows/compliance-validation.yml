@@ -1,0 +1,53 @@
+name: Compliance branch validation
+
+on:
+  push:
+    branches:
+      - compliance-hardening-2026
+    paths:
+      - "src/**"
+      - "worker/**"
+      - "public/**"
+      - "index.html"
+      - "ocean.html"
+      - "package.json"
+      - "wrangler.toml"
+      - ".github/workflows/compliance-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate website code and dependency licences
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build website assets only
+        run: npm run build
+
+      - name: Generate production dependency licence report
+        run: |
+          npx --yes license-checker@25.0.1 --production --json --out npm-production-licenses.json
+          npx --yes license-checker@25.0.1 --production --summary
+
+      - name: Upload validation and licence report
+        uses: actions/upload-artifact@v4
+        with:
+          name: taal-lab-compliance-validation
+          path: |
+            npm-production-licenses.json
+            dist/
+          if-no-files-found: error
+          retention-days: 7
