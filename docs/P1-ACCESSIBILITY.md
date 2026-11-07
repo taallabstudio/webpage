@@ -25,6 +25,17 @@ Ratios below are calculated from the CSS foreground/background colour pairs chan
 | Contact metadata | `#626d79` | `#eaf0f4` | 4.59:1 |
 | Small blue links | `#0068c9` | `#ffffff` | 5.49:1 |
 
+## Image alt-text source audit
+
+A source-level pass over the repository image renderers found:
+
+- Decorative logo and avatar images use empty alt text and are hidden from assistive technology where appropriate.
+- File-transfer image previews use the uploaded file name; product covers use the product name; OCEAN uploaded assets use the file name; page covers use the page title as a fallback.
+- OCEAN Unsplash search thumbnails and the cover-crop preview now fall back to a descriptive label when the provider description is empty, rather than emitting an empty alt value.
+- The six-digit verification inputs, authenticator QR, and OCEAN image controls have explicit accessible names or descriptions.
+
+This is a source-code audit of known image components, not a complete content audit: user-provided alt descriptions can still be missing or inaccurate, and the production DOM may include images from data or external providers not represented by these renderers.
+
 ## Remaining manual verification
 
 - Keyboard-test every route and OCEAN's table, board, calendar, menus, sharing dialogs and settings with a real keyboard.
