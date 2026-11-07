@@ -1,0 +1,39 @@
+name: Compliance branch validation
+
+on:
+  push:
+    branches:
+      - compliance-hardening
+    paths:
+      - "src/**"
+      - "worker/**"
+      - "public/**"
+      - "index.html"
+      - "ocean.html"
+      - "admin/**"
+      - "package.json"
+      - "wrangler.toml"
+      - "scripts/**"
+      - ".github/workflows/compliance-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate web assets and Worker bundle (no deployment)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build web assets
+        run: npm run build
+      - name: Validate Worker bundle without deploying
+        run: npx wrangler deploy --dry-run --outdir .wrangler-dry-run
