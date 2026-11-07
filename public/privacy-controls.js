@@ -69,7 +69,7 @@
     #taal-privacy-banner button{border:1px solid #8993a0;background:transparent;color:#f5f7fa}
     #taal-privacy-banner button.primary{background:#f5f7fa;color:#171a20;border-color:#f5f7fa}
     #taal-cookie-settings{position:fixed;z-index:99999;left:14px;bottom:12px;border:1px solid #8993a0;background:#171a20;color:#f5f7fa;box-shadow:0 3px 14px rgba(0,0,0,.18)}
-    #taal-privacy-banner button:focus-visible,#taal-cookie-settings:focus-visible{outline:3px solid #7dbaff;outline-offset:3px}
+    #taal-privacy-banner button:focus-visible,#taal-cookie-settings:focus-visible,:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:3px solid #0068cc;outline-offset:3px}
     @media(max-width:620px){#taal-privacy-banner{left:10px;right:10px;bottom:58px;align-items:stretch;flex-direction:column;gap:12px;padding:15px}#taal-privacy-banner .taal-actions{display:grid;grid-template-columns:1fr 1fr}#taal-privacy-banner button{min-height:42px}#taal-cookie-settings{left:10px;bottom:10px}}
   `;
   document.head.appendChild(style);
