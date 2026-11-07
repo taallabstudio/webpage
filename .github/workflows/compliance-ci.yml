@@ -27,7 +27,7 @@ jobs:
           node-version: 24
           cache: ""
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Generate dependency licence inventory
         run: mkdir -p .audit && npx --yes license-checker --json --out .audit/third-party-licenses.json && node scripts/generate-license-inventory.mjs
       - name: Preserve lockfile and licence inventory
