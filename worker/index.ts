@@ -789,6 +789,7 @@ async function updateMarketingPreference(req: Request, env: Env) {
       consented,
       consented_at: row?.consented_at || null,
       unsubscribe_url: unsubscribeToken ? `${origin(env)}/unsubscribe.html?token=${encodeURIComponent(unsubscribeToken)}` : null,
+      list_unsubscribe_url: unsubscribeToken ? `${origin(env)}/api/marketing/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}` : null,
     });
   }
   const body = await req.json().catch(() => ({}));
@@ -811,8 +812,15 @@ async function updateMarketingPreference(req: Request, env: Env) {
 }
 
 async function unsubscribeMarketing(req: Request, env: Env) {
-  const body = await req.json().catch(() => ({}));
-  const token = String(body.token || "").trim();
+  const requestUrl = new URL(req.url);
+  const contentType = req.headers.get("content-type") || "";
+  let body: any = {};
+  if (contentType.includes("application/json")) body = await req.json().catch(() => ({}));
+  else if (contentType.includes("application/x-www-form-urlencoded")) {
+    const form = await req.formData().catch(() => null);
+    body = form ? Object.fromEntries(form.entries()) : {};
+  }
+  const token = String(body.token || requestUrl.searchParams.get("token") || "").trim();
   const parts = token.split(".");
   if (parts.length !== 2) return json({ error: "This unsubscribe link is invalid." }, { status: 400 });
   let userId = "";
