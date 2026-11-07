@@ -2067,6 +2067,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
 
   if (req.method === "GET") return json({page});
   if (req.method === "PATCH") {
+    if (page.source === "obsidian") return json({error:"This page is synced from Obsidian and is read-only in OCEAN."},{status:403});
     if (!oceanCanEdit(page)) return json({error:"You have view-only access to this page."},{status:403});
     const body = await req.json().catch(() => ({}));
     if (page.access_permission === "edit_content" && Object.keys(body).some(key => key !== "blocks")) return json({error:"You can edit page content, but not page settings."},{status:403});
