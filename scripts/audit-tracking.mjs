@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-const roots = ["public", "src", "worker"];
+const roots = ["public", "src", "worker", "admin"];
 const rootFiles = ["index.html", "ocean.html", "404.html"];
 const ignored = new Set(["node_modules", "dist", ".git", "target"]);
 const extensions = new Set([".html", ".js", ".jsx", ".ts", ".tsx", ".css"]);
@@ -32,7 +32,7 @@ async function walk(dir) {
   return files;
 }
 
-const files = [...rootFiles.filter(file => true), ...((await Promise.all(roots.map(walk))).flat())];
+const files = [...rootFiles, ...((await Promise.all(roots.map(walk))).flat())];
 const findings = [];
 for (const file of files) {
   let content;
