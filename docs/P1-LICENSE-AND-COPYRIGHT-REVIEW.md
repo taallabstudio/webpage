@@ -112,7 +112,7 @@ Product owner decision recorded 7 November 2026: **do not impose a blanket 18+ r
 
 The inspected repository uses Resend for transactional messages such as verification, password recovery, security codes and service notifications. No marketing campaign/list workflow was found.
 
-To avoid unnecessary collection, Taal Lab should not add a marketing opt-in checkbox or collect marketing preferences until it actually launches marketing emails. Before any marketing email is sent, implement separate optional opt-in, record its version/time/source, provide a working unsubscribe link in each marketing message, and honour opt-outs before sending further campaigns. Transactional/security messages must remain separate from marketing consent.
+Account settings now offer a separate adult-only optional marketing opt-in, unchecked by default; consent version and timestamp are recorded, and an account preference can be withdrawn at any time. A public one-click unsubscribe endpoint is implemented. No marketing campaign sender or list exists, so marketing emails are not currently sent. Before a sender is introduced, include a per-user unsubscribe URL and RFC 8058 `List-Unsubscribe` / `List-Unsubscribe-Post` headers in every campaign and test that opt-outs are honoured before subsequent sends. Transactional/security messages remain separate from marketing consent.
 
 ## 8. Required follow-up before marking P1 licensing/legal items complete
 
