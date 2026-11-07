@@ -151,11 +151,27 @@ function TransferPage({id}) {
 }
 
 function Preview({file,onClose}) {
-  return <div className="modal-backdrop" onClick={onClose}>
-    <div className="preview-modal" onClick={e=>e.stopPropagation()}>
-      <div className="modal-head"><strong>{file.name}</strong><button onClick={onClose}><X/></button></div>
+  const dialogRef=useRef(null),closeRef=useRef(null);
+  useEffect(()=>{
+    const previous=document.activeElement;
+    closeRef.current?.focus();
+    function handleKeyDown(event){
+      if(event.key==="Escape"){event.preventDefault();onClose();return;}
+      if(event.key!=="Tab")return;
+      const focusable=Array.from(dialogRef.current?.querySelectorAll('button,a[href],input,select,textarea,audio[controls],video[controls],[tabindex]:not([tabindex="-1"])')||[]).filter(el=>!el.disabled);
+      if(!focusable.length){event.preventDefault();dialogRef.current?.focus();return;}
+      const first=focusable[0],last=focusable[focusable.length-1];
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    }
+    document.addEventListener("keydown",handleKeyDown);
+    return()=>{document.removeEventListener("keydown",handleKeyDown);if(previous instanceof HTMLElement)previous.focus();}
+  },[onClose]);
+  return <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="preview-modal" ref={dialogRef} role="dialog" aria-modal="true" aria-label={`Preview ${file.name}`} tabIndex={-1} onClick={e=>e.stopPropagation()}>
+      <div className="modal-head"><strong>{file.name}</strong><button ref={closeRef} type="button" aria-label="Close preview" onClick={onClose}><X/></button></div>
       {file.kind === "audio" ? <audio controls autoPlay src={`/api/files/${file.token}/preview`}/> :
-       file.kind === "image" ? <img src={`/api/files/${file.token}/preview`} alt="" /> :
+       file.kind === "image" ? <img src={`/api/files/${file.token}/preview`} alt={file.name} /> :
        file.kind === "video" ? <video controls autoPlay src={`/api/files/${file.token}/preview`}/> :
        <div className="preview-placeholder"><FileText/><p>Preview this file in its native application.</p></div>}
     </div>
