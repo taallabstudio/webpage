@@ -53,7 +53,7 @@ function origin(env: Env) {
 
 function cookie(name: string, value: string, maxAge: number, req?: Request) {
   const host = req ? new URL(req.url).hostname : "";
-  const domain = host === "taallab.work" || host.endsWith(".taallab.work") ? "Domain=.taallab.work; " : "";
+  const domain = host === "taallab.in" || host.endsWith(".taallab.in") ? "Domain=.taallab.in; " : "";
   return `${name}=${value}; Max-Age=${maxAge}; ${domain}Path=/; HttpOnly; Secure; SameSite=Lax`;
 }
  
@@ -823,7 +823,7 @@ function googleLoginRedirect(env: Env, params: Record<string, string> = {}, retu
   // OCEAN is a separate hostname-routed SPA. Returning it to taallab.work
   // loads the studio/transfer app instead, which cannot render OceanLogin's
   // Google 2FA challenge and appears as a blank/incorrect page.
-  const redirectOrigin = isOceanReturn ? "https://app.taallab.work" : origin(env);
+  const redirectOrigin = isOceanReturn ? "https://ocean.taallab.in" : origin(env);
   const url = new URL(safeReturn, redirectOrigin);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   return url;
@@ -846,17 +846,17 @@ async function googleAuthStart(req: Request, env: Env) {
   url.searchParams.set("prompt", "select_account");
   url.searchParams.set("include_granted_scopes", "true");
   const response = new Response(null, { status: 302, headers: { location: url.toString(), "cache-control": "no-store" } });
-  // The flow can begin on app.taallab.work and finish on taallab.work.
+  // The flow can begin on ocean.taallab.in and finish on taallab.work.
   // State and return cookies must therefore be valid on both hosts.
-  response.headers.append("set-cookie", cookie("google_login_state", state, 600, req).replace("Path=/;", "Domain=.taallab.work; Path=/;"));
-  response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req).replace("Path=/;", "Domain=.taallab.work; Path=/;"));
+  response.headers.append("set-cookie", cookie("google_login_state", state, 600, req).replace("Path=/;", "Domain=.taallab.in; Path=/;"));
+  response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req).replace("Path=/;", "Domain=.taallab.in; Path=/;"));
   return response;
 }
 
 async function googleAuthCallback(req: Request, env: Env) {
   const url = new URL(req.url);
-  const clearStateCookie = "google_login_state=; Max-Age=0; Domain=.taallab.work; Path=/; HttpOnly; Secure; SameSite=Lax";
-  const clearReturnCookie = "google_login_return=; Max-Age=0; Domain=.taallab.work; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const clearStateCookie = "google_login_state=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const clearReturnCookie = "google_login_return=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const returnTo = parseCookie(req, "google_login_return") === "/ocean.html" ? "/ocean.html" : "/admin";
   const fail = (message: string) => {
     const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: message }, returnTo).toString(), "cache-control": "no-store" } });
@@ -1748,7 +1748,7 @@ async function oceanCalendarConnect(req: Request,env: Env,user: any) {
 async function oceanCalendarCallback(req: Request,env: Env,user: any) {
   const url=new URL(req.url),state=url.searchParams.get("state")||"",code=url.searchParams.get("code")||"";
   const redirect=(status:string,message="")=>{
-    const target=new URL("/", "https://app.taallab.work");
+    const target=new URL("/", "https://ocean.taallab.in");
     target.searchParams.set("panel","calendar");
     target.searchParams.set("calendar",status);
     if(message)target.searchParams.set("calendar_error",message.slice(0,180));
@@ -2116,7 +2116,7 @@ export default {
     const url = new URL(req.url);
     try {
       if (url.pathname === "/" && req.method === "GET") {
-        const assetPath = url.hostname === "app.taallab.work" || env.OCEAN_PREVIEW_MODE === "true" ? "/ocean.html" : "/index.html";
+        const assetPath = url.hostname === "ocean.taallab.in" || env.OCEAN_PREVIEW_MODE === "true" ? "/ocean.html" : "/index.html";
         return env.ASSETS.fetch(new Request(new URL(assetPath, req.url), { headers: req.headers }));
       }
       const sharedTransfer = url.pathname.match(/^\/d\/([a-f0-9]+)$/i);
