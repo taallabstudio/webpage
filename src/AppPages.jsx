@@ -453,6 +453,7 @@ function UserPortal({user}) {
   const [page,setPage]=useState("transfers");
   const [mobileNavOpen,setMobileNavOpen]=useState(false);
   function navigatePortal(next){setPage(next);setMobileNavOpen(false)}
+  useEffect(()=>{if(mobileNavOpen)document.querySelector(".sidebar.mobile-open .side-links button")?.focus()},[mobileNavOpen]);
   const [transfers,setTransfers]=useState([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
@@ -478,7 +479,7 @@ function UserPortal({user}) {
   const downloaded=transfers.filter(t=>t.downloaded).length;
 
   return <div className="admin-layout">
-    <aside className={`sidebar ${mobileNavOpen?"mobile-open":""}`}><Logo/><div className="side-links">
+    <aside id="account-mobile-navigation" onKeyDown={e=>{if(e.key==="Escape"){setMobileNavOpen(false);document.querySelector(".admin-mobile-head button")?.focus()}}} className={`sidebar ${mobileNavOpen?"mobile-open":""}`}><Logo/><div className="side-links">
       <button className={page==="transfers"?"active":""} onClick={()=>navigatePortal("transfers")}><FolderOpen/> My Transfers</button>
       <button className={page==="settings"?"active":""} onClick={()=>navigatePortal("settings")}><Settings/> Account</button>
       {user?.account_type==="adult" && <button className={page==="parent"?"active":""} onClick={()=>navigatePortal("parent")}><ShieldCheck/> Parent controls</button>}
@@ -486,7 +487,7 @@ function UserPortal({user}) {
     <div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div>
     <button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
     <main className="admin-main">
-      <div className="admin-mobile-head"><Logo/><button type="button" aria-label={mobileNavOpen?"Close account navigation":"Open account navigation"} aria-expanded={mobileNavOpen} onClick={()=>setMobileNavOpen(v=>!v)}><Menu/></button></div>
+      <div className="admin-mobile-head"><Logo/><button type="button" aria-label={mobileNavOpen?"Close account navigation":"Open account navigation"} aria-expanded={mobileNavOpen} aria-controls="account-mobile-navigation" onClick={()=>setMobileNavOpen(v=>!v)}><Menu/></button></div>
       {page==="transfers" ? <div className="admin-content">
         <div className="page-head"><div>
           <span className="eyebrow">TAAL LAB</span>
@@ -526,6 +527,7 @@ function Admin({initialUpload=false}) {
   const [page,setPage]=useState(initialUpload ? "upload" : "dashboard");
   const [mobileNavOpen,setMobileNavOpen]=useState(false);
   function navigateAdmin(next){setPage(next);setMobileNavOpen(false)}
+  useEffect(()=>{if(mobileNavOpen)document.querySelector(".sidebar.mobile-open .side-links button")?.focus()},[mobileNavOpen]);
   const [stats,setStats]=useState(null);
   const [transfers,setTransfers]=useState([]);
   const [selected,setSelected]=useState(null);
@@ -547,7 +549,7 @@ function Admin({initialUpload=false}) {
 
   async function logout(){await api("/auth/logout",{method:"POST"});setAuthed(false);setUser(null)}
   return <div className="admin-layout">
-    <aside className={`sidebar ${mobileNavOpen?"mobile-open":""}`}><Logo/><div className="side-links">
+    <aside id="admin-mobile-navigation" onKeyDown={e=>{if(e.key==="Escape"){setMobileNavOpen(false);document.querySelector(".admin-mobile-head button")?.focus()}}} className={`sidebar ${mobileNavOpen?"mobile-open":""}`}><Logo/><div className="side-links">
       <button className={page==="dashboard"?"active":""} onClick={()=>navigateAdmin("dashboard")}><Gauge/> Dashboard</button>
       <button className={page==="transfers"?"active":""} onClick={()=>navigateAdmin("transfers")}><FolderOpen/> Transfers</button>
       <button className={page==="products"?"active":""} onClick={()=>navigateAdmin("products")}><HardDrive/> Store Products</button>
@@ -557,7 +559,7 @@ function Admin({initialUpload=false}) {
       <button className={page==="settings"?"active":""} onClick={()=>navigateAdmin("settings")}><Settings/> Account</button>
     </div><div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div><button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
     <main className="admin-main">
-      <div className="admin-mobile-head"><Logo/><button type="button" aria-label={mobileNavOpen?"Close admin navigation":"Open admin navigation"} aria-expanded={mobileNavOpen} onClick={()=>setMobileNavOpen(v=>!v)}><Menu/></button></div>
+      <div className="admin-mobile-head"><Logo/><button type="button" aria-label={mobileNavOpen?"Close admin navigation":"Open admin navigation"} aria-expanded={mobileNavOpen} aria-controls="admin-mobile-navigation" onClick={()=>setMobileNavOpen(v=>!v)}><Menu/></button></div>
       {page==="dashboard"&&<Dashboard stats={stats} transfers={transfers} onOpen={setSelected}/>}
       {page==="transfers"&&<Transfers transfers={transfers} onOpen={setSelected}/>}
       {page==="products"&&<StoreProductManager/>}
