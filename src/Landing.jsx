@@ -360,9 +360,9 @@ function Landing() {
           <h2>Come make<br/><em>some noise.</em></h2>
         </div>
         <div className="contact-grid reveal">
-          <a className="reveal contact-card" id="contact-email" href="mailto:contact@taallab.work">
+          <a className="reveal contact-card" id="contact-email" href="mailto:contact@taallab.in">
             <Mail className="contact-card-icon" size={22} strokeWidth={1.7} aria-hidden="true" />
-            <span>Email</span><strong>contact@taallab.work</strong>
+            <span>Email</span><strong>contact@taallab.in</strong>
           </a>
           <a className="reveal contact-card" id="contact-instagram" href="https://www.instagram.com/taallabstudio" target="_blank" rel="noopener noreferrer">
             <MessageCircle className="contact-card-icon" size={22} strokeWidth={1.7} aria-hidden="true" />
