@@ -1,0 +1,36 @@
+name: Compliance branch build
+
+on:
+  push:
+    branches:
+      - compliance/p0-p1-p2-hardening
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compliance-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: ""
+      - name: Install dependencies
+        run: npm install
+      - name: Build website and app assets
+        run: npm run build
+      - name: Bundle Cloudflare Worker without deploying
+        run: npx esbuild worker/index.ts --bundle --platform=browser --format=esm --outfile=/tmp/taallab-worker.js
+      - name: Validate Cloudflare Worker bundle without deploying
+        run: npx wrangler deploy --dry-run --outdir=worker-dist

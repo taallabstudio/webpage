@@ -405,7 +405,7 @@ function Login({onLogin}) {
     <h1>{signup?"Create account":"Sign in"}</h1>
     <p>{signup?"Create your TaalLab account to receive files shared with you.":"Manage TaalLab transfers securely."}</p>
     {!signup&&<button type="button" className="ghost-btn full" style={{marginBottom:12}} onClick={signInWithPasskey} disabled={passkeyBusy}><ShieldCheck size={17}/>{passkeyBusy?"Waiting for passkey…":"Sign in with a passkey"}</button>}
-    <button type="button" className="google-login-btn" onClick={()=>{if(signup&&!policyAccepted){setError("Please accept the Terms of Service and Privacy Policy to create an account.");return;}window.location.assign("/api/auth/google/start"+(signup?"?terms=2026-11-07&privacy=2026-11-07":""));}}>
+    <button type="button" className="google-login-btn" onClick={()=>{if(signup&&!policyAccepted){setError("Please accept the Terms of Service and Privacy Policy to create an account.");return;}window.location.assign("/api/auth/google/start"+(signup?"?terms=2026-11-07&privacy=2026-11-07.1":""));}}>
       <svg aria-hidden="true" viewBox="0 0 48 48" width="20" height="20"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z" transform="translate(0 4) scale(.92)"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.72 7.18l7.62 5.91c4.45-4.11 7.14-10.17 7.14-17.56Z"/><path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.2A23.9 23.9 0 0 0 0 24c0 3.87.93 7.53 2.56 10.78l7.97-6.19Z" transform="translate(0 2) scale(1)"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.89l-7.62-5.91c-2.12 1.42-4.84 2.26-8.28 2.26-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.2C6.51 42.62 14.62 48 24 48Z" transform="translate(0 -1) scale(.98)"/></svg>
       <span>Continue with Google</span>
     </button>
@@ -632,6 +632,92 @@ function SecurityMethods({user}) {
   </section>;
 }
 
+function PrivacyControls({user}) {
+  const [requestType,setRequestType]=useState("deletion");
+  const [description,setDescription]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const [message,setMessage]=useState("");
+  const [requests,setRequests]=useState([]);
+  async function loadRequests() {
+    try { const result=await api("/account/privacy-requests");setRequests(result.requests||[]); }
+    catch { /* The request form remains available if history cannot be loaded. */ }
+  }
+  useEffect(()=>{loadRequests();},[]);
+
+  async function submitRequest(event) {
+    event.preventDefault();
+    setBusy(true);setError("");setMessage("");
+    try {
+      const result=await api("/account/privacy-request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:requestType,description})});
+      setMessage((result.alreadyOpen?"You already have an open request. Reference: ":"Your request has been received. Reference: ")+result.requestId+". TaalLab will review it and contact you at "+user?.email+".");
+      setDescription("");
+      await loadRequests();
+    } catch(e) { setError(e.message||"Could not submit your privacy request."); }
+    finally { setBusy(false); }
+  }
+
+  return <section id="privacy-data" className="panel" style={{maxWidth:720,padding:24,marginTop:18,scrollMarginTop:24}}>
+    <span className="eyebrow">YOUR DATA</span><h2>Privacy &amp; personal data</h2>
+    <p className="muted" style={{marginTop:6}}>Download a copy of the account information TaalLab holds, or submit a request to correct or delete your personal data.</p>
+    <div style={{display:"flex",flexWrap:"wrap",gap:10,marginTop:18}}>
+      <a className="primary-btn" href="/api/account/data-export" download><Download size={15}/> Download my data</a>
+    </div>
+    <form onSubmit={submitRequest} style={{marginTop:22}}>
+      <label>Request type
+        <select value={requestType} onChange={e=>setRequestType(e.target.value)}>
+          <option value="deletion">Delete my account and personal data</option>
+          <option value="correction">Correct my personal data</option>
+        </select>
+      </label>
+      <label>Additional details <span className="muted">(optional)</span>
+        <textarea value={description} onChange={e=>setDescription(e.target.value)} maxLength={1000} rows={3} placeholder="Tell us what you would like us to review."/>
+      </label>
+      <p className="muted" style={{fontSize:12,lineHeight:1.6}}>For deletion requests, TaalLab will verify the request and review connected services, shared content and records that must be retained for legal, tax, payment or security reasons. Submitting this request does not immediately delete your account. You can also manage Google Drive and Calendar data in your Google Account.</p>
+      {error&&<div className="error-box" role="alert">{error}</div>}
+      {message&&<div className="success-pill" role="status">{message}</div>}
+      <button className="primary-btn" type="submit" disabled={busy}>{busy?"Submitting…":"Submit privacy request"}</button>
+    </form>
+    {requests.length>0&&<div style={{marginTop:22}}>
+      <h3 style={{fontSize:14,marginBottom:10}}>Your privacy requests</h3>
+      <div style={{display:"grid",gap:8}}>{requests.map(item=><div key={item.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,padding:"11px 12px",border:"1px solid var(--line)",borderRadius:10}}>
+        <span><strong style={{display:"block",fontSize:12}}>{item.id}</strong><small className="muted">{item.request_type==="deletion"?"Account deletion":"Data correction"} · {fmtDate(item.created_at)}</small></span>
+        <span className={"status "+(item.status==="completed"?"active":item.status==="declined"?"deleted":"expired")}>{item.status.replace("_"," ")}</span>
+      </div>)}</div>
+    </div>}
+    <p className="muted" style={{fontSize:12,marginTop:16}}>Privacy questions: <a href="mailto:contact@taallab.in">contact@taallab.in</a> · <a href="/privacy.html">Privacy Policy</a></p>
+  </section>;
+}
+
+function PrivacyRequestAdmin() {
+  const [requests,setRequests]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  const [busyId,setBusyId]=useState("");
+
+  async function load() {
+    setLoading(true);setError("");
+    try { const data=await api("/admin/privacy-requests");setRequests(data.requests||[]); }
+    catch(e) { setError(e.message||"Could not load privacy requests."); }
+    finally { setLoading(false); }
+  }
+  useEffect(()=>{load();},[]);
+  async function update(id,status) {
+    setBusyId(id);setError("");
+    try { await api("/admin/privacy-requests/"+encodeURIComponent(id),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});await load(); }
+    catch(e) { setError(e.message||"Could not update this request."); }
+    finally { setBusyId(""); }
+  }
+  return <section className="panel" style={{maxWidth:900,padding:24,marginTop:18}}>
+    <div className="panel-head" style={{padding:0,border:0}}><div><h2>Privacy requests</h2><p>Review account data correction and deletion requests.</p></div><button type="button" className="ghost-btn" onClick={load} disabled={loading}><RefreshCw size={15}/> Refresh</button></div>
+    {error&&<div className="error-box" role="alert">{error}</div>}
+    {loading?<p className="muted">Loading privacy requests…</p>:requests.length===0?<p className="muted">No privacy requests have been submitted.</p>:<div className="table-wrap"><table><thead><tr><th>Reference</th><th>Account</th><th>Request</th><th>Submitted</th><th>Status</th><th>Action</th></tr></thead><tbody>
+      {requests.map(item=><tr key={item.id}><td><strong>{item.id}</strong>{item.description&&<small style={{whiteSpace:"normal",maxWidth:240}}>{item.description}</small>}</td><td>{item.email||"Account unavailable"}</td><td>{item.request_type==="deletion"?"Delete data":"Correct data"}</td><td>{fmtDate(item.created_at)}</td><td><span className={"status "+(item.status==="completed"?"active":item.status==="declined"?"deleted":"expired")}>{item.status.replace("_"," ")}</span></td><td>{item.status==="completed"||item.status==="declined"?<span className="muted">Closed</span>:<select aria-label={"Update status for "+item.id} value={item.status} disabled={busyId===item.id} onChange={e=>update(item.id,e.target.value)}><option value="open">Open</option><option value="in_review">In review</option><option value="completed">Completed</option><option value="declined">Declined</option></select>}</td></tr>)}
+    </tbody></table></div>}
+    <p className="muted" style={{fontSize:12,marginTop:12}}>Mark a request completed only after verifying identity, carrying out the appropriate changes and documenting any records retained for legal or payment obligations. <a href="https://github.com/taallabstudio/webpage/blob/main/docs/PRIVACY_REQUEST_RUNBOOK.md" target="_blank" rel="noopener noreferrer">Open the handling guide</a>.</p>
+  </section>;
+}
+
 function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [currentPassword,setCurrentPassword]=useState("");
   const [newPassword,setNewPassword]=useState("");
@@ -724,6 +810,8 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
         <button className="primary-btn" disabled={profileSaving}>{profileSaving?"Saving profile…":"Save profile"}</button>
       </form>
     </section>
+    <PrivacyControls user={user}/>
+    {showGoogleDrive&&<PrivacyRequestAdmin/>}
     <SecurityMethods user={user}/>
     <section className="panel" style={{maxWidth:620,padding:24,marginTop:18}}><h2>Change password</h2><form onSubmit={change}>
       <label>Current password<input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} required/></label>
