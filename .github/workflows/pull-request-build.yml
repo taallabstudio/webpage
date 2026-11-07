@@ -1,6 +1,9 @@
 name: Pull request build validation
 
 on:
+  push:
+    branches:
+      - "compliance/**"
   pull_request:
     branches:
       - main
