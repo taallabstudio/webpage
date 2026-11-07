@@ -77,9 +77,12 @@ function RouteLoader() {
   const isOcean = location.hostname === "ocean.taallab.in";
   const Page = isOcean ? OceanApp : path === "/" ? Landing : AppPages;
   return (
-    <Suspense fallback={<div className="route-loading" role="status">Loading…</div>}>
-      <Page />
-    </Suspense>
+    <>
+      <EssentialStorageNotice />
+      <Suspense fallback={<div className="route-loading" role="status">Loading…</div>}>
+        <Page />
+      </Suspense>
+    </>
   );
 }
 
