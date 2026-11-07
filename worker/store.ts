@@ -351,7 +351,6 @@ async function validateCoupon(req: Request, env: StoreEnv) {
   const user = await env.getCustomer?.(req);
   if (!user) return json({ error: "Please log in to continue checkout." }, 401);
   const body: any = await req.json().catch(() => ({}));
-  if (body.acceptTerms !== true) return json({ error: "Please accept the Terms of Service and Privacy Policy before placing your order." }, 400);
   const rawIds: string[] = Array.isArray(body.productIds) ? body.productIds.map((id: any) => String(id)) : [String(body.productId || "")];
   const ids = [...new Set(rawIds.filter(Boolean))];
   const all = await allProducts(env);
@@ -372,6 +371,7 @@ async function createOrder(req: Request, env: StoreEnv) {
   const user = await env.getCustomer?.(req);
   if (!user) return json({ error: "Please log in to continue checkout." }, 401);
   const body: any = await req.json().catch(() => ({}));
+  if (body.acceptTerms !== true) return json({ error: "Please accept the Terms of Service and Privacy Policy before placing your order." }, 400);
   const rawIds: string[] = Array.isArray(body.productIds) ? body.productIds.map((id: any) => String(id)) : [String(body.productId || "")];
   const ids = [...new Set(rawIds.filter(Boolean))];
   if (!ids.length || ids.length > 30) return json({ error: "Choose between 1 and 30 products to check out." }, 400);
