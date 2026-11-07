@@ -667,7 +667,7 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
     setPrivacyBusy(true);setPrivacyError("");setPrivacyMessage("");
     try{
       const result=await api("/account/privacy-request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"deletion"})});
-      setPrivacyMessage(result.alreadyOpen?"You already have an open request ("+result.requestId+").":"Your request has been submitted. Reference: "+result.requestId+". We will contact you at your account email.");
+      setPrivacyMessage(result.alreadyOpen?"You already have an open request ("+result.requestId+").":result.notificationSent===false?"Your request is recorded as "+result.requestId+", but our notification email could not be sent. Please also email contact@taallab.in with this reference.":"Your request has been submitted. Reference: "+result.requestId+". We will contact you at your account email.");
     }catch(e){setPrivacyError(e.message||"Could not submit your request.");}
     finally{setPrivacyBusy(false);}
   }
