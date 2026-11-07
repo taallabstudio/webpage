@@ -652,6 +652,67 @@ async function currentUser(env: Env, req: Request) {
   return user ? json({ authenticated: true, user }) : json({ authenticated: false });
 }
 
+async function ensurePrivacyTables(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS user_consents (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, terms_version TEXT NOT NULL,
+    privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL,
+    marketing_consent INTEGER NOT NULL DEFAULT 0
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS privacy_requests (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, request_type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending', created_at INTEGER NOT NULL,
+    resolved_at INTEGER
+  )`).run();
+}
+
+async function accountPrivacyExport(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  await ensurePrivacyTables(env);
+  const profile: any = await env.DB.prepare("SELECT id,email,role,status,created_at,updated_at,email_verified_at,display_name FROM users WHERE id=? LIMIT 1").bind(user.id).first();
+  const transfers = await env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all();
+  const files = await env.DB.prepare(`SELECT f.id,f.transfer_id,f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status
+    FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC`).bind(user.id).all();
+  let consents: any[] = [];
+  try { const rows = await env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method,marketing_consent FROM user_consents WHERE user_id=? ORDER BY accepted_at").bind(user.id).all(); consents = rows.results || []; } catch {}
+  let orders: any[] = [], savedProfile: any = null;
+  try {
+    const rows = await env.DBStore.prepare("SELECT order_number,product_id,amount,currency,status,customer_name,customer_phone,address_line1,address_line2,city,state,pincode,country,coupon_code,discount_amount,created_at,paid_at,download_count,last_downloaded_at FROM store_orders WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all();
+    orders = rows.results || [];
+  } catch {}
+  try { savedProfile = await env.DBStore.prepare("SELECT full_name,phone,address_line1,address_line2,city,state,pincode,country,updated_at FROM store_customer_profiles WHERE user_id=? LIMIT 1").bind(user.id).first(); } catch {}
+  const payload = { exportedAt: new Date().toISOString(), account: profile, transfers: transfers.results || [], files: files.results || [], purchases: orders, savedCustomerProfile: savedProfile, consentHistory: consents };
+  return new Response(JSON.stringify(payload, null, 2), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "content-disposition": "attachment; filename=taallab-personal-data.json", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+}
+
+async function accountPrivacyPreferences(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  await ensurePrivacyTables(env);
+  if (req.method === "GET") {
+    const row: any = await env.DB.prepare("SELECT marketing_consent,accepted_at FROM user_consents WHERE user_id=? ORDER BY accepted_at DESC LIMIT 1").bind(user.id).first();
+    return json({ marketingConsent: Number(row?.marketing_consent || 0) === 1 });
+  }
+  const body = await req.json().catch(() => ({}));
+  if (typeof body.marketingConsent !== "boolean") return json({ error: "Choose whether to receive optional marketing emails." }, { status: 400 });
+  await env.DB.prepare("INSERT INTO user_consents(id,user_id,terms_version,privacy_version,accepted_at,method,marketing_consent) VALUES(?,?,?,?,?,?,?)")
+    .bind(randomToken(16), user.id, TERMS_VERSION, PRIVACY_VERSION, now(), "marketing_preferences", body.marketingConsent ? 1 : 0).run();
+  return json({ ok: true, marketingConsent: body.marketingConsent });
+}
+
+async function accountDeletionRequest(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  await ensurePrivacyTables(env);
+  const existing: any = await env.DB.prepare("SELECT id FROM privacy_requests WHERE user_id=? AND request_type='deletion' AND status IN ('pending','in_progress') LIMIT 1").bind(user.id).first();
+  if (existing) return json({ ok: true, requestId: existing.id, alreadyPending: true });
+  const requestId = randomToken(12);
+  const createdAt = now();
+  await env.DB.prepare("INSERT INTO privacy_requests(id,user_id,request_type,status,created_at) VALUES(?,?, 'deletion','pending',?)").bind(requestId, user.id, createdAt).run();
+  if (env.RESEND_API_KEY) {
+    const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: "Bearer " + env.RESEND_API_KEY, "Content-Type": "application/json" }, body: JSON.stringify({ from: "TaalLab Privacy <contact@taallab.in>", to: ["contact@taallab.in"], subject: "Personal data deletion request — " + requestId, text: "A signed-in user has requested account and personal-data deletion.\n\nRequest: " + requestId + "\nAccount: " + user.email + "\nUser ID: " + user.id + "\n\nPlease verify the request, review statutory payment/accounting retention requirements, and record completion in the privacy_requests table." }) });
+    if (!response.ok) console.error("Privacy request notification failed", response.status);
+  }
+  return json({ ok: true, requestId });
+}
+
 async function updateAccountProfile(req: Request, env: Env) {
   const user = await requireUser(req, env);
   const body = await req.json().catch(() => ({}));
@@ -2268,6 +2329,9 @@ export default {
       if ((url.pathname === "/api/auth/logout" || url.pathname === "/api/admin/logout") && req.method === "POST") return authLogout(req, env);
       if (url.pathname === "/api/auth/me" && req.method === "GET") return currentUser(env, req);
       if (url.pathname === "/api/account/profile" && req.method === "PATCH") return updateAccountProfile(req, env);
+      if (url.pathname === "/api/account/privacy/export" && req.method === "GET") return accountPrivacyExport(req, env);
+      if (url.pathname === "/api/account/privacy/preferences" && (req.method === "GET" || req.method === "POST")) return accountPrivacyPreferences(req, env);
+      if (url.pathname === "/api/account/privacy/deletion-request" && req.method === "POST") return accountDeletionRequest(req, env);
       if (url.pathname === "/api/account/password" && req.method === "POST") return changeOwnPassword(req, env);
       if (url.pathname === "/api/account/security" && req.method === "POST") return updateSecuritySettings(req, env);
 
