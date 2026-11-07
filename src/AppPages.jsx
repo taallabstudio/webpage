@@ -549,6 +549,7 @@ function Admin({initialUpload=false}) {
       <button className={page==="products"?"active":""} onClick={()=>setPage("products")}><HardDrive/> Store Products</button>
       <button className={page==="upload"?"active":""} onClick={()=>setPage("upload")}><UploadCloud/> New Transfer</button>
       <button className={page==="users"?"active":""} onClick={()=>setPage("users")}><UserRound/> Users</button>
+      <button className={page==="parent-verification"?"active":""} onClick={()=>setPage("parent-verification")}><ShieldCheck/> Parent verification</button>
       <button className={page==="settings"?"active":""} onClick={()=>setPage("settings")}><Settings/> Account</button>
     </div><div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div><button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
     <main className="admin-main">
@@ -558,12 +559,38 @@ function Admin({initialUpload=false}) {
       {page==="products"&&<StoreProductManager/>}
       {page==="upload"&&<Upload onDone={()=>{setPage("dashboard");refresh()}}/>}
       {page==="users"&&<UserManagement currentUser={user}/>}
+      {page==="parent-verification"&&<ParentalVerificationAdmin/>}
       {page==="settings"&&<AccountSettings user={user} onPasswordChanged={refresh} showGoogleDrive/>}
       {selected&&<TransferDetail transfer={selected} onClose={()=>setSelected(null)} onChanged={refresh}/>}
     </main>
   </div>;
 }
 
+
+
+function ParentalVerificationAdmin() {
+  const [items,setItems]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [busy,setBusy]=useState("");
+  const [error,setError]=useState("");
+  const [notice,setNotice]=useState("");
+  async function load(){setLoading(true);setError("");try{const d=await api("/admin/parental-verifications");setItems(d.verifications||[])}catch(e){setError(e.message||"Could not load verification requests.")}finally{setLoading(false)}}
+  useEffect(()=>{load()},[]);
+  async function verify(item){const confirmed=confirm("Only continue after you have independently checked the adult's identity, age and parent/guardian relationship using reliable evidence outside this app. This action enables the parent's child permissions. No identity document should be uploaded here. Have you completed that review?");if(!confirmed||busy)return;setBusy(item.child_user_id);setError("");setNotice("");try{await api("/admin/parental-verifications/"+encodeURIComponent(item.child_user_id),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmManualVerification:true})});setNotice("Manual verification recorded. The parent can now manage child permissions.");await load()}catch(e){setError(e.message||"Could not record verification.")}finally{setBusy("")}}
+  return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">CHILD SAFEGUARDS</span><h1>Parent verification</h1><p>Review pending parent/guardian links. Do not approve using only a date of birth, email address or self-attestation.</p></div><button className="ghost-btn" onClick={load} disabled={loading}><RefreshCw size={16}/> Refresh</button></div>
+    <div className="notice" role="note" style={{padding:16,marginBottom:18}}>Manual review is an operational control, not an automated identity service. Check reliable evidence of the adult's identity, age and relationship to the child according to TaalLab's approved legal process. Do not upload or store identity documents in this dashboard.</div>
+    {error&&<div className="error-box" role="alert">{error}</div>}{notice&&<div className="success-box" role="status">{notice}</div>}
+    {loading?<div className="loading">Loading verification requests…</div>:!items.length?<div className="empty-state"><ShieldCheck/><h3>No pending parent links</h3><p>New child link requests will appear here.</p></div>:items.map(item=><section className="panel" key={item.id} style={{padding:22,marginBottom:16}}>
+      <div className="child-permission-heading"><div><h2 style={{margin:"0 0 4px"}}>{item.parent_name||item.parent_email}</h2><p>Parent/guardian · {item.parent_email}</p></div><span className="status">Pending review</span></div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16,margin:"16px 0"}}>
+        <div><strong>Child account</strong><p>{item.child_name||item.child_email}<br/><span className="muted">{item.child_email}</span></p></div>
+        <div><strong>Account checks</strong><p>Parent email: {item.parent_email_verified_at?"Verified":"Not verified"}<br/>Parent DOB age screen: recorded<br/>Child email: {item.child_email_verified_at?"Verified":"Not verified"}<br/>Child DOB: {item.child_date_of_birth?"Recorded":"Missing"}</p></div>
+        <div><strong>Parent attestation</strong><p>{item.parent_attested_at?new Date(item.parent_attested_at*1000).toLocaleString():"Not recorded"}</p></div>
+      </div>
+      <button className="primary-btn" disabled={Boolean(busy)} onClick={()=>verify(item)}>{busy===item.child_user_id?"Recording…":"Confirm independent manual review"}</button>
+    </section>)}
+  </div>;
+}
 
 function StoreProductManager(){
   const blank={id:"",name:"",category:"Max for Live Device",description:"",features:"",price:"199",version:"1.0",status:"draft",fileKey:"",fileName:"",coverKey:"",coverName:""};
@@ -1124,8 +1151,8 @@ function ParentDashboard({user}) {
     {notice&&<div className="success-box" role="status" style={{marginBottom:16}}>{notice}</div>}
     <section className="panel" style={{padding:24,marginBottom:20}}><div className="panel-head"><div><h2>Linked children</h2><p>{data.children.length} active linked account{data.children.length===1?"":"s"}</p></div><button className="ghost-btn" onClick={load} disabled={loading}><RefreshCw size={16}/> Refresh</button></div>
       {loading?<div className="loading">Loading parent controls…</div>:!data.children.length?<div className="empty-state"><ShieldCheck/><h3>No linked child accounts</h3><p>Send an invitation above. Permissions remain off until you enable them here.</p></div>:data.children.map(child=><article className="child-permission-card" key={child.id}>
-        <div className="child-permission-heading"><div><h3>{child.display_name||child.email}</h3><p>{child.email} · Linked {new Date(child.linked_at*1000).toLocaleDateString()}</p></div><span className="status active">Linked</span></div>
-        <div className="child-permission-list">{controls.map(([key,label,description])=><label className="child-permission-row" key={key}><span><strong>{label}</strong><small>{description}</small></span><input type="checkbox" role="switch" aria-label={label+" for "+child.email} checked={Number(child[key])===1} disabled={Boolean(busy)} onChange={e=>toggle(child,key,e.target.checked)}/></label>)}</div>
+        <div className="child-permission-heading"><div><h3>{child.display_name||child.email}</h3><p>{child.email} · Linked {new Date(child.linked_at*1000).toLocaleDateString()}</p></div><span className={child.verification_status==="verified"?"status active":"status"}>{child.verification_status==="verified"?"Verified":"Verification pending"}</span></div>{child.verification_status!=="verified"&&<div className="notice" role="status" style={{margin:"12px 0",padding:12}}>TaalLab must complete a separate manual adult identity and parent/guardian relationship review before any child permission can be enabled.</div>}
+        <div className="child-permission-list">{controls.map(([key,label,description])=><label className="child-permission-row" key={key}><span><strong>{label}</strong><small>{description}</small></span><input type="checkbox" role="switch" aria-label={label+" for "+child.email} checked={Number(child[key])===1} disabled={child.verification_status!=="verified"||Boolean(busy)} onChange={e=>toggle(child,key,e.target.checked)}/></label>)}</div>
         <div className="child-permission-footer"><span className="muted">Purchases and payments are always disabled for child accounts.</span><button className="danger-btn" disabled={Boolean(busy)} onClick={()=>withdraw(child)}>Withdraw consent</button></div>
       </article>)}
     </section>
@@ -1142,7 +1169,7 @@ function ParentLinkAcceptance() {
   async function accept(){if(busy||!token)return;setBusy(true);setError("");try{await api("/parent/invites/accept",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token})});setDone(true)}catch(e){setError(e.message||"Could not accept this invitation.")}finally{setBusy(false)}}
   if(checking)return <div className="loading"><RefreshCw className="spin"/> Checking invitation…</div>;
   if(!user)return <Login onLogin={refresh}/>;
-  if(done)return <div className="login-page"><section className="login-card" role="status"><Logo/><div className="login-icon"><Check/></div><h1>Parent account linked</h1><p>The link is active. All optional permissions start switched off. A parent can enable each permission separately from Parent controls.</p><a className="primary-btn full" href="/account">Continue to account</a></section></div>;
+  if(done)return <div className="login-page"><section className="login-card" role="status"><Logo/><div className="login-icon"><Check/></div><h1>Parent link recorded</h1><p>Your parent or guardian link has been recorded. TaalLab must complete a separate adult identity and parent/guardian relationship review before child account features can be enabled. All optional permissions start switched off.</p><a className="primary-btn full" href="/account">Continue to account</a></section></div>;
   if(user.account_type!=="child"||!user.date_of_birth||!user.email_verified_at)return <div className="login-page"><section className="login-card"><Logo/><h1>This invitation is for a child account</h1><p>Sign in with the child's own email-verified account after completing the date-of-birth step.</p><a className="ghost-btn full" href="/account">Go to account</a></section></div>;
   return <div className="login-page"><section className="login-card"><Logo/><div className="login-icon"><ShieldCheck/></div><h1>Review parent link</h1><p>Accepting this request links your child account to the adult account that sent the invitation. The parent will manage separate access settings. Your parent can withdraw consent from their dashboard. If you believe this link is incorrect, contact TaalLab support.</p>{error&&<div className="error-box" role="alert">{error}</div>}<button className="primary-btn full" onClick={accept} disabled={busy||!token}>{busy?"Linking account…":"Accept parent link"}</button><a className="ghost-btn full" style={{marginTop:10}} href="/account">Cancel</a></section></div>;
 }
