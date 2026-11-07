@@ -1118,7 +1118,7 @@ async function googleAuthStart(req: Request, env: Env) {
   }
   const params = new URL(req.url).searchParams;
   const acceptedPolicies = params.get("terms") === TERMS_VERSION && params.get("privacy") === PRIVACY_VERSION;
-  const marketingAccepted = params.get("marketing") === "1";
+  const marketingAccepted = acceptedPolicies && params.get("marketing") === "1";
   const state = randomToken(24);
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", env.GOOGLE_LOGIN_CLIENT_ID);
