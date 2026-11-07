@@ -344,7 +344,7 @@ async function sendMarketingEmail(env: Env, userId: string, subject: string, htm
     headers: {
       "Authorization": `Bearer ${env.RESEND_API_KEY}`,
       "Content-Type": "application/json",
-      "Idempotency-Key": `marketing:${userId}:${now()}`,
+      "Idempotency-Key": `marketing:${userId}:${randomToken(12)}`,
     },
     body: JSON.stringify({
       from: "TaalLab <contact@taallab.in>",
