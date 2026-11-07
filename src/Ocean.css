@@ -1395,3 +1395,45 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 .ocean-db-table th.ocean-db-row-select .ocean-db-select-resizer:hover::after,.ocean-db-table th.ocean-db-row-select .ocean-db-select-resizer:focus-visible::after{background:#2583d8}
 .ocean-db-table th.ocean-db-row-select input,.ocean-db-table td.ocean-db-row-select input{display:block!important;width:14px!important;height:14px!important;min-width:14px!important;margin:0 auto!important;padding:0!important}
 .ocean-db-table-scroll{overscroll-behavior-x:contain}
+
+
+/* Workspace settings, page actions and keyboard navigation. */
+.ocean-user-row{display:flex;align-items:center;gap:6px}
+.ocean-user-profile{min-width:0;flex:1;display:flex;align-items:center;gap:9px;padding:5px;border-radius:7px;text-align:left;color:inherit}
+.ocean-user-profile:hover,.ocean-user-settings:hover{background:#edf5fd;color:#0878e8}
+.ocean-user-name{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0;line-height:1.2}
+.ocean-user-name strong{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600}
+.ocean-user-role{display:inline-flex;align-items:center;border-radius:999px;padding:2px 7px;font-size:9px;font-weight:700;letter-spacing:.02em;line-height:1.4}
+.ocean-user-role.admin{background:#eaf4ff;color:#0878e8}
+.ocean-user-role.super{background:#eaf7ef;color:#287a4c}
+.ocean-user-settings{width:32px;height:32px;flex:none;display:grid;place-items:center;border-radius:7px;color:#71808e}
+.ocean-page-row{position:relative}
+.ocean-page-menu-wrap{position:relative;flex:none}
+.ocean-page-row>.ocean-page-menu-wrap>.ocean-page-more{width:25px;height:27px;display:grid;place-items:center;border-radius:5px;color:#8e969f;opacity:0}
+.ocean-page-row:hover>.ocean-page-menu-wrap>.ocean-page-more,.ocean-page-menu-wrap:focus-within>.ocean-page-more{opacity:1}
+.ocean-page-menu-wrap>.ocean-page-more:hover{background:#eaf4ff;color:#0878e8}
+.ocean-sidebar-context-menu{position:absolute;right:2px;top:calc(100% + 3px);z-index:90;min-width:190px;max-width:260px;padding:5px;background:#fff;border:1px solid #dce3eb;border-radius:9px;box-shadow:0 12px 32px rgba(24,39,54,.16);display:flex;flex-direction:column;gap:2px}
+.ocean-sidebar-context-menu>button,.ocean-sidebar-folder-options>button{width:100%;min-height:32px;display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:6px;text-align:left;color:#46515d;font-size:12px}
+.ocean-sidebar-context-menu>button:hover,.ocean-sidebar-folder-options>button:hover{background:#edf5fd;color:#0878e8}
+.ocean-sidebar-context-menu>button svg:last-child{margin-left:auto}
+.ocean-sidebar-folder-options{display:flex;flex-direction:column;gap:2px;padding:4px 0 0 9px;margin-top:3px;border-top:1px solid #e8edf2;max-height:210px;overflow:auto}
+.ocean-sidebar-folder-options small{padding:8px;color:#84909b;font-size:11px}
+.ocean-settings-section{max-width:100%;overflow:hidden;background:#fff;border:1px solid #e3e8ed;border-radius:14px;box-shadow:0 3px 14px rgba(25,45,65,.035)}
+.ocean-settings-section-heading{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:22px 24px;border-bottom:1px solid #edf0f3;color:#0878e8}
+.ocean-settings-section-heading h2{margin:0 0 6px;color:#1b2732;font-size:17px;letter-spacing:-.02em}
+.ocean-settings-section-heading p{margin:0;color:#75818c;font-size:13px;line-height:1.5}
+.ocean-settings-section .ocean-access-card{border:0;border-radius:0;box-shadow:none}
+.ocean-settings-section .ocean-access-note{margin:0 20px 20px}
+.ocean-shell[data-theme="dark"] .ocean-user-profile:hover,.ocean-shell[data-theme="dark"] .ocean-user-settings:hover{background:#2b3541;color:#91c3f5}
+.ocean-shell[data-theme="dark"] .ocean-user-role.admin{background:#263d54;color:#9bcaff}
+.ocean-shell[data-theme="dark"] .ocean-user-role.super{background:#263d34;color:#9bdbb4}
+.ocean-shell[data-theme="dark"] .ocean-sidebar-context-menu{background:#242a32;border-color:#3a424d;box-shadow:0 12px 36px rgba(0,0,0,.4)}
+.ocean-shell[data-theme="dark"] .ocean-sidebar-context-menu>button,.ocean-shell[data-theme="dark"] .ocean-sidebar-folder-options>button{color:#c6d0da}
+.ocean-shell[data-theme="dark"] .ocean-sidebar-context-menu>button:hover,.ocean-shell[data-theme="dark"] .ocean-sidebar-folder-options>button:hover{background:#303a46;color:#91c3f5}
+.ocean-shell[data-theme="dark"] .ocean-sidebar-folder-options{border-color:#414c58}
+.ocean-shell[data-theme="dark"] .ocean-settings-section{background:#202832;border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-settings-section-heading{border-color:#3a424d}
+.ocean-shell[data-theme="dark"] .ocean-settings-section-heading h2{color:#edf2f7}
+.ocean-shell[data-theme="dark"] .ocean-settings-section-heading p{color:#aab5c1}
+.ocean-shell :is(button,a,input,select,textarea,[tabindex]):focus-visible{outline:2px solid #1685ed;outline-offset:2px}
+@media(max-width:760px){.ocean-page-row>.ocean-page-menu-wrap>.ocean-page-more{opacity:.8}.ocean-settings-section-heading{padding:18px}.ocean-settings-section .ocean-managed-user{gap:9px}}
