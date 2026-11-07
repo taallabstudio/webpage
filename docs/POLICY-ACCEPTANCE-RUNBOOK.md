@@ -4,8 +4,8 @@ Last reviewed: 7 November 2026
 
 ## Current versions
 
-- Terms of Service: 2026-11-07.1
-- Privacy Policy: 2026-11-07.5
+- Terms of Service: 2026-11-07.2
+- Privacy Policy: 2026-11-07.6
 
 Keep these values aligned across:
 - worker/index.ts policy constants and Google OAuth validation;
