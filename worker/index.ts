@@ -786,10 +786,12 @@ async function updateMarketingPreference(req: Request, env: Env) {
   const body=await req.json().catch(()=>({}));
   if(typeof body.enabled!=="boolean") return json({error:"Choose whether to receive optional marketing emails."},{status:400});
   const timestamp=now(), enabled=body.enabled;
+  let unsubscribeUrl: string | null = null;
   if(enabled){
     await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,enabled,consent_version,consented_at,withdrawn_at,updated_at)
       VALUES(?,1,?,?,NULL,?) ON CONFLICT(user_id) DO UPDATE SET enabled=1,consent_version=excluded.consent_version,consented_at=excluded.consented_at,withdrawn_at=NULL,updated_at=excluded.updated_at`)
       .bind(user.id,MARKETING_CONSENT_VERSION,timestamp,timestamp).run();
+    unsubscribeUrl=await createMarketingUnsubscribeToken(env,user.id);
   }else{
     await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,enabled,withdrawn_at,updated_at)
       VALUES(?,0,?,?) ON CONFLICT(user_id) DO UPDATE SET enabled=0,withdrawn_at=excluded.withdrawn_at,updated_at=excluded.updated_at`)
@@ -798,7 +800,7 @@ async function updateMarketingPreference(req: Request, env: Env) {
   }
   await env.DB.prepare("INSERT INTO marketing_preference_events(id,user_id,enabled,consent_version,source,created_at) VALUES(?,?,?,?,?,?)")
     .bind(randomToken(16),user.id,enabled?1:0,enabled?MARKETING_CONSENT_VERSION:null,"account_settings",timestamp).run();
-  return json({ok:true,enabled,message:enabled?"Your optional marketing email preference has been saved. No marketing campaigns are currently being sent.":"You are opted out of marketing emails."});
+  return json({ok:true,enabled,unsubscribeUrl,message:enabled?"Your optional marketing email preference has been saved. No marketing campaigns are currently being sent.":"You are opted out of marketing emails."});
 }
 
 async function createMarketingUnsubscribeToken(env: Env, userId: string) {
