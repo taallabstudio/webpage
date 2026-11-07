@@ -820,7 +820,7 @@ async function setSetting(env: Env, key: string, value: string) {
 function googleLoginRedirect(env: Env, params: Record<string, string> = {}, returnTo = "/admin") {
   const isOceanReturn = returnTo === "/ocean.html";
   const safeReturn = isOceanReturn ? "/" : "/admin";
-  // OCEAN is a separate hostname-routed SPA. Returning it to taallab.work
+  // OCEAN is a separate hostname-routed SPA. Return it to ocean.taallab.in
   // loads the studio/transfer app instead, which cannot render OceanLogin's
   // Google 2FA challenge and appears as a blank/incorrect page.
   const redirectOrigin = isOceanReturn ? "https://ocean.taallab.in" : origin(env);
@@ -846,9 +846,9 @@ async function googleAuthStart(req: Request, env: Env) {
   url.searchParams.set("prompt", "select_account");
   url.searchParams.set("include_granted_scopes", "true");
   const response = new Response(null, { status: 302, headers: { location: url.toString(), "cache-control": "no-store" } });
-  // The flow can begin on ocean.taallab.in and finish on taallab.work.
+  // The flow can begin on ocean.taallab.in and finish on taallab.in.
   // State and return cookies must therefore be valid on both hosts.
-  response.headers.append("set-cookie", cookie("google_login_state", state, 600, req).replace("Path=/;", "Domain=.taallab.in; Path=/;"));
+  response.headers.append("set-cookie", cookie("google_login_state", state, 600, req));
   response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req).replace("Path=/;", "Domain=.taallab.in; Path=/;"));
   return response;
 }
