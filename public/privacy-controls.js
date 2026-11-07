@@ -4,8 +4,11 @@
   const MAX_AGE = 60 * 60 * 24 * 180;
   const readChoice = () => {
     const match = document.cookie.match(new RegExp("(?:^|;\\s*)" + COOKIE + "=([^;]+)"));
-    if (!match) return null;
-    const value = decodeURIComponent(match[1]);
+    let value = match ? decodeURIComponent(match[1]) : "";
+    if (!value) {
+      try { value = localStorage.getItem(COOKIE) || ""; } catch {}
+    }
+    if (!value) return null;
     if (value === "v1.essential") return { essential: true, externalResources: false, analytics: false, marketing: false };
     if (value === "v1.optional") return { essential: true, externalResources: true, analytics: false, marketing: false };
     return null;
@@ -16,6 +19,7 @@
     if (location.protocol === "https:") cookie += "; Secure";
     if (location.hostname === "taallab.in" || location.hostname.endsWith(".taallab.in")) cookie += "; Domain=.taallab.in";
     document.cookie = cookie;
+    try { localStorage.setItem(COOKIE, value); } catch {}
   };
   const loadOptionalResources = () => {
     if (document.querySelector("[data-taal-optional-fonts]")) return;
@@ -91,6 +95,7 @@
     const choice = getChoice();
     banner.hidden = true;
     if (optional) loadOptionalResources();
+    else document.querySelectorAll("[data-taal-optional-fonts]").forEach((node) => node.remove());
     announce(choice);
   };
   banner.addEventListener("click", (event) => {
