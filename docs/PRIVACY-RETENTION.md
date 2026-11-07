@@ -21,7 +21,7 @@ This schedule records the retention behaviour implemented in the application. It
 | Booking anti-abuse identifiers (email and IP) | Up to 1 year after last use | Hourly Worker cleanup |
 | Account profile and OCEAN content | While the account remains active; following a verified deletion request, review and erase data no longer needed | Human review through the privacy-request queue; shared content, legal holds and provider-side copies require case-by-case handling |
 | Date of birth and age classification | Stored after email verification and sign-in; retained with the active account while needed for age safeguards and parent/guardian controls | User cannot self-edit after submission; correction requests require support review and identity checks |
-| Privacy-request records | As needed to document and respond to the request and meet accountability obligations | Periodic manual review; no fixed automatic purge until an approved accountability period is set |
+| Resolved privacy-request records | Up to two years after completion or decline; open and in-review requests are retained until resolved | Hourly Worker cleanup removes completed/declined requests after two years |
 | Terms and Privacy acceptance records | As needed to demonstrate which policy versions were accepted | Periodic manual review; no automatic purge currently configured |
 | Parent-link invitations | Single-use token expires after 24 hours; invitation metadata is deleted 30 days after expiry | Hourly Worker cleanup |
 | Parent-child link and parental-consent history | While the link is active; revoked link rows, withdrawn consent records and associated events are retained for up to two years after withdrawal unless a legal hold or other legal obligation requires longer | Hourly Worker cleanup removes eligible revoked links, consent records and events |
@@ -40,7 +40,7 @@ This schedule records the retention behaviour implemented in the application. It
 ## Known manual follow-ups
 
 - Confirm statutory retention periods for invoices, paid orders and payment records.
-- Confirm the legal basis and exact retention period for privacy-request and policy-acceptance records.
+- Confirm the legal basis and whether two years is the appropriate accountability period for resolved privacy-request and policy-acceptance records.
 - Review the contact mailbox retention policy for booking enquiries.
 - Verify provider-side deletion, backups, regional processing and DPA settings.
 - The app now asks for date of birth only after email verification and the user's first subsequent sign-in. It classifies accounts as adult or child; child accounts remain pending parent/guardian setup.
