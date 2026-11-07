@@ -117,13 +117,16 @@ export default class TaalLabObsidianSync extends Plugin {
         }
 
         let uploaded = 0, changedNotes = 0;
+        const skipped: string[] = [];
         for (const file of attachments) {
+          if (file.stat.size > 100 * 1024 * 1024) { skipped.push(file.path + " (over 100 MB)"); continue; }
           await this.uploadAttachment(file, remoteAttachments.get(file.path));
           uploaded++;
         }
 
         for (const file of notes) {
           const content = await this.app.vault.cachedRead(file);
+          if (content.length > 350000) { skipped.push(file.path + " (over 350 KB)"); continue; }
           const contentHash = await this.hash(content);
           if (remoteNotes.get(file.path)?.contentHash === contentHash) continue;
           const frontmatter = { ...(this.app.metadataCache.getFileCache(file)?.frontmatter || {}) };
@@ -153,8 +156,8 @@ export default class TaalLabObsidianSync extends Plugin {
         for (const path of remoteFolders) {
           if (!localFolderPaths.has(path)) await this.api("/api/integrations/obsidian/folders?externalId=" + encodeURIComponent(path), { method: "DELETE" });
         }
-        status.setText("OCEAN: synced");
-        if (!silent) new Notice("OCEAN sync complete. " + changedNotes + " notes updated; " + uploaded + " attachments checked.");
+        status.setText(skipped.length ? "OCEAN: synced with skips" : "OCEAN: synced");
+        if (!silent) new Notice("OCEAN sync complete. " + changedNotes + " notes updated; " + uploaded + " attachments checked." + (skipped.length ? " " + skipped.length + " oversized files skipped: " + skipped.slice(0, 3).join(", ") : ""), 10000);
       } while (this.rerun);
     } catch (error) {
       status.setText("OCEAN: sync error");
