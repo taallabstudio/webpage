@@ -121,4 +121,4 @@ Account settings now offer a separate adult-only optional marketing opt-in, unch
 - Confirm Unsplash production application status and API compliance in the provider console.
 - Obtain legal advice on Indian intermediary obligations and whether Taal Lab will seek U.S. DMCA section 512 safe-harbour protection; appoint/register a real agent only if proceeding.
 - Choose the adults-only or verifiable-parental-consent product policy before collecting data from children.
-- Keep marketing email disabled until a separate consent and unsubscribe implementation is ready.
+- Keep marketing campaign sending disabled until a campaign sender exists and is tested to enforce the recorded opt-in, per-recipient unsubscribe URL, and RFC 8058 headers. The preference and unsubscribe endpoints are implemented; no marketing sender/list currently exists and no marketing campaigns are sent.
