@@ -2378,7 +2378,12 @@ export default {
           authorizeAdmin: async (request: Request) => { try { await requireAdmin(request, env); return true; } catch { return false; } },
           getCustomer: async (request: Request) => {
             const customer = await getSessionUser(request, env);
-            return customer ? { id: String(customer.id), email: String(customer.email), displayName: String(customer.display_name || "") } : null;
+            return customer ? {
+              id: String(customer.id), email: String(customer.email),
+              displayName: String(customer.display_name || ""),
+              accountType: String(customer.account_type || "unclassified"),
+              parentalConsentStatus: String(customer.parental_consent_status || "not_required"),
+            } : null;
           },
         });
         if (storeResponse) return storeResponse;
