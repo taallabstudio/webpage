@@ -54,13 +54,13 @@ Before publishing a DMCA agent page, the owner must provide the authorised agent
 
 ## India intermediary and grievance review
 
-Because Taal Lab provides user file storage and sharing, obtain Indian legal advice on whether the service is an intermediary under the Information Technology Act and the current Intermediary Rules, and which due-diligence and grievance obligations apply to the specific features and entity.
+Because Taal Lab provides user file storage, public sharing and OCEAN pages, obtain Indian legal advice on whether the service is an intermediary under the Information Technology Act and the current Intermediary Rules, and which due-diligence and grievance obligations apply to the specific features and entity. The 2026 Amendment Rules took effect on 20 February 2026. They add a requirement for intermediaries to inform users at least once every three months about compliance, removal/suspension and legal consequences. A scheduled, non-marketing policy reminder is now implemented for verified active accounts; the actual legal applicability and required notice wording still need counsel review.
 
-If applicable, appoint and publish the required Grievance Officer details and implement a tracked complaint process with acknowledgement, review, takedown, appeal and evidence-preservation steps. The repository currently publishes a general contact email but does not identify a named Grievance Officer or a dedicated grievance workflow.
+The 2026 amendments also shorten certain grievance and law-enforcement response timelines. If applicable, appoint and publish the required named Grievance Officer details and implement a tracked complaint process with the correct acknowledgement, resolution, takedown, appeal and evidence-preservation deadlines. The current privacy-request queue is not a substitute for a statutory grievance workflow. The repository currently publishes a general contact email but does not identify a named Grievance Officer or a dedicated grievance workflow.\n\nThe 2026 amendments introduce obligations for intermediaries whose computer resources enable, permit or facilitate the creation, generation, modification, alteration, publication, transmission, sharing or dissemination of synthetically generated audio, visual or audio-visual information. Taal Lab does not provide an AI-generation feature, but users can upload and share audio, images and video. Obtain a legal determination on whether those sharing features trigger labelling/provenance obligations. If they do, design per-content declarations, prominent labels and technically feasible provenance metadata before treating this requirement as complete. Significant social media intermediaries have additional declaration/verification requirements; do not assume Taal Lab falls into or outside that category without review.
 
 Official references:
 - https://upload.indiacode.nic.in/view-casepdf?id=AC_CEN_45_76_00001_200021_1517807324077&type=act
-- https://www.meity.gov.in/static/uploads/2024/02/IT-Intermediary-Rules-2021-updated-on-28.10.2022-2.pdf
+- https://www.meity.gov.in/static/uploads/2024/02/IT-Intermediary-Rules-2021-updated-on-28.10.2022-2.pdf\n- 2026 Amendment Rules (Gazette of India, 10 February 2026; effective 20 February 2026): https://egazette.gov.in/WriteReadData/2026/269993.pdf
 
 ## Features not identified in the repository review
 
