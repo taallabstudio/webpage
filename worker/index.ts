@@ -347,7 +347,7 @@ async function sendAuthEmail(env: Env, to: string, subject: string, html: string
   return { sent: true, id: data?.id || null };
 }
 
-async function sendMarketingEmail(env: Env, userId: string, subject: string, html: string, text: string) {
+async function sendMarketingEmail(env: Env, userId: string, campaignId: string, subject: string, html: string, text: string) {
   await ensureMarketingSchema(env);
   const preference: any = await env.DB.prepare("SELECT m.email,m.subscribed,u.email_verified_at FROM marketing_preferences m JOIN users u ON u.id=m.user_id WHERE m.user_id=? LIMIT 1").bind(userId).first();
   if (!preference || Number(preference.subscribed) !== 1 || !preference.email || !preference.email_verified_at) return { sent: false, skipped: true };
@@ -360,7 +360,7 @@ async function sendMarketingEmail(env: Env, userId: string, subject: string, htm
     headers: {
       "Authorization": `Bearer ${env.RESEND_API_KEY}`,
       "Content-Type": "application/json",
-      "Idempotency-Key": `marketing:${userId}:${randomToken(12)}`,
+      "Idempotency-Key": `marketing:${campaignId}:${userId}`,
     },
     body: JSON.stringify({
       from: "TaalLab <contact@taallab.in>",
