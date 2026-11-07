@@ -30,5 +30,7 @@ jobs:
         run: npm install
       - name: Build website and app assets
         run: npm run build
+      - name: Bundle Cloudflare Worker without deploying
+        run: npx esbuild worker/index.ts --bundle --platform=browser --format=esm --outfile=/tmp/taallab-worker.js
       - name: Validate Cloudflare Worker bundle without deploying
         run: npx wrangler deploy --dry-run --outdir=worker-dist
