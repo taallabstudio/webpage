@@ -240,8 +240,13 @@ async function ensureSupportSchema(env: Env) {
     status TEXT NOT NULL DEFAULT 'received' CHECK(status IN ('received','in_review','completed','rejected')),
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
-    resolved_at INTEGER
+    resolved_at INTEGER,
+    reviewed_by TEXT,
+    resolution_notes TEXT
   )`).run();
+  for (const [column, declaration] of [["reviewed_by","TEXT"],["resolution_notes","TEXT"]]) {
+    try { await env.DB.prepare(`ALTER TABLE privacy_requests ADD COLUMN ${column} ${declaration}`).run(); } catch {}
+  }
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_user_created ON privacy_requests(user_id,created_at DESC)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_status_created ON privacy_requests(status,created_at)").run();
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
@@ -1590,7 +1595,7 @@ async function accountDataExport(req: Request, env: Env) {
     account: {
       id: userId, email: user.email, role: user.role, status: user.status,
       createdAt: user.created_at, updatedAt: user.updated_at, emailVerifiedAt: user.email_verified_at,
-      displayName: user.display_name || "", twoFactorEnabled: !!Number(user.two_factor_enabled),
+      displayName: user.display_name || "", avatarData: user.avatar_data || "", twoFactorEnabled: !!Number(user.two_factor_enabled),
     },
     connectedGoogleAccounts: googleIdentities.results || [],
     googleCalendarConnection: calendar || null,
@@ -1650,17 +1655,21 @@ async function submitAccountDeletionRequest(req: Request, env: Env) {
 
 async function listAdminPrivacyRequests(req: Request, env: Env) {
   await requireAdmin(req, env);
-  const rows = await env.DB.prepare("SELECT id,user_id,email,request_type,details,status,created_at,updated_at,resolved_at FROM privacy_requests ORDER BY CASE status WHEN 'received' THEN 0 WHEN 'in_review' THEN 1 ELSE 2 END,created_at DESC LIMIT 100").all();
+  const rows = await env.DB.prepare("SELECT id,user_id,email,request_type,details,status,created_at,updated_at,resolved_at,reviewed_by,resolution_notes FROM privacy_requests ORDER BY CASE status WHEN 'received' THEN 0 WHEN 'in_review' THEN 1 ELSE 2 END,created_at DESC LIMIT 100").all();
   return json({ requests: rows.results || [] }, { headers: { "cache-control": "no-store" } });
 }
 
 async function updateAdminPrivacyRequest(req: Request, env: Env, requestId: string) {
-  await requireAdmin(req, env);
+  const admin = await requireAdmin(req, env);
   const body: any = await req.json().catch(() => ({}));
   const status = String(body.status || "");
+  const resolutionNotes = String(body.resolutionNotes || "").trim().slice(0, 1000);
   if (!["received","in_review","completed","rejected"].includes(status)) return json({ error: "Choose a valid request status." }, { status: 400 });
-  const result = await env.DB.prepare("UPDATE privacy_requests SET status=?,updated_at=?,resolved_at=? WHERE id=?")
-    .bind(status, now(), status === "completed" || status === "rejected" ? now() : null, requestId).run();
+  if ((status === "completed" || status === "rejected") && resolutionNotes.length < 10) {
+    return json({ error: "Add a brief resolution note before closing this request." }, { status: 400 });
+  }
+  const result = await env.DB.prepare("UPDATE privacy_requests SET status=?,updated_at=?,resolved_at=?,reviewed_by=?,resolution_notes=? WHERE id=?")
+    .bind(status, now(), status === "completed" || status === "rejected" ? now() : null, admin.id, resolutionNotes, requestId).run();
   if (!result.meta?.changes) return json({ error: "Privacy request not found." }, { status: 404 });
   return json({ ok: true, requestId, status });
 }
