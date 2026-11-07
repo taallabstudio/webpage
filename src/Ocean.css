@@ -1457,3 +1457,26 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 .ocean-calendar-settings .ocean-access-note{margin:18px 20px 20px}
 .ocean-shell[data-theme="dark"] .ocean-user-settings{background:#202832;border-color:#3a424d;color:#c1cad4}
 .ocean-shell[data-theme="dark"] .ocean-calendar-settings .ocean-settings-section-heading,.ocean-shell[data-theme="dark"] .ocean-calendar-settings .ocean-calendar-connection{border-color:#3a424d}
+
+
+/* Account actions live in Workspace Settings; sidebar page deletion is explicit. */
+.ocean-account-settings{margin-bottom:22px}
+.ocean-account-settings-body{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 22px}
+.ocean-account-email{display:flex;flex-direction:column;gap:5px;min-width:0}
+.ocean-account-email>span{font-size:11px;color:#7d8995}
+.ocean-account-email>strong{font-size:13px;color:#273442;overflow-wrap:anywhere}
+.ocean-account-settings-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ocean-account-settings-actions button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:34px;padding:7px 11px;border:1px solid #dfe5eb;border-radius:7px;background:#fff;color:#45515e;font-size:12px}
+.ocean-account-settings-actions button:hover{background:#f3f7fb;border-color:#cbd8e5}
+.ocean-account-settings-actions .ocean-account-signout{color:#b83d43;border-color:#f0d7d8}
+.ocean-account-settings-actions .ocean-account-signout:hover{background:#fff5f5;border-color:#e7bfc1}
+.ocean-sidebar-context-menu>.ocean-sidebar-delete-action{margin-top:3px;padding-top:9px;border-top:1px solid #edf0f3;color:#c04449}
+.ocean-sidebar-context-menu>.ocean-sidebar-delete-action:hover{background:#fff2f2;color:#ae252b}
+.ocean-shell[data-theme="dark"] .ocean-account-email>strong{color:#e7edf4}
+.ocean-shell[data-theme="dark"] .ocean-account-email>span{color:#aab5c1}
+.ocean-shell[data-theme="dark"] .ocean-account-settings-actions button{background:#202832;border-color:#3a424d;color:#d4dde6}
+.ocean-shell[data-theme="dark"] .ocean-account-settings-actions button:hover{background:#2c3743}
+.ocean-shell[data-theme="dark"] .ocean-account-settings-actions .ocean-account-signout{color:#ff9b9f;border-color:#684044}
+.ocean-shell[data-theme="dark"] .ocean-sidebar-context-menu>.ocean-sidebar-delete-action{border-color:#414c58;color:#ff9b9f}
+.ocean-shell[data-theme="dark"] .ocean-sidebar-context-menu>.ocean-sidebar-delete-action:hover{background:#432d32;color:#ffb5b8}
+@media(max-width:650px){.ocean-account-settings-body{align-items:flex-start;flex-direction:column;gap:14px}.ocean-account-settings-actions{width:100%}}
