@@ -1093,6 +1093,8 @@ async function googleAuthCallback(req: Request, env: Env) {
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
     response.headers.append("set-cookie", clearConsentCookie);
+    response.headers.append("set-cookie", clearAgeCookie);
+    response.headers.append("set-cookie", clearMarketingCookie);
     return response;
   }
 
@@ -1111,6 +1113,8 @@ async function googleAuthCallback(req: Request, env: Env) {
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
     response.headers.append("set-cookie", clearConsentCookie);
+    response.headers.append("set-cookie", clearAgeCookie);
+    response.headers.append("set-cookie", clearMarketingCookie);
     return response;
   }
   const sid = await createUserSession(env, user.id);
@@ -1118,6 +1122,8 @@ async function googleAuthCallback(req: Request, env: Env) {
   response.headers.append("set-cookie", clearStateCookie);
   response.headers.append("set-cookie", clearReturnCookie);
   response.headers.append("set-cookie", clearConsentCookie);
+  response.headers.append("set-cookie", clearAgeCookie);
+  response.headers.append("set-cookie", clearMarketingCookie);
   attachSessionCookie(response, sid, req);
   return response;
 }
