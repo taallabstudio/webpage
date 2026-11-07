@@ -45,13 +45,13 @@ The repository contains these local assets:
 
 | Asset | Current evidence | Clearance status |
 |---|---|---|
-| `public/logo.png` | File is present in the repository | Confirm Taal Lab owns or has permission to use all artwork in the logo |
-| `public/studio.webp` | Studio photograph is present | Confirm photographer/creator, ownership and any identifiable people/property permissions |
-| `public/headphones.webp` | Hero image is present | Confirm it is original, commissioned, or covered by a valid licence |
+| `public/logo.png` | TaalLab owner confirmed on 7 November 2026 that they hold the licence/permission to use the logo | Owner confirmation recorded; retain the licence/permission document in the business records |
+| `public/studio.webp` | TaalLab owner confirmed on 7 November 2026 that they hold the licence/permission to use the studio photography | Owner confirmation recorded; retain the photographer's licence/permission and any necessary identifiable-person/property releases |
+| `public/headphones.webp` | TaalLab owner confirmed on 7 November 2026 that they generated the image using AI | Owner states it is AI-generated; retain the generation/source records and check the applicable tool terms |
 | `public/studio-preview.avif` | Generated/optimised preview referenced by the landing page build | Verify it is derived only from a cleared source image |
 | Product cover images | Loaded from configured store product metadata/storage | Keep the source and licence evidence alongside each product record |
 
-No asset provenance or licence file is embedded in the repository for these local images. Do not mark them cleared until the owner has confirmed the source and any necessary permissions. User-supplied files are not automatically proof of copyright ownership.
+The owner has confirmed the source/permission position for the three named local assets. This is an owner-provided confirmation, not an independent legal verification; the underlying licence documents, releases and AI-generation records should be retained in TaalLab's business records. Product covers remain separately subject to source/licence evidence.
 
 ## 4. npm dependencies — incomplete until a lockfile and full report exist
 
@@ -116,7 +116,7 @@ Account settings now offer a separate adult-only optional marketing opt-in, unch
 
 ## 8. Required follow-up before marking P1 licensing/legal items complete
 
-- Obtain owner/creator confirmation and permission records for the logo, studio photo, headphones image and every product cover.
+- File the logo and studio-photography licence/permission evidence and AI-generation records for the headphones image in TaalLab's business records. Review product-cover rights separately.
 - Generate and retain a complete licence report from the exact dependency tree; add a lockfile and a third-party notices file for shipped app builds.
 - Confirm Unsplash production application status and API compliance in the provider console.
 - Obtain legal advice on Indian intermediary obligations and whether Taal Lab will seek U.S. DMCA section 512 safe-harbour protection; appoint/register a real agent only if proceeding.
