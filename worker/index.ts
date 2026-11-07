@@ -1,4 +1,4 @@
-import { handleStoreRequest } from "./store";
+import { handleStoreRequest, getStorePrivacyData, cleanupStoreData } from "./store";
 import {
   ensureAuthMethodsSchema, hasEnabledTotp, verifyTotpOrRecovery,
   startAuthenticatorSetup, confirmAuthenticatorSetup, disableAuthenticator,
@@ -35,7 +35,7 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const SETTINGS_REFRESH = "google_refresh_token";
 const SETTINGS_FOLDER = "google_drive_folder_id";
 const now = () => Math.floor(Date.now() / 1000);
-const POLICY_VERSION = "2026-11-07";
+const POLICY_VERSION = "2026-11-07.1";
 
 async function recordPolicyAcceptance(env: Env, userId: string, method: string) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
@@ -230,6 +230,26 @@ async function ensureSupportSchema(env: Env) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS booking_rate_limits (
     identity TEXT PRIMARY KEY,
     last_sent_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS privacy_requests (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    request_type TEXT NOT NULL CHECK(request_type IN ('deletion')),
+    details TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'received' CHECK(status IN ('received','in_review','completed','rejected')),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    resolved_at INTEGER
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_user_created ON privacy_requests(user_id,created_at DESC)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_status_created ON privacy_requests(status,created_at)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, terms_version TEXT NOT NULL,
+    privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS google_app_login_codes (
+    code_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at INTEGER NOT NULL
   )`).run();
 }
 
@@ -1348,14 +1368,12 @@ async function driveFile(env: Env, fileId: string) {
   return response.json();
 }
 
-async function trashDriveFile(env: Env, fileId: string) {
+async function deleteDriveFilePermanently(env: Env, fileId: string) {
   const response = await driveFetch(env, `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ trashed: true }),
+    method: "DELETE",
   });
-  if (!response.ok) {
-    console.error("Drive delete failed", fileId, await response.text());
+  if (!response.ok && response.status !== 404) {
+    console.error("Permanent Drive deletion failed", fileId, response.status, await response.text());
   }
 }
 
@@ -1518,18 +1536,128 @@ async function cleanup(env: Env) {
     if (Number(refs?.n || 0) > 0) continue;
 
     try {
-      await trashDriveFile(env, f.storage_key);
+      await deleteDriveFilePermanently(env, f.storage_key);
     } catch (e) {
       console.error("Drive delete failed", f.storage_key, e);
     }
   }
 
+  const metadataCutoff = cutoff - 30 * 86400;
   await env.DB.batch([
     env.DB.prepare("UPDATE files SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM email_verification_tokens WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM password_reset_tokens WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM webauthn_challenges WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM google_app_login_codes WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM ocean_google_calendar_states WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM booking_rate_limits WHERE last_sent_at<=?").bind(metadataCutoff),
+    env.DB.prepare("DELETE FROM files WHERE status='deleted' AND expires_at<=?").bind(metadataCutoff),
+    env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=?").bind(metadataCutoff),
   ]);
+}
+
+async function accountDataExport(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  await ensureOceanSchema(env);
+  const userId = String(user.id);
+  const [transfers, files, googleIdentities, policyAcceptances, pages, comments, shares, assets, calendar, totp, passkeys, store] = await Promise.all([
+    env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(userId).all(),
+    env.DB.prepare(`SELECT f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status
+      FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC`).bind(userId).all(),
+    env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=?").bind(userId).all(),
+    env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at").bind(userId).all(),
+    env.DB.prepare("SELECT id,parent_id,title,icon,cover,blocks_json,is_favorite,is_archived,created_at,updated_at,is_folder,is_shared,general_access,cover_credit,cover_credit_url,cover_source_url FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(userId).all(),
+    env.DB.prepare("SELECT id,page_id,body,created_at FROM ocean_comments WHERE user_id=? ORDER BY created_at").bind(userId).all(),
+    env.DB.prepare("SELECT page_id,permission,created_at,updated_at FROM ocean_page_shares WHERE user_id=? ORDER BY created_at").bind(userId).all(),
+    env.DB.prepare("SELECT id,page_id,file_name,mime_type,size,created_at FROM ocean_assets WHERE user_id=? ORDER BY created_at").bind(userId).all(),
+    env.DB.prepare("SELECT email,scope,connected_at,updated_at FROM ocean_google_calendar WHERE user_id=? LIMIT 1").bind(userId).first(),
+    env.DB.prepare("SELECT enabled,created_at,updated_at,pending_expires_at FROM user_totp WHERE user_id=? LIMIT 1").bind(userId).first(),
+    env.DB.prepare("SELECT name,device_type,backed_up,created_at,last_used_at FROM passkey_credentials WHERE user_id=? ORDER BY created_at").bind(userId).all(),
+    getStorePrivacyData(env, userId),
+  ]);
+  const payload = {
+    generatedAt: new Date().toISOString(),
+    notice: "This export excludes passwords, session identifiers, authentication secrets, OAuth tokens, passkey public keys, storage keys and private download tokens.",
+    account: {
+      id: userId, email: user.email, role: user.role, status: user.status,
+      createdAt: user.created_at, updatedAt: user.updated_at, emailVerifiedAt: user.email_verified_at,
+      displayName: user.display_name || "", twoFactorEnabled: !!Number(user.two_factor_enabled),
+    },
+    connectedGoogleAccounts: googleIdentities.results || [],
+    googleCalendarConnection: calendar || null,
+    securityMethods: {
+      authenticator: totp ? { enabled: !!Number((totp as any).enabled), createdAt: (totp as any).created_at, updatedAt: (totp as any).updated_at, pendingExpiresAt: (totp as any).pending_expires_at } : null,
+      passkeys: passkeys.results || [],
+    },
+    policyAcceptances: policyAcceptances.results || [],
+    transfers: transfers.results || [],
+    transferFiles: files.results || [],
+    ocean: { pages: pages.results || [], comments: comments.results || [], shares: shares.results || [], assets: assets.results || [] },
+    store,
+  };
+  return new Response(JSON.stringify(payload, null, 2), {
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": `attachment; filename="taallab-data-export-${new Date().toISOString().slice(0,10)}.json"`,
+      "cache-control": "private, no-store, max-age=0",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
+async function listAccountPrivacyRequests(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  const rows = await env.DB.prepare("SELECT id,request_type,status,created_at,updated_at,resolved_at FROM privacy_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 20").bind(user.id).all();
+  return json({ requests: rows.results || [] }, { headers: { "cache-control": "no-store" } });
+}
+
+async function submitAccountDeletionRequest(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  const body: any = await req.json().catch(() => ({}));
+  if (body.confirmation !== "DELETE") return json({ error: "Type DELETE to confirm your account deletion request." }, { status: 400 });
+  const details = String(body.details || "").trim().slice(0, 1000);
+  const existing: any = await env.DB.prepare("SELECT id,status FROM privacy_requests WHERE user_id=? AND request_type='deletion' AND status IN ('received','in_review') ORDER BY created_at DESC LIMIT 1").bind(user.id).first();
+  if (existing) return json({ ok: true, requestId: existing.id, status: existing.status, alreadyOpen: true });
+  const id = randomToken(16);
+  const createdAt = now();
+  await env.DB.prepare("INSERT INTO privacy_requests(id,user_id,email,request_type,details,status,created_at,updated_at) VALUES(?,?,?,'deletion',?,'received',?,?)")
+    .bind(id, user.id, user.email, details, createdAt, createdAt).run();
+  let notificationSent = false;
+  try {
+    const safeEmail = escapeHtml(String(user.email || ""));
+    const safeDetails = escapeHtml(details || "No additional details supplied.");
+    const notice = await sendAuthEmail(
+      env, "contact@taallab.in", `Privacy deletion request ${id}`,
+      `<div style="font-family:Arial,sans-serif"><h2>Account deletion request</h2><p>Request: <strong>${id}</strong></p><p>Account email: ${safeEmail}</p><p>Details: ${safeDetails}</p><p>Review this request and complete deletion only after checking legal, payment and shared-content retention requirements.</p></div>`,
+      `Account deletion request: ${id}\nEmail: ${user.email}\nDetails: ${details || "None"}\nReview applicable retention requirements before completing.`,
+      `privacy-request:${id}`,
+    );
+    notificationSent = !!notice.sent;
+  } catch (error) {
+    console.error("Privacy request notification failed", error);
+  }
+  return json({ ok: true, requestId: id, status: "received", notificationSent });
+}
+
+async function listAdminPrivacyRequests(req: Request, env: Env) {
+  await requireAdmin(req, env);
+  const rows = await env.DB.prepare("SELECT id,user_id,email,request_type,details,status,created_at,updated_at,resolved_at FROM privacy_requests ORDER BY CASE status WHEN 'received' THEN 0 WHEN 'in_review' THEN 1 ELSE 2 END,created_at DESC LIMIT 100").all();
+  return json({ requests: rows.results || [] }, { headers: { "cache-control": "no-store" } });
+}
+
+async function updateAdminPrivacyRequest(req: Request, env: Env, requestId: string) {
+  await requireAdmin(req, env);
+  const body: any = await req.json().catch(() => ({}));
+  const status = String(body.status || "");
+  if (!["received","in_review","completed","rejected"].includes(status)) return json({ error: "Choose a valid request status." }, { status: 400 });
+  const result = await env.DB.prepare("UPDATE privacy_requests SET status=?,updated_at=?,resolved_at=? WHERE id=?")
+    .bind(status, now(), status === "completed" || status === "rejected" ? now() : null, requestId).run();
+  if (!result.meta?.changes) return json({ error: "Privacy request not found." }, { status: 404 });
+  return json({ ok: true, requestId, status });
 }
 
 function escapeHtml(value: string) {
@@ -2261,6 +2389,12 @@ export default {
       if (url.pathname === "/api/account/profile" && req.method === "PATCH") return updateAccountProfile(req, env);
       if (url.pathname === "/api/account/password" && req.method === "POST") return changeOwnPassword(req, env);
       if (url.pathname === "/api/account/security" && req.method === "POST") return updateSecuritySettings(req, env);
+      if (url.pathname === "/api/account/data-export" && req.method === "GET") return accountDataExport(req, env);
+      if (url.pathname === "/api/account/privacy-requests" && req.method === "GET") return listAccountPrivacyRequests(req, env);
+      if (url.pathname === "/api/account/privacy-requests/deletion" && req.method === "POST") return submitAccountDeletionRequest(req, env);
+      if (url.pathname === "/api/admin/privacy-requests" && req.method === "GET") return listAdminPrivacyRequests(req, env);
+      const adminPrivacyRequest = url.pathname.match(/^\/api\/admin\/privacy-requests\/([^/]+)$/);
+      if (adminPrivacyRequest && req.method === "PATCH") return updateAdminPrivacyRequest(req, env, adminPrivacyRequest[1]);
 
       if (url.pathname === "/api/admin/users" && req.method === "GET") {
         await requireAdmin(req, env);
@@ -2587,10 +2721,7 @@ export default {
   },
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(Promise.all([
-      cleanup(env),
-      env.DB.prepare("DELETE FROM email_verification_tokens WHERE expires_at<=?").bind(now()).run(),
-      env.DB.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").bind(now()).run(),
-    ]));
+    await Promise.all([ensureSupportSchema(env), ensureAuthMethodsSchema(env), ensureOceanSchema(env)]);
+    ctx.waitUntil(Promise.all([cleanup(env), cleanupStoreData({ DBStore: env.DBStore, APP_ORIGIN: env.APP_ORIGIN, ASSETS: env.ASSETS })]));
   },
 } satisfies ExportedHandler<Env>;
