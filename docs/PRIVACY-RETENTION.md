@@ -15,8 +15,8 @@ This document records the retention behavior implemented in the application. It 
 | Password reset tokens | 30 minutes | Expired rows removed hourly. |
 | Google app hand-off codes | 2 minutes | Expired rows removed hourly. |
 | Google Calendar OAuth state | Stored expiry | Expired rows removed hourly. |
-| Transfer file objects | Transfer's displayed expiry | Worker attempts deletion from connected Google Drive at/after expiry. Failed deletion remains eligible for retry. |
-| Transfer and file metadata | 1 year after transfer expiry | Purged after expiry only after associated file records are marked deleted; failed storage deletion keeps the record for retry. |
+| Transfer file objects | Transfer's displayed expiry | Worker moves the object to Google Drive trash at/after expiry. Failed trash operations remain eligible for retry; final removal follows Google's trash and backup lifecycle. |
+| Transfer and file metadata | 1 year after transfer expiry | Purged after expiry only after associated file records are marked deleted following a successful move to provider trash; failed operations keep the record for retry. |
 | Booking anti-abuse identifiers | 1 year after last activity | Old rate-limit rows are removed hourly. |
 
 ## Records not automatically deleted
