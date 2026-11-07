@@ -1561,7 +1561,7 @@ async function cleanup(env: Env) {
     env.DB.prepare("DELETE FROM ocean_google_calendar_states WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM booking_rate_limits WHERE last_sent_at<=?").bind(metadataCutoff),
     env.DB.prepare("DELETE FROM files WHERE status='deleted' AND expires_at<=?").bind(metadataCutoff),
-    env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=?").bind(metadataCutoff),
+    env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=? AND NOT EXISTS (SELECT 1 FROM files WHERE files.transfer_id=transfers.id AND files.status!='deleted')").bind(metadataCutoff),
   ]);
 }
 
