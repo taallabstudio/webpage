@@ -128,6 +128,13 @@ async function ensureFolder(env: Env, user: User, path: string) {
   }
   return parentId;
 }
+async function syncFolder(req: Request, env: Env, user: User) {
+  const body: any = await req.json().catch(() => ({}));
+  let externalId: string;
+  try { externalId = safePath(String(body.externalId || "")); } catch (error: any) { return json({ error: error.message }, 400); }
+  const id = await ensureFolder(env, user, "Obsidian/" + externalId);
+  return json({ ok: true, folderId: id, externalId }, 200);
+}
 async function syncNote(req: Request, env: Env, user: User) {
   const body: any = await req.json().catch(() => ({}));
   let externalId: string;
@@ -139,7 +146,7 @@ async function syncNote(req: Request, env: Env, user: User) {
   if (!/^[a-f0-9]{64}$/i.test(contentHash)) return json({ error: "Invalid content hash." }, 400);
   let frontmatter: any = body.frontmatter && typeof body.frontmatter === "object" ? body.frontmatter : {};
   const folderPath = externalId.includes("/") ? externalId.split("/").slice(0,-1).join("/") : "";
-  const parentId = folderPath ? await ensureFolder(env, user, folderPath) : null;
+  const parentId = await ensureFolder(env, user, folderPath ? "Obsidian/" + folderPath : "Obsidian");
   const title = String(body.title || titleFromPath(externalId)).trim().slice(0,160) || "Untitled";
   const blocks = markdownBlocks(content);
   const timestamp = now();
@@ -194,12 +201,8 @@ async function uploadAttachment(req: Request, env: Env, user: User) {
   const uploaded = await fetch(ud.uploadUrl, { method: "POST", headers: { Authorization: ud.authorizationToken, "X-Bz-File-Name": encodeURIComponent(key), "Content-Type": mime, "X-Bz-Content-Sha1": "do_not_verify" }, body: bytes });
   const up: any = await uploaded.json().catch(() => ({}));
   if (!uploaded.ok || !up.fileId) return json({ error: "Backblaze could not store the attachment." }, 502);
-  const root: any = await env.DB.prepare("SELECT id FROM ocean_pages WHERE user_id=? AND source='obsidian' AND external_id='@folder/Obsidian' LIMIT 1").bind(user.id).first();
-  let pageId = root?.id;
-  if (!pageId) {
-    pageId = randomToken(12);
-    await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,icon,blocks_json,is_folder,source,external_id,created_at,updated_at) VALUES(?,?,NULL,'Obsidian','📁','[]',1,'obsidian','@folder/Obsidian',?,?)").bind(pageId, user.id, now(), now()).run();
-  }
+  const attachmentFolder = externalId.includes("/") ? "Obsidian/" + externalId.split("/").slice(0,-1).join("/") : "Obsidian";
+  const pageId = await ensureFolder(env, user, attachmentFolder);
   await env.DB.prepare("INSERT INTO ocean_assets(id,user_id,page_id,storage_key,file_name,mime_type,size,created_at) VALUES(?,?,?,?,?,?,?,?)")
     .bind(id,user.id,pageId,key,filename,mime,bytes.byteLength,now()).run();
   await env.DB.prepare("INSERT INTO ocean_obsidian_attachments(id,user_id,external_id,content_hash,asset_id,created_at,updated_at,deleted_at) VALUES(?,?,?,?,?,?,?,NULL) ON CONFLICT(user_id,external_id) DO UPDATE SET content_hash=excluded.content_hash,asset_id=excluded.asset_id,updated_at=excluded.updated_at,deleted_at=NULL")
@@ -221,6 +224,7 @@ export async function handleObsidianIntegration(req: Request, env: Env, getSessi
     const attachments = await env.DB.prepare("SELECT external_id AS externalId,content_hash AS contentHash,updated_at AS updatedAt FROM ocean_obsidian_attachments WHERE user_id=? AND deleted_at IS NULL").bind(user.id).all();
     return json({ notes: notes.results || [], attachments: attachments.results || [] });
   }
+  if (path === "/api/integrations/obsidian/folders" && req.method === "PUT") return syncFolder(req, env, user);
   if (path === "/api/integrations/obsidian/notes" && req.method === "PUT") return syncNote(req, env, user);
   if (path === "/api/integrations/obsidian/notes" && req.method === "DELETE") return deleteNote(req, env, user);
   if (path === "/api/integrations/obsidian/attachments" && req.method === "PUT") return uploadAttachment(req, env, user);
