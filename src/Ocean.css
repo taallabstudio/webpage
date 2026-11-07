@@ -1483,3 +1483,7 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 .ocean-shell[data-theme="dark"] .ocean-sidebar-context-menu>.ocean-sidebar-delete-action{border-color:#414c58;color:#ff9b9f}
 .ocean-shell[data-theme="dark"] .ocean-sidebar-context-menu>.ocean-sidebar-delete-action:hover{background:#432d32;color:#ffb5b8}
 @media(max-width:650px){.ocean-account-settings-body{align-items:flex-start;flex-direction:column;gap:14px}.ocean-account-settings-actions{width:100%}}
+
+
+/* Keyboard focus remains visible in the dark OCEAN workspace and login screen. */
+.ocean-shell :where(button,a,input,textarea,select,[tabindex]):focus-visible,.ocean-auth :where(button,a,input,textarea,select,[tabindex]):focus-visible{outline:3px solid #8bb8e8!important;outline-offset:3px}
