@@ -4,20 +4,20 @@
 
 ## Official website
 
-- [TAAL LAB](https://taallab.work/): Official studio website and overview.
-- [Studio services](https://taallab.work/#services): Music production, recording, dubbing, mixing, and mastering.
-- [Studio](https://taallab.work/#studio): Information about the recording space.
-- [Equipment](https://taallab.work/#equipment): Studio equipment and setup.
-- [Book a session](https://taallab.work/#book-session): Request a studio session.
-- [Contact](https://taallab.work/#contact): Contact details and social links.
+- [TAAL LAB](https://taallab.in/): Official studio website and overview.
+- [Studio services](https://taallab.in/#services): Music production, recording, dubbing, mixing, and mastering.
+- [Studio](https://taallab.in/#studio): Information about the recording space.
+- [Equipment](https://taallab.in/#equipment): Studio equipment and setup.
+- [Book a session](https://taallab.in/#book-session): Request a studio session.
+- [Contact](https://taallab.in/#contact): Contact details and social links.
 
 ## Shop
 
-- [TAAL LAB Shop](https://taallab.work/shop.html): Public catalogue of audio downloads and digital products.
+- [TAAL LAB Shop](https://taallab.in/shop.html): Public catalogue of audio downloads and digital products.
 
 ## Contact
 
-- Email: contact@taallab.work
+- Email: contact@taallab.in
 - Instagram: https://www.instagram.com/taallabstudio
 
 ## Usage notes
