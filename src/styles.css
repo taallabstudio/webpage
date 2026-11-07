@@ -1560,3 +1560,40 @@ button.button-click-feedback{
 @media(prefers-reduced-motion:reduce){
   button:not(:disabled),button.button-click-feedback{transition:none!important;animation:none!important}
 }
+
+
+/* Six-digit email verification input */
+.email-code-boxes{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:10px;
+  margin:24px 0;
+}
+.email-code-input{
+  width:100%;
+  min-width:0;
+  height:58px;
+  border:1px solid #d7dce3;
+  border-radius:12px;
+  background:#fff;
+  color:#172033;
+  font-size:25px;
+  font-weight:650;
+  text-align:center;
+  outline:none;
+  box-shadow:0 1px 2px rgba(20,35,50,.04);
+  transition:border-color .16s ease,box-shadow .16s ease,background .16s ease;
+}
+.email-code-input:focus{
+  border-color:#147ce5;
+  box-shadow:0 0 0 3px rgba(20,124,229,.14);
+}
+.email-code-input:disabled{
+  background:#f1f3f6;
+  color:#8b95a3;
+  cursor:wait;
+}
+@media(max-width:420px){
+  .email-code-boxes{gap:7px}
+  .email-code-input{height:50px;font-size:22px;border-radius:10px}
+}
