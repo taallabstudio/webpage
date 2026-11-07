@@ -746,6 +746,7 @@ async function authSetup(req: Request, env: Env) {
   const createdAt = now();
   await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status,email_verified_at,two_factor_enabled) VALUES(?,?,?,?,?,?,?,?,?)")
     .bind(id, email, hash, "admin", createdAt, createdAt, "active", null, 1).run();
+  await recordAgeConfirmation(env,id,"initial_admin_self_attestation");
 
   const verification = await createEmailVerification(env, { id, email });
   if (!verification.sent) {
