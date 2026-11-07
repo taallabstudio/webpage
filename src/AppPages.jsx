@@ -542,7 +542,7 @@ function Admin({initialUpload=false}) {
   if(!authed) return <Login onLogin={refresh}/>;
   if(user?.role!=="admin") { location.replace("/account"); return <div className="loading"><RefreshCw className="spin"/> Redirecting to your account…</div>; }
 
-  function navigateAdmin(next){setPage(next);setMobileNavOpen(false);mobileNavToggleRef.current?.focus();}
+  function navigateAdmin(next){setPage(next);if(mobileNavOpen){setMobileNavOpen(false);mobileNavToggleRef.current?.focus();}}
   useEffect(()=>{
     if(!mobileNavOpen)return;
     const first=mobileNavRef.current?.querySelector("button");
