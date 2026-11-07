@@ -596,6 +596,7 @@ async function authSignup(req: Request, env: Env) {
   const body = await req.json().catch(() => ({}));
   const email = normalizeEmail(body.email);
   const password = String(body.password || "");
+  if (body.acceptTerms !== true) return json({ error: "Please accept the Terms of Service and Privacy Policy to create an account." }, { status: 400 });
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, { status: 400 });
   if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, { status: 400 });
@@ -608,6 +609,7 @@ async function authSignup(req: Request, env: Env) {
   const createdAt = now();
   await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status,email_verified_at,two_factor_enabled) VALUES(?,?,?,?,?,?,?,?,?)")
     .bind(id, email, hash, "user", createdAt, createdAt, "active", null, 1).run();
+  await recordLegalConsent(env, id, "email_signup", body.marketingConsent === true);
   await recordLegalConsent(env, id, "email_signup", body.marketingConsent === true);
 
   const verification = await createEmailVerification(env, { id, email });
