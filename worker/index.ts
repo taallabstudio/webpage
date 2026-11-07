@@ -1769,12 +1769,12 @@ async function cleanup(env: Env) {
     env.DB.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM google_app_login_codes WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM ocean_google_calendar_states WHERE expires_at<=?").bind(cutoff),
-    env.DB.prepare("DELETE FROM booking_rate_limits WHERE last_sent_at<=?").bind(cutoff - 30 * 86400),
+    env.DB.prepare("DELETE FROM booking_rate_limits WHERE last_sent_at<=?").bind(cutoff - 365 * 86400),
   ]);
 
   // Keep expired transfer metadata for a short recovery/dispute window, then purge it.
   // File objects are removed above; only records expired for more than 30 days are purged here.
-  const metadataCutoff = cutoff - 30 * 86400;
+  const metadataCutoff = cutoff - 365 * 86400;
   await env.DB.batch([
     env.DB.prepare("DELETE FROM files WHERE transfer_id IN (SELECT id FROM transfers WHERE status='deleted' AND expires_at<=?) AND status='deleted'").bind(metadataCutoff),
     env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=? AND NOT EXISTS (SELECT 1 FROM files f WHERE f.transfer_id=transfers.id AND f.status!='deleted')").bind(metadataCutoff),
