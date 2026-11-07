@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
@@ -38,6 +39,7 @@ try {
     ["OCEAN", `http://ocean.taallab.in:${port}/ocean.html`],
   ];
   let total = 0;
+  const report = [];
   for (const [label, url] of pages) {
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
@@ -46,6 +48,16 @@ try {
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
       .analyze();
     total += results.violations.length;
+    report.push({
+      page: label,
+      url,
+      violations: results.violations.map(violation => ({
+        id: violation.id,
+        impact: violation.impact,
+        help: violation.help,
+        nodes: violation.nodes.map(node => ({ target: node.target, summary: node.failureSummary || "" })),
+      })),
+    });
     console.log(`\n[AXE] ${label}: ${results.violations.length} violation(s)`);
     for (const violation of results.violations) {
       console.log(`- ${violation.id} (${violation.impact}): ${violation.help}`);
@@ -57,6 +69,7 @@ try {
     }
     await page.close();
   }
+  await writeFile("/tmp/taallab-accessibility-report.json", JSON.stringify(report, null, 2), "utf8");
   console.log(`\nAccessibility audit complete. Total page-level violations: ${total}`);
   if (total > 0) process.exitCode = 1;
 } finally {
