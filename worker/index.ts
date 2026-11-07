@@ -666,9 +666,10 @@ async function currentUser(env: Env, req: Request) {
 async function exportAccountData(req: Request, env: Env) {
   const user = await requireUser(req, env);
   await ensureOceanSchema(env);
-  const [identity, acceptances, transfers, files, pages, shares, comments, assets, calendar, passkeys, authenticator, recovery, store] = await Promise.all([
-    env.DB.prepare("SELECT id,email,role,created_at,updated_at,email_verified_at,display_name,two_factor_enabled FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
+  const [identity, acceptances, privacyRequests, transfers, files, pages, shares, comments, assets, calendar, passkeys, authenticator, recovery, store] = await Promise.all([
+    env.DB.prepare("SELECT id,email,role,created_at,updated_at,email_verified_at,display_name,avatar_data,two_factor_enabled FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at").bind(user.id).all(),
+    env.DB.prepare("SELECT id,request_type,description,status,created_at,resolved_at FROM privacy_requests WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
     env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT f.id,f.transfer_id,f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT id,parent_id,title,icon,cover,cover_credit,cover_credit_url,cover_source_url,blocks_json,is_favorite,is_folder,is_archived,general_access,created_at,updated_at FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
@@ -685,6 +686,7 @@ async function exportAccountData(req: Request, env: Env) {
     exported_at: new Date().toISOString(),
     account: identity || null,
     policy_acceptances: acceptances.results || [],
+    privacy_requests: privacyRequests.results || [],
     transfers: transfers.results || [],
     transfer_files: files.results || [],
     ocean_pages: pages.results || [],
@@ -1662,6 +1664,8 @@ async function cleanup(env: Env) {
     env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted' AND NOT EXISTS (SELECT 1 FROM files WHERE files.transfer_id=transfers.id AND files.status='expired')").bind(cutoff),
     env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM password_reset_tokens WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM booking_rate_limits WHERE last_sent_at<=?").bind(cutoff - 365 * 86400),
     env.DB.prepare("DELETE FROM webauthn_challenges WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM google_app_login_codes WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM ocean_google_calendar_states WHERE expires_at<=?").bind(cutoff),
