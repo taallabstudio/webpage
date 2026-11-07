@@ -2590,19 +2590,26 @@ export default {
       if (adminDelete && req.method === "DELETE") {
         await requireAdmin(req, env);
         const id = adminDelete[1];
+        const deletedAt = now();
+        try { await env.DB.prepare("ALTER TABLE files ADD COLUMN storage_deleted_at INTEGER").run(); } catch {}
         const files = await env.DB.prepare("SELECT id,storage_key FROM files WHERE transfer_id=?").bind(id).all();
         for (const f of files.results as any[]) {
           const refs: any = await env.DB.prepare(
-            "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND transfer_id!=?"
-          ).bind(f.storage_key, id).first();
-          if (Number(refs?.n || 0) === 0) {
-            try { await trashDriveFile(env, f.storage_key); } catch (e) { console.error(e); }
+            "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND expires_at>? AND transfer_id!=?"
+          ).bind(f.storage_key, deletedAt, id).first();
+          if (Number(refs?.n || 0) > 0) {
+            await env.DB.prepare("UPDATE files SET status='deleted',storage_deleted_at=? WHERE id=?").bind(deletedAt, f.id).run();
+            continue;
+          }
+          try {
+            await trashDriveFile(env, f.storage_key);
+            await env.DB.prepare("UPDATE files SET status='deleted',storage_deleted_at=? WHERE id=?").bind(deletedAt, f.id).run();
+          } catch (e) {
+            console.error("Manual transfer deletion will retry storage cleanup", f.storage_key, e);
+            await env.DB.prepare("UPDATE files SET status='expired',expires_at=? WHERE id=?").bind(deletedAt, f.id).run();
           }
         }
-        await env.DB.batch([
-          env.DB.prepare("UPDATE files SET status='deleted' WHERE transfer_id=?").bind(id),
-          env.DB.prepare("UPDATE transfers SET status='deleted' WHERE id=?").bind(id),
-        ]);
+        await env.DB.prepare("UPDATE transfers SET status='deleted',expires_at=? WHERE id=?").bind(deletedAt, id).run();
         return json({ ok: true });
       }
 
