@@ -1565,8 +1565,8 @@ async function trashDriveFile(env: Env, fileId: string) {
   if (response.status === 404) return;
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    console.error("Drive delete failed", fileId, response.status, detail);
-    throw new Error(`Google Drive file deletion failed (HTTP ${response.status}).`);
+    console.error("Drive trash operation failed", fileId, response.status, detail);
+    throw new Error(`Google Drive trash operation failed (HTTP ${response.status}).`);
   }
 }
 
@@ -1756,7 +1756,7 @@ async function cleanup(env: Env) {
       await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(f.id).run();
     } catch (e) {
       // Leave the record eligible for retry on the next scheduled run.
-      console.error("Drive delete failed; will retry", f.storage_key, e);
+      console.error("Drive trash operation failed; will retry", f.storage_key, e);
     }
   }
 
