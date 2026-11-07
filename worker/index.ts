@@ -250,6 +250,13 @@ async function ensureSupportSchema(env: Env) {
   )`).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_user ON privacy_requests(user_id,created_at DESC)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_status ON privacy_requests(status,created_at)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS marketing_preferences (
+    user_id TEXT PRIMARY KEY,
+    consented_at INTEGER,
+    withdrawn_at INTEGER,
+    source TEXT NOT NULL DEFAULT 'account_settings',
+    policy_version TEXT NOT NULL
+  )`).run();
 }
 
 function normalizeEmail(value: unknown) {
@@ -758,6 +765,62 @@ async function listOwnPrivacyRequests(req: Request, env: Env) {
   const rows = await env.DB.prepare("SELECT id,request_type,status,created_at,resolved_at FROM privacy_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 20")
     .bind(user.id).all();
   return json({ requests: rows.results || [] });
+}
+
+const MARKETING_CONSENT_VERSION = "2026-11-07";
+
+async function getMarketingUnsubscribeToken(env: Env, userId: string) {
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(env.SESSION_SECRET),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode("taallab-marketing-unsubscribe:" + userId));
+  return base64Url(new TextEncoder().encode(userId)) + "." + base64Url(new Uint8Array(signature));
+}
+
+async function updateMarketingPreference(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  if (req.method === "GET") {
+    const row: any = await env.DB.prepare("SELECT consented_at,withdrawn_at,source,policy_version FROM marketing_preferences WHERE user_id=? LIMIT 1")
+      .bind(user.id).first();
+    return json({ consented: Boolean(row?.consented_at && !row?.withdrawn_at), consented_at: row?.consented_at || null });
+  }
+  const body = await req.json().catch(() => ({}));
+  if (body.consent !== true && body.consent !== false) return json({ error: "Choose whether to receive marketing emails." }, { status: 400 });
+  const timestamp = now();
+  if (body.consent === true) {
+    await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,consented_at,withdrawn_at,source,policy_version)
+      VALUES(?,?,NULL,'account_settings',?)
+      ON CONFLICT(user_id) DO UPDATE SET consented_at=excluded.consented_at,withdrawn_at=NULL,
+      source=excluded.source,policy_version=excluded.policy_version`)
+      .bind(user.id, timestamp, MARKETING_CONSENT_VERSION).run();
+  } else {
+    await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,consented_at,withdrawn_at,source,policy_version)
+      VALUES(?,NULL,?,'account_settings',?)
+      ON CONFLICT(user_id) DO UPDATE SET withdrawn_at=excluded.withdrawn_at,source=excluded.source,
+      policy_version=excluded.policy_version`)
+      .bind(user.id, timestamp, MARKETING_CONSENT_VERSION).run();
+  }
+  return json({ ok: true, consented: body.consent === true, updated_at: timestamp });
+}
+
+async function unsubscribeMarketing(req: Request, env: Env) {
+  const body = await req.json().catch(() => ({}));
+  const token = String(body.token || "").trim();
+  const parts = token.split(".");
+  if (parts.length !== 2) return json({ error: "This unsubscribe link is invalid." }, { status: 400 });
+  let userId = "";
+  try { userId = new TextDecoder().decode(fromBase64Url(parts[0])); } catch { return json({ error: "This unsubscribe link is invalid." }, { status: 400 }); }
+  if (!userId || userId.length > 128) return json({ error: "This unsubscribe link is invalid." }, { status: 400 });
+  const expected = await getMarketingUnsubscribeToken(env, userId);
+  if (expected !== token) return json({ error: "This unsubscribe link is invalid." }, { status: 400 });
+  const timestamp = now();
+  await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,consented_at,withdrawn_at,source,policy_version)
+    VALUES(?,NULL,?,'email_unsubscribe',?)
+    ON CONFLICT(user_id) DO UPDATE SET withdrawn_at=excluded.withdrawn_at,source=excluded.source,
+    policy_version=excluded.policy_version`)
+    .bind(userId, timestamp, MARKETING_CONSENT_VERSION).run();
+  return json({ ok: true, unsubscribed: true });
 }
 
 async function updatePrivacyRequest(req: Request, env: Env, requestId: string) {
@@ -2410,6 +2473,8 @@ export default {
 
       if (url.pathname === "/api/account/data-export" && req.method === "GET") return exportAccountData(req, env);
       if (url.pathname === "/api/account/privacy-requests" && req.method === "GET") return listOwnPrivacyRequests(req, env);
+      if (url.pathname === "/api/account/marketing-preference" && (req.method === "GET" || req.method === "POST")) return updateMarketingPreference(req, env);
+      if (url.pathname === "/api/marketing/unsubscribe" && req.method === "POST") return unsubscribeMarketing(req, env);
       if (url.pathname === "/api/account/privacy-request" && req.method === "POST") return createPrivacyRequest(req, env);
       if (url.pathname === "/api/admin/privacy-requests" && req.method === "GET") { await requireAdmin(req, env); return listPrivacyRequests(env); }
       const privacyRequestMatch = url.pathname.match(/^\/api\/admin\/privacy-requests\/([^/]+)$/);
