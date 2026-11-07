@@ -673,11 +673,12 @@ async function currentUser(env: Env, req: Request) {
 async function exportAccountData(req: Request, env: Env) {
   const user = await requireUser(req, env);
   await ensureOceanSchema(env);
-  const [identity, googleIdentity, acceptances, privacyRequests, transfers, files, pages, shares, pageCollaborators, comments, assets, calendar, passkeys, authenticator, recovery, store] = await Promise.all([
+  const [identity, googleIdentity, acceptances, privacyRequests, marketingPreferences, transfers, files, pages, shares, pageCollaborators, comments, assets, calendar, passkeys, authenticator, recovery, store] = await Promise.all([
     env.DB.prepare("SELECT id,email,role,created_at,updated_at,email_verified_at,display_name,avatar_data,two_factor_enabled FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at").bind(user.id).all(),
     env.DB.prepare("SELECT id,request_type,description,status,created_at,resolved_at FROM privacy_requests WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT consented_at,withdrawn_at,source,policy_version FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT f.id,f.transfer_id,f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT id,parent_id,title,icon,cover,cover_credit,cover_credit_url,cover_source_url,public_token,blocks_json,is_favorite,is_folder,is_archived,general_access,created_at,updated_at FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
@@ -697,6 +698,7 @@ async function exportAccountData(req: Request, env: Env) {
     google_sign_in_identity: googleIdentity || null,
     policy_acceptances: acceptances.results || [],
     privacy_requests: privacyRequests.results || [],
+    marketing_preferences: marketingPreferences || null,
     transfers: transfers.results || [],
     transfer_files: files.results || [],
     ocean_pages: pages.results || [],
