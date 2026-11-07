@@ -450,6 +450,9 @@ function Login({onLogin}) {
 
 function UserPortal({user}) {
   const [page,setPage]=useState("transfers");
+  const [mobileNavOpen,setMobileNavOpen]=useState(false);
+  const mobileNavRef=useRef(null);
+  const mobileNavToggleRef=useRef(null);
   const [transfers,setTransfers]=useState([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
@@ -465,24 +468,42 @@ function UserPortal({user}) {
   }
 
   useEffect(()=>{load()},[refreshKey]);
+  useEffect(()=>{
+    if(!mobileNavOpen)return;
+    const focusable=()=>[...(mobileNavRef.current?.querySelectorAll('button:not([disabled]),a[href]')||[])];
+    const items=focusable();items[0]?.focus();
+    const onKeyDown=event=>{
+      if(event.key==="Escape"){event.preventDefault();setMobileNavOpen(false);mobileNavToggleRef.current?.focus();return;}
+      if(event.key!=="Tab")return;
+      const current=focusable();if(!current.length){event.preventDefault();return;}
+      const first=current[0],last=current[current.length-1];
+      if(event.shiftKey&&(document.activeElement===first||document.activeElement===mobileNavRef.current)){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    };
+    document.addEventListener("keydown",onKeyDown);
+    return ()=>document.removeEventListener("keydown",onKeyDown);
+  },[mobileNavOpen]);
 
   async function logout(){
     await api("/auth/logout",{method:"POST"});
-    location.href="/login";
+    location.href="/login";setMobileNavOpen(false);
   }
+
+  function navigateUserPortal(next){setPage(next);if(mobileNavOpen){setMobileNavOpen(false);mobileNavToggleRef.current?.focus();}}
 
   const available=transfers.filter(t=>t.available).length;
   const downloaded=transfers.filter(t=>t.downloaded).length;
 
   return <div className="admin-layout">
-    <aside className="sidebar"><Logo/><div className="side-links">
-      <button className={page==="transfers"?"active":""} onClick={()=>setPage("transfers")}><FolderOpen/> My Transfers</button>
-      <button className={page==="settings"?"active":""} onClick={()=>setPage("settings")}><Settings/> Account</button>
+    <aside id="user-sidebar" ref={mobileNavRef} className={"sidebar"+(mobileNavOpen?" mobile-open":"")}><Logo/><div className="side-links">
+      <button className={page==="transfers"?"active":""} onClick={()=>navigateUserPortal("transfers")}><FolderOpen/> My Transfers</button>
+      <button className={page==="settings"?"active":""} onClick={()=>navigateUserPortal("settings")}><Settings/> Account</button>
     </div>
     <div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div>
     <button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
+    {mobileNavOpen&&<button type="button" className="mobile-nav-backdrop" aria-label="Close navigation" onClick={()=>{setMobileNavOpen(false);mobileNavToggleRef.current?.focus();}}/>}
     <main className="admin-main">
-      <div className="admin-mobile-head"><Logo/></div>
+      <div className="admin-mobile-head"><Logo/><button ref={mobileNavToggleRef} type="button" aria-label={mobileNavOpen?"Close navigation":"Open navigation"} aria-expanded={mobileNavOpen} aria-controls="user-sidebar" onClick={()=>setMobileNavOpen(v=>!v)}>{mobileNavOpen?<X/>:<Menu/>}</button></div>
       {page==="transfers" ? <div className="admin-content">
         <div className="page-head"><div>
           <span className="eyebrow">TAAL LAB</span>
