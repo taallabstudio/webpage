@@ -145,12 +145,13 @@ async function syncNote(req: Request, env: Env, user: User) {
   const contentHash = await sha256(content);
   if (body.contentHash && String(body.contentHash).toLowerCase() !== contentHash) return json({ error: "The Markdown content hash did not match the uploaded content." }, 400);
   let frontmatter: any = body.frontmatter && typeof body.frontmatter === "object" ? body.frontmatter : {};
+  frontmatter = { ...frontmatter, tags: tagsFrom(content, frontmatter) };
   const folderPath = externalId.includes("/") ? externalId.split("/").slice(0,-1).join("/") : "";
   const parentId = await ensureFolder(env, user, folderPath ? "Obsidian/" + folderPath : "Obsidian");
   const title = String(body.title || titleFromPath(externalId)).trim().slice(0,160) || "Untitled";
   const frontmatterJson = JSON.stringify(frontmatter);
   if (frontmatterJson.length > 20000) return json({ error: "Frontmatter exceeds the 20 KB limit." }, 413);
-  const markdown = content.replace(/^---\\s*\\n[\\s\\S]*?\\n---\\s*(?:\\n|$)/, "");
+  const markdown = content.replace(/^---\s*\n[\s\S]*?\n---\s*(?:\n|$)/, "");
   const blocks = markdownBlocks(markdown);
   const timestamp = now();
   const existing: any = await env.DB.prepare("SELECT id FROM ocean_pages WHERE user_id=? AND source='obsidian' AND external_id=? LIMIT 1").bind(user.id, externalId).first();
@@ -162,7 +163,7 @@ async function syncNote(req: Request, env: Env, user: User) {
   } else {
     id = randomToken(12);
     await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,icon,blocks_json,is_folder,source,external_id,content_hash,source_modified_at,frontmatter_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-      .bind(id,user.id,parentId,title,"",JSON.stringify(blocks),0,"obsidian",externalId,contentHash,Number(body.modifiedAt)||timestamp,JSON.stringify(frontmatter).slice(0,20000),timestamp,timestamp).run();
+      .bind(id,user.id,parentId,title,"",JSON.stringify(blocks),0,"obsidian",externalId,contentHash,Number(body.modifiedAt)||timestamp,frontmatterJson,timestamp,timestamp).run();
   }
   return json({ ok: true, pageId: id, externalId, contentHash, updatedAt: timestamp }, existing ? 200 : 201);
 }
