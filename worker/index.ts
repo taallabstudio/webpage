@@ -867,14 +867,14 @@ async function acceptParentInvite(req: Request, env: Env) {
   const timestamp=now(), linkId=randomToken(16), consentId=randomToken(16);
   const initialScope={tutorial_access:false,lesson_downloads:false,comments:false,uploads_sharing:false,purchases:false,payments:false};
   await env.DB.batch([
-    env.DB.prepare("undefined").bind(linkId,parent.id,child.id,timestamp,timestamp,invite.parent_attested_at),
+    env.DB.prepare("INSERT INTO parent_child_links(id,parent_user_id,child_user_id,status,created_at,linked_at,parent_attested_at) VALUES(?,?,?,'active',?,?,?)").bind(linkId,parent.id,child.id,timestamp,timestamp,invite.parent_attested_at),
     env.DB.prepare("INSERT INTO child_permissions(child_user_id,parent_user_id,tutorial_access,lesson_downloads,comments,uploads_sharing,updated_at) VALUES(?,?,0,0,0,0,?)").bind(child.id,parent.id,timestamp),
     env.DB.prepare("INSERT INTO parental_consent_records(id,parent_user_id,child_user_id,policy_version,scope_json,verification_method,consented_at) VALUES(?,?,?,?,?,?,?)").bind(consentId,parent.id,child.id,PARENT_CONSENT_VERSION,JSON.stringify(initialScope),"parent_attestation_and_child_acceptance_pending_manual_verification",timestamp),
     env.DB.prepare("INSERT INTO parental_consent_events(id,parent_user_id,child_user_id,event_type,details_json,created_at) VALUES(?,?,?,'link_accepted',?,?)").bind(randomToken(16),parent.id,child.id,JSON.stringify({policyVersion:PARENT_CONSENT_VERSION,initialPermissions:initialScope}),timestamp),
     env.DB.prepare("UPDATE users SET parent_user_id=?,parental_consent_status='pending_verification',updated_at=? WHERE id=? AND account_type='child' AND parent_user_id IS NULL").bind(parent.id,timestamp,child.id),
     env.DB.prepare("UPDATE parent_link_invites SET consumed_at=? WHERE id=? AND consumed_at IS NULL").bind(timestamp,invite.id),
   ]);
-  return json({ok:true,message:"Parent account linked. All optional child permissions start switched off."});
+  return json({ok:true,message:"Parent link recorded. Child access remains blocked until TaalLab completes the separate adult/guardian verification review. All optional permissions start switched off."});
 }
 
 async function updateChildPermissions(req: Request, env: Env, childId: string, body: any) {
@@ -2695,7 +2695,7 @@ export default {
       if (url.pathname === "/api/auth/me" && req.method === "GET") return currentUser(env, req);
       if (url.pathname === "/api/account/date-of-birth" && req.method === "POST") return saveDateOfBirth(req, env);
       if (url.pathname === "/api/admin/parental-verifications" && req.method === "GET") return listPendingParentVerifications(req, env);
-      const parentVerifyMatch=url.pathname.match(/^\\/api\\/admin\\/parental-verifications\\/([^/]+)$/);
+      const parentVerifyMatch=url.pathname.match(/^\/api\/admin\/parental-verifications\/([^/]+)$/);
       if (parentVerifyMatch && req.method === "PATCH") return verifyParentLinkManually(req, env, parentVerifyMatch[1]);
       if (url.pathname === "/api/parent/dashboard" && req.method === "GET") return getParentDashboard(req, env);
       if (url.pathname === "/api/parent/invites" && req.method === "POST") return createParentInvite(req, env);
