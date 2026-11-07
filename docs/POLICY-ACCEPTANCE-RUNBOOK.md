@@ -27,3 +27,8 @@ Historical acceptance records are immutable. A user who accepted an earlier vers
 The current application does not yet force all existing users to re-accept a newly published policy version before every sign-in. For a future material policy change that requires affirmative re-acceptance, implement and test a policy-update gate for email, Google and passkey sign-in before publishing the new version. Do not merely change the constants and assume existing users have accepted the new text.
 
 Every store checkout continues to request acceptance of the current Terms and Privacy versions.
+
+
+## Outstanding acceptance gap
+
+The current record covers self-service email signup, Google signup and store checkout. It does not yet record the end user's acceptance when an administrator provisions an account through the managed-user or transfer-recipient flows (or the initial setup flow). Do not record an administrator's action as if it were the user's consent. Before treating every account path as covered, implement a first-login policy-acceptance gate for administrator-provisioned accounts and test email, Google and passkey sign-in. Until then, describe the acceptance record as covering the self-service signup and checkout paths only.
