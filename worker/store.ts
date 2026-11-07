@@ -585,6 +585,24 @@ async function purchaseDownload(req: Request, env: StoreEnv) {
   const token = await makeDownloadToken(env, String(order.id), product.id);
   return json({ downloadUrl: downloadOrigin(req, env) + "/download.html?token=" + encodeURIComponent(token) });
 }
+export async function getStorePrivacyData(env: StoreEnv, userId: string) {
+  await ensureStoreSchema(env);
+  const [profile, orders] = await Promise.all([
+    env.DBStore.prepare("SELECT full_name,phone,address_line1,address_line2,city,state,pincode,country,updated_at FROM store_customer_profiles WHERE user_id=? LIMIT 1").bind(userId).first(),
+    env.DBStore.prepare(`SELECT order_number,product_id,amount,currency,status,customer_email,customer_name,customer_phone,
+      address_line1,address_line2,city,state,pincode,country,created_at,updated_at,paid_at,download_count,last_downloaded_at,
+      terms_version,privacy_version,accepted_at FROM store_orders WHERE user_id=? ORDER BY created_at DESC`).bind(userId).all(),
+  ]);
+  return { customerProfile: profile || null, orders: orders.results || [] };
+}
+
+export async function cleanupStoreData(env: StoreEnv, cutoff = unixNow()) {
+  await ensureStoreSchema(env);
+  const abandonedBefore = cutoff - 30 * 86400;
+  await env.DBStore.prepare("DELETE FROM store_orders WHERE status!='paid' AND razorpay_payment_id IS NULL AND created_at<=?")
+    .bind(abandonedBefore).run();
+}
+
 export async function handleStoreRequest(req: Request, env: StoreEnv): Promise<Response | null> {
   const url = new URL(req.url);
   if (url.pathname === "/api/store/admin/products" && req.method === "GET") {
