@@ -211,6 +211,7 @@ const navToggle=document.querySelector(".mobile-nav-toggle");
 const siteNav=document.querySelector("#shop-navigation");
 navToggle.addEventListener("click",()=>{const open=siteNav.classList.toggle("mobile-open");navToggle.setAttribute("aria-expanded",String(open));navToggle.setAttribute("aria-label",open?"Close navigation":"Open navigation");navToggle.textContent=open?"×":"☰"});
 siteNav.querySelectorAll("a").forEach(a=>a.addEventListener("click",()=>{siteNav.classList.remove("mobile-open");navToggle.setAttribute("aria-expanded","false");navToggle.textContent="☰"}));
+siteNav.addEventListener("keydown",event=>{if(event.key==="Escape"){event.preventDefault();siteNav.classList.remove("mobile-open");navToggle.setAttribute("aria-expanded","false");navToggle.setAttribute("aria-label","Open navigation");navToggle.textContent="☰";navToggle.focus();}});
 function renderCart(){
  const items=cartRead().filter(p=>!ownedProductIds.has(p.id));
  if(items.length!==cartRead().length)localStorage.setItem(CART_KEY,JSON.stringify(items));
