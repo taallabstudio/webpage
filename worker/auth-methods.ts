@@ -5,9 +5,9 @@ import {
   verifyRegistrationResponse,
 } from "@simplewebauthn/server";
 
-const RP_ID = "taallab.work";
+const RP_ID = "taallab.in";
 const RP_NAME = "TaalLab";
-const RP_ORIGINS = ["https://taallab.work", "https://app.taallab.work"];
+const RP_ORIGINS = ["https://taallab.in", "https://ocean.taallab.in"];
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
 const json = (data: any, init: ResponseInit = {}) =>
