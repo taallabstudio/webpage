@@ -22,7 +22,7 @@ This is an implementation review, not a legal opinion or a certification of comp
 
 ## Marketing email status
 
-No marketing campaign sender, marketing list or newsletter subscription flow was found in this repository. Marketing emails must remain disabled. The application currently sends transactional/security messages only (for example, verification, sign-in and parent-link emails). Do not add marketing sends until separate, affirmative opt-in and a one-click unsubscribe mechanism are implemented and tested. Transactional messages must not be repurposed as marketing.
+No marketing campaign sender or marketing list was found, so no marketing emails are currently sent. Account settings now provide a separate adult-only opt-in, unchecked by default, with versioned consent records. The Worker provides a public one-click unsubscribe POST endpoint; the GET page requires a confirmation click so email-security scanners do not silently unsubscribe users. A future sender must add the per-user unsubscribe URL and RFC 8058 `List-Unsubscribe` and `List-Unsubscribe-Post` headers before any campaign is sent. Transactional/security messages remain separate from marketing.
 
 ## Asset and software licensing review
 
