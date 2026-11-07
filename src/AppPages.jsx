@@ -675,6 +675,35 @@ function PrivacyControls({user}) {
   </section>;
 }
 
+function PrivacyRequestAdmin() {
+  const [requests,setRequests]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  const [busyId,setBusyId]=useState("");
+
+  async function load() {
+    setLoading(true);setError("");
+    try { const data=await api("/admin/privacy-requests");setRequests(data.requests||[]); }
+    catch(e) { setError(e.message||"Could not load privacy requests."); }
+    finally { setLoading(false); }
+  }
+  useEffect(()=>{load();},[]);
+  async function update(id,status) {
+    setBusyId(id);setError("");
+    try { await api("/admin/privacy-requests/"+encodeURIComponent(id),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});await load(); }
+    catch(e) { setError(e.message||"Could not update this request."); }
+    finally { setBusyId(""); }
+  }
+  return <section className="panel" style={{maxWidth:900,padding:24,marginTop:18}}>
+    <div className="panel-head" style={{padding:0,border:0}}><div><h2>Privacy requests</h2><p>Review account data correction and deletion requests.</p></div><button type="button" className="ghost-btn" onClick={load} disabled={loading}><RefreshCw size={15}/> Refresh</button></div>
+    {error&&<div className="error-box" role="alert">{error}</div>}
+    {loading?<p className="muted">Loading privacy requests…</p>:requests.length===0?<p className="muted">No privacy requests have been submitted.</p>:<div className="table-wrap"><table><thead><tr><th>Reference</th><th>Account</th><th>Request</th><th>Submitted</th><th>Status</th><th>Action</th></tr></thead><tbody>
+      {requests.map(item=><tr key={item.id}><td><strong>{item.id}</strong>{item.description&&<small style={{whiteSpace:"normal",maxWidth:240}}>{item.description}</small>}</td><td>{item.email||"Account unavailable"}</td><td>{item.request_type==="deletion"?"Delete data":"Correct data"}</td><td>{fmtDate(item.created_at)}</td><td><span className={"status "+(item.status==="completed"?"active":item.status==="declined"?"deleted":"expired")}>{item.status.replace("_"," ")}</span></td><td>{item.status==="completed"||item.status==="declined"?<span className="muted">Closed</span>:<select aria-label={"Update status for "+item.id} value={item.status} disabled={busyId===item.id} onChange={e=>update(item.id,e.target.value)}><option value="open">Open</option><option value="in_review">In review</option><option value="completed">Completed</option><option value="declined">Declined</option></select>}</td></tr>)}
+    </tbody></table></div>}
+    <p className="muted" style={{fontSize:12,marginTop:12}}>Mark a request completed only after verifying identity, carrying out the appropriate changes and documenting any records retained for legal or payment obligations.</p>
+  </section>;
+}
+
 function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [currentPassword,setCurrentPassword]=useState("");
   const [newPassword,setNewPassword]=useState("");
@@ -768,6 +797,7 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
       </form>
     </section>
     <PrivacyControls user={user}/>
+    {showGoogleDrive&&<PrivacyRequestAdmin/>}
     <SecurityMethods user={user}/>
     <section className="panel" style={{maxWidth:620,padding:24,marginTop:18}}><h2>Change password</h2><form onSubmit={change}>
       <label>Current password<input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} required/></label>
