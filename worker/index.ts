@@ -1808,6 +1808,7 @@ async function ensureOceanSchema(env: Env) {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS ocean_schema_migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)`),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_pages_user_updated ON ocean_pages(user_id,is_archived,updated_at DESC)"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_pages_parent ON ocean_pages(user_id,parent_id)"),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS ocean_page_shares (
@@ -1858,8 +1859,12 @@ async function ensureOceanSchema(env: Env) {
     "ALTER TABLE ocean_pages ADD COLUMN cover_position_y REAL NOT NULL DEFAULT 50",
     "ALTER TABLE ocean_pages ADD COLUMN cover_zoom REAL NOT NULL DEFAULT 100"
   ]) { try { await env.DB.prepare(statement).run(); } catch { /* Column already exists. */ } }
-  // Lock down existing pages to owner-only agent authorization. Owners can explicitly opt into broader delegation.
-  await env.DB.prepare("UPDATE ocean_pages SET agent_grant_policy='owner_only' WHERE agent_grant_policy='anyone_with_access'").run();
+  // One-time migration: existing pages default to owner-only agent authorization.
+  // Owners can explicitly opt into broader delegation from Advanced settings.
+  await env.DB.batch([
+    env.DB.prepare("UPDATE ocean_pages SET agent_grant_policy='owner_only' WHERE agent_grant_policy='anyone_with_access' AND NOT EXISTS (SELECT 1 FROM ocean_schema_migrations WHERE id='agent-grant-owner-only-v1')"),
+    env.DB.prepare("INSERT OR IGNORE INTO ocean_schema_migrations(id,applied_at) VALUES('agent-grant-owner-only-v1',?)").bind(now()),
+  ]);
 }
 
 function oceanId() { return randomToken(12); }
@@ -2198,7 +2203,7 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
         { id: oceanId(), type: "todo", text: "Create your first page", checked: false },
         { id: oceanId(), type: "callout", text: "Your OCEAN pages are private to your account." }
       ];
-      await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,icon,cover,blocks_json,agent_grant_policy,created_at,updated_at) VALUES(?,?,NULL,?,?,?,?,?,'owner_only',?,?)")
+      await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,icon,cover,blocks_json,agent_grant_policy,created_at,updated_at) VALUES(?,?,NULL,?,?,?,?,'owner_only',?,?)")
         .bind(id,user.id,"Getting started","🌊","",JSON.stringify(starter),"owner_only",created,created).run();
       rows = await env.DB.prepare(`SELECT p.id,p.user_id,p.parent_id,p.title,p.icon,p.cover,p.blocks_json,p.is_favorite,p.is_folder,
         CASE WHEN p.user_id=? THEN 0 ELSE 1 END AS is_shared,p.created_at,p.updated_at
