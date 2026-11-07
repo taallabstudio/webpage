@@ -451,6 +451,8 @@ function Login({onLogin}) {
 
 function UserPortal({user}) {
   const [page,setPage]=useState("transfers");
+  const [mobileNavOpen,setMobileNavOpen]=useState(false);
+  function navigatePortal(next){setPage(next);setMobileNavOpen(false)}
   const [transfers,setTransfers]=useState([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
@@ -476,15 +478,15 @@ function UserPortal({user}) {
   const downloaded=transfers.filter(t=>t.downloaded).length;
 
   return <div className="admin-layout">
-    <aside className="sidebar"><Logo/><div className="side-links">
-      <button className={page==="transfers"?"active":""} onClick={()=>setPage("transfers")}><FolderOpen/> My Transfers</button>
-      <button className={page==="settings"?"active":""} onClick={()=>setPage("settings")}><Settings/> Account</button>
-      {user?.account_type==="adult" && <button className={page==="parent"?"active":""} onClick={()=>setPage("parent")}><ShieldCheck/> Parent controls</button>}
+    <aside className={`sidebar ${mobileNavOpen?"mobile-open":""}`}><Logo/><div className="side-links">
+      <button className={page==="transfers"?"active":""} onClick={()=>navigatePortal("transfers")}><FolderOpen/> My Transfers</button>
+      <button className={page==="settings"?"active":""} onClick={()=>navigatePortal("settings")}><Settings/> Account</button>
+      {user?.account_type==="adult" && <button className={page==="parent"?"active":""} onClick={()=>navigatePortal("parent")}><ShieldCheck/> Parent controls</button>}
     </div>
     <div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div>
     <button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
     <main className="admin-main">
-      <div className="admin-mobile-head"><Logo/></div>
+      <div className="admin-mobile-head"><Logo/><button type="button" aria-label={mobileNavOpen?"Close account navigation":"Open account navigation"} aria-expanded={mobileNavOpen} onClick={()=>setMobileNavOpen(v=>!v)}><Menu/></button></div>
       {page==="transfers" ? <div className="admin-content">
         <div className="page-head"><div>
           <span className="eyebrow">TAAL LAB</span>
@@ -522,6 +524,8 @@ function Admin({initialUpload=false}) {
   const [authed,setAuthed]=useState(null);
   const [user,setUser]=useState(null);
   const [page,setPage]=useState(initialUpload ? "upload" : "dashboard");
+  const [mobileNavOpen,setMobileNavOpen]=useState(false);
+  function navigateAdmin(next){setPage(next);setMobileNavOpen(false)}
   const [stats,setStats]=useState(null);
   const [transfers,setTransfers]=useState([]);
   const [selected,setSelected]=useState(null);
@@ -543,21 +547,21 @@ function Admin({initialUpload=false}) {
 
   async function logout(){await api("/auth/logout",{method:"POST"});setAuthed(false);setUser(null)}
   return <div className="admin-layout">
-    <aside className="sidebar"><Logo/><div className="side-links">
-      <button className={page==="dashboard"?"active":""} onClick={()=>setPage("dashboard")}><Gauge/> Dashboard</button>
-      <button className={page==="transfers"?"active":""} onClick={()=>setPage("transfers")}><FolderOpen/> Transfers</button>
-      <button className={page==="products"?"active":""} onClick={()=>setPage("products")}><HardDrive/> Store Products</button>
-      <button className={page==="upload"?"active":""} onClick={()=>setPage("upload")}><UploadCloud/> New Transfer</button>
-      <button className={page==="users"?"active":""} onClick={()=>setPage("users")}><UserRound/> Users</button>
-      <button className={page==="parent-verification"?"active":""} onClick={()=>setPage("parent-verification")}><ShieldCheck/> Parent verification</button>
-      <button className={page==="settings"?"active":""} onClick={()=>setPage("settings")}><Settings/> Account</button>
+    <aside className={`sidebar ${mobileNavOpen?"mobile-open":""}`}><Logo/><div className="side-links">
+      <button className={page==="dashboard"?"active":""} onClick={()=>navigateAdmin("dashboard")}><Gauge/> Dashboard</button>
+      <button className={page==="transfers"?"active":""} onClick={()=>navigateAdmin("transfers")}><FolderOpen/> Transfers</button>
+      <button className={page==="products"?"active":""} onClick={()=>navigateAdmin("products")}><HardDrive/> Store Products</button>
+      <button className={page==="upload"?"active":""} onClick={()=>navigateAdmin("upload")}><UploadCloud/> New Transfer</button>
+      <button className={page==="users"?"active":""} onClick={()=>navigateAdmin("users")}><UserRound/> Users</button>
+      <button className={page==="parent-verification"?"active":""} onClick={()=>navigateAdmin("parent-verification")}><ShieldCheck/> Parent verification</button>
+      <button className={page==="settings"?"active":""} onClick={()=>navigateAdmin("settings")}><Settings/> Account</button>
     </div><div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div><button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
     <main className="admin-main">
-      <div className="admin-mobile-head"><Logo/><button><Menu/></button></div>
+      <div className="admin-mobile-head"><Logo/><button type="button" aria-label={mobileNavOpen?"Close admin navigation":"Open admin navigation"} aria-expanded={mobileNavOpen} onClick={()=>setMobileNavOpen(v=>!v)}><Menu/></button></div>
       {page==="dashboard"&&<Dashboard stats={stats} transfers={transfers} onOpen={setSelected}/>}
       {page==="transfers"&&<Transfers transfers={transfers} onOpen={setSelected}/>}
       {page==="products"&&<StoreProductManager/>}
-      {page==="upload"&&<Upload onDone={()=>{setPage("dashboard");refresh()}}/>}
+      {page==="upload"&&<Upload onDone={()=>{navigateAdmin("dashboard");refresh()}}/>}
       {page==="users"&&<UserManagement currentUser={user}/>}
       {page==="parent-verification"&&<ParentalVerificationAdmin/>}
       {page==="settings"&&<AccountSettings user={user} onPasswordChanged={refresh} showGoogleDrive/>}
