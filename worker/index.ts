@@ -2047,6 +2047,8 @@ async function cleanup(env: Env) {
     env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=?").bind(cutoff - 30 * 86400),
     env.DB.prepare("DELETE FROM parent_link_invites WHERE expires_at<=?").bind(cutoff - 30 * 86400),
     env.DB.prepare("DELETE FROM privacy_requests WHERE status IN ('completed','declined') AND resolved_at IS NOT NULL AND resolved_at<=?").bind(cutoff - 730 * 86400),
+    env.DB.prepare("DELETE FROM marketing_unsubscribe_tokens WHERE used_at IS NOT NULL AND used_at<=?").bind(cutoff - 730 * 86400),
+    env.DB.prepare("DELETE FROM marketing_preference_events WHERE created_at<=? AND user_id IN (SELECT user_id FROM marketing_preferences WHERE enabled=0 AND withdrawn_at IS NOT NULL AND withdrawn_at<=?)").bind(cutoff - 730 * 86400,cutoff - 730 * 86400),
     env.DB.prepare("DELETE FROM parent_child_links WHERE status='revoked' AND revoked_at<=?").bind(cutoff - 730 * 86400),
     env.DB.prepare("DELETE FROM parental_consent_records WHERE withdrawn_at IS NOT NULL AND withdrawn_at<=?").bind(cutoff - 730 * 86400),
     env.DB.prepare("DELETE FROM parental_consent_events WHERE created_at<=? AND NOT EXISTS (SELECT 1 FROM parent_child_links l WHERE l.child_user_id=parental_consent_events.child_user_id AND l.status='active')").bind(cutoff - 730 * 86400),
