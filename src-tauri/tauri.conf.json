@@ -39,5 +39,22 @@
         "installMode": "currentUser"
       }
     }
+  },
+  "plugins": {
+    "deep-link": {
+      "mobile": [
+        {
+          "scheme": [
+            "ocean"
+          ],
+          "appLink": false
+        }
+      ],
+      "desktop": {
+        "schemes": [
+          "ocean"
+        ]
+      }
+    }
   }
 }
