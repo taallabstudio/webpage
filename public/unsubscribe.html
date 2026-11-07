@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Unsubscribe | TAAL LAB</title>
+<style>
+:root{color-scheme:light;--ink:#1d2229;--muted:#626b76;--line:#e1e6eb;--blue:#075fb8}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#f5f7f8;color:var(--ink);font:15px/1.65 Inter,system-ui,sans-serif}
+main{width:min(480px,100%);padding:32px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 18px 60px rgba(20,35,50,.08)}
+.brand{font:700 18px "Space Grotesk",sans-serif;letter-spacing:-.04em;text-decoration:none;color:var(--ink)}
+h1{font:700 30px/1.1 "Space Grotesk",sans-serif;letter-spacing:-.04em;margin:30px 0 10px}
+p{color:#46515d;font-size:14px}
+button{margin-top:14px;border:0;border-radius:10px;padding:12px 18px;background:#0878e8;color:#fff;font:600 14px inherit;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:3px solid #075fb8;outline-offset:3px}
+#status{min-height:24px;margin-top:16px;font-size:13px}
+</style>
+</head>
+<body>
+<main>
+<a class="brand" href="/">TAAL LAB</a>
+<h1>Marketing email preferences</h1>
+<p id="intro">Use the button below to stop receiving optional marketing emails from Taal Lab. This does not affect essential account, security, purchase or service messages.</p>
+<button id="unsubscribe" type="button">Unsubscribe from marketing emails</button>
+<p id="status" role="status" aria-live="polite"></p>
+<p><a href="/privacy.html">Privacy Policy</a> · <a href="mailto:contact@taallab.in">Contact Taal Lab</a></p>
+</main>
+<script>
+(()=> {
+ const token=new URLSearchParams(location.search).get("token")||"";
+ const button=document.getElementById("unsubscribe");
+ const status=document.getElementById("status");
+ if(!token){button.disabled=true;status.textContent="This unsubscribe link is missing or invalid. You can also change your preference in Account settings.";return;}
+ button.addEventListener("click",async()=>{
+  button.disabled=true;status.textContent="Updating your preference…";
+  try{
+   const response=await fetch("/api/marketing/unsubscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token})});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(result.error||"We could not update your preference.");
+   document.getElementById("intro").textContent="You have been unsubscribed from optional marketing emails. Essential account, security, purchase and service messages may still be sent.";
+   button.hidden=true;status.textContent="Your marketing preference has been updated.";
+  }catch(error){status.textContent=error.message||"We could not update your preference.";button.disabled=false;}
+ });
+})();
+</script>
+</body>
+</html>
