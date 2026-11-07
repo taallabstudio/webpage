@@ -129,7 +129,7 @@
 @media(max-width:760px){.ocean-sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);transition:transform .2s ease;width:270px;box-shadow:15px 0 40px #0008}.ocean-sidebar.mobile-open{transform:translateX(0)}.ocean-topbar{padding:0 12px}.ocean-mobile-menu{display:grid;place-items:center;width:30px;height:30px;margin-right:8px}.ocean-crumb{flex:1}.ocean-editor{padding:28px 24px 80px 35px}.ocean-title{font-size:34px}.ocean-title-row{margin-top:20px}.ocean-page-controls{opacity:1;gap:10px}.ocean-page-controls button{font-size:10px}.ocean-cover{height:150px}.ocean-slash-menu{left:0;width:min(340px,calc(100vw - 50px))}.ocean-save-state{display:none}}
 @media(min-width:761px){.ocean-shell.sidebar-collapsed .ocean-sidebar{width:0;overflow:hidden;border:0}}
 
-:root{--ocean-bg:#f4f6f8;--ocean-panel:#fff;--ocean-panel2:#f8fafc;--ocean-hover:#edf5fd;--ocean-border:#e3e8ee;--ocean-text:#1d2229;--ocean-muted:#707782;--ocean-dim:#858d97;--ocean-accent:#0878e8;--ocean-font:Inter,system-ui,sans-serif;--ocean-display:"Inter",system-ui,sans-serif}
+:root{--ocean-bg:#f4f6f8;--ocean-panel:#fff;--ocean-panel2:#f8fafc;--ocean-hover:#edf5fd;--ocean-border:#e3e8ee;--ocean-text:#1d2229;--ocean-muted:#5f6975;--ocean-dim:#5f6975;--ocean-accent:#0878e8;--ocean-font:Inter,system-ui,sans-serif;--ocean-display:"Inter",system-ui,sans-serif}
 .ocean-shell,.ocean-auth,.ocean-loading,.ocean-access-denied{background:#f4f6f8;color:#1d2229;font-family:var(--ocean-font)}
 .ocean-sidebar{background:#fff;border-color:#e4e7eb}.ocean-brand{color:#1d2229}.ocean-brand-mark{width:34px;height:30px;color:#0878e8;background:transparent;display:grid;place-items:center}.ocean-brand-mark svg{width:31px;height:25px}
 .ocean-mark{background:#e7f2ff;color:#0878e8;border:1px solid #d6e9fc}.ocean-mark svg{width:27px;height:20px}
@@ -1435,7 +1435,7 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 .ocean-shell[data-theme="dark"] .ocean-settings-section-heading{border-color:#3a424d}
 .ocean-shell[data-theme="dark"] .ocean-settings-section-heading h2{color:#edf2f7}
 .ocean-shell[data-theme="dark"] .ocean-settings-section-heading p{color:#aab5c1}
-.ocean-shell :is(button,a,input,select,textarea,[tabindex]):focus-visible{outline:2px solid #1685ed;outline-offset:2px}
+.ocean-shell :is(button,a,input,select,textarea,[tabindex]):focus-visible{outline:3px solid #1685ed;outline-offset:3px}
 @media(max-width:760px){.ocean-page-row>.ocean-page-menu-wrap>.ocean-page-more{opacity:.8}.ocean-settings-section-heading{padding:18px}.ocean-settings-section .ocean-managed-user{gap:9px}}
 
 
@@ -1480,3 +1480,37 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 .ocean-shell[data-theme="dark"] .ocean-sidebar-context-menu>.ocean-sidebar-delete-action{border-color:#414c58;color:#ff9b9f}
 .ocean-shell[data-theme="dark"] .ocean-sidebar-context-menu>.ocean-sidebar-delete-action:hover{background:#432d32;color:#ffb5b8}
 @media(max-width:650px){.ocean-account-settings-body{align-items:flex-start;flex-direction:column;gap:14px}.ocean-account-settings-actions{width:100%}}
+
+
+/* WCAG AA contrast improvements for light and dark workspace themes. */
+.ocean-shell:not([data-theme="dark"]) .ocean-side-label,
+.ocean-shell:not([data-theme="dark"]) .ocean-topbar,
+.ocean-shell:not([data-theme="dark"]) .ocean-save-state,
+.ocean-shell:not([data-theme="dark"]) .ocean-block-gutter button,
+.ocean-shell:not([data-theme="dark"]) .ocean-block-actions>button,
+.ocean-shell:not([data-theme="dark"]) .ocean-list-marker,
+.ocean-shell:not([data-theme="dark"]) .ocean-view-placeholder,
+.ocean-shell:not([data-theme="dark"]) .ocean-embed-content span,
+.ocean-shell:not([data-theme="dark"]) .ocean-embed-content a,
+.ocean-shell:not([data-theme="dark"]) .ocean-add-line button,
+.ocean-shell:not([data-theme="dark"]) .ocean-slash-results section small,
+.ocean-shell:not([data-theme="dark"]) .ocean-empty,
+.ocean-shell:not([data-theme="dark"]) .ocean-loading,
+.ocean-shell:not([data-theme="dark"]) .ocean-auth-card p,
+.ocean-shell:not([data-theme="dark"]) .ocean-auth-card>small,
+.ocean-shell:not([data-theme="dark"]) .ocean-managed-info span,
+.ocean-shell:not([data-theme="dark"]) .ocean-admin-empty,
+.ocean-shell:not([data-theme="dark"]) .ocean-access-card-head span,
+.ocean-shell:not([data-theme="dark"]) .ocean-comment-list small,
+.ocean-shell:not([data-theme="dark"]) .ocean-db-record-comments article small,
+.ocean-shell:not([data-theme="dark"]) .ocean-account-email>span,
+.ocean-shell:not([data-theme="dark"]) .ocean-page-add{color:#5f6975!important}
+.ocean-shell:not([data-theme="dark"]) .ocean-title::placeholder{color:#66717d!important}
+.ocean-shell:not([data-theme="dark"]) .ocean-block-text.color-gray{color:#59636f!important}
+.ocean-shell:not([data-theme="dark"]) .ocean-block-text.color-brown{color:#77523b!important}
+.ocean-shell:not([data-theme="dark"]) .ocean-block-text.color-orange{color:#8b4d15!important}
+.ocean-shell:not([data-theme="dark"]) .ocean-block-text.color-yellow{color:#756000!important}
+.ocean-shell:not([data-theme="dark"]) .ocean-block-text.color-blue{color:#006bc4!important}
+.ocean-shell:not([data-theme="dark"]) .ocean-block-text.color-pink{color:#8c3e67!important}
+.ocean-shell[data-theme="dark"] .ocean-title::placeholder{color:#9ba8b5!important}
+.ocean-shell[data-theme="dark"] .ocean-db-calendar-day.outside .ocean-db-calendar-date{color:#a0acb8!important}
