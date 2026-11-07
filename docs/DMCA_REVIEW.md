@@ -29,7 +29,7 @@ Official sources:
 - The legal name of the service provider that should be registered (individual, proprietorship, partnership or company).
 - The named designated agent and a monitored telephone number.
 - Whether a separate legal entity operates any related service that would require a separate designation.
-- The current fee displayed by the Copyright Office at the time of registration. Older Office material referenced a $6 fee, but that historical figure should not be relied on; check the live registration flow.
+- The U.S. Copyright Office's current DMCA Directory FAQ lists a $6 fee per designation, amendment or resubmission as checked on 7 November 2026. Re-check the live fee schedule immediately before filing.
 
 ## Owner decision required
 
