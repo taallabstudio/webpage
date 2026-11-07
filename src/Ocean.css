@@ -1487,3 +1487,24 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 
 /* Keyboard focus remains visible in the dark OCEAN workspace and login screen. */
 .ocean-shell :where(button,a,input,textarea,select,[tabindex]):focus-visible,.ocean-auth :where(button,a,input,textarea,select,[tabindex]):focus-visible{outline:3px solid #8bb8e8!important;outline-offset:3px}
+
+
+/* Improve readability of muted labels and placeholders in the dark OCEAN editor. */
+.ocean-shell .ocean-title::placeholder{color:#9a9a9a!important}
+.ocean-shell .ocean-block-text:empty:before{color:#929292!important}
+.ocean-shell .ocean-add-line button{color:#929292!important}
+.ocean-shell .ocean-slash-results section small{color:#a0a0a0!important}
+.ocean-shell .ocean-page-controls button{color:#a0a0a0!important}
+.ocean-shell .ocean-side-label{color:#a0a0a0!important}
+.ocean-shell .ocean-new-page{color:#a0a0a0!important}
+.ocean-shell .ocean-save-state{color:#a0a0a0!important}
+.ocean-shell .ocean-block-text.color-gray{color:#a0a0a0!important}
+.ocean-shell .ocean-block-text.color-brown{color:#c49b7b!important}
+.ocean-shell .ocean-block-text.color-orange{color:#e9a36d!important}
+.ocean-shell .ocean-block-text.color-yellow{color:#e1c878!important}
+.ocean-shell .ocean-block-text.color-green{color:#8fbd9d!important}
+.ocean-shell .ocean-block-text.color-blue{color:#8dbbe8!important}
+.ocean-shell .ocean-block-text.color-purple{color:#b6a1df!important}
+.ocean-shell .ocean-block-text.color-pink{color:#d7a1bd!important}
+.ocean-shell .ocean-block-text.color-red{color:#df9292!important}
+.ocean-auth-card>small{color:#929292!important}
