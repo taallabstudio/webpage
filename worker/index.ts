@@ -35,6 +35,16 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const SETTINGS_REFRESH = "google_refresh_token";
 const SETTINGS_FOLDER = "google_drive_folder_id";
 const now = () => Math.floor(Date.now() / 1000);
+const POLICY_VERSION = "2026-11-07";
+
+async function recordPolicyAcceptance(env: Env, userId: string, method: string) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, terms_version TEXT NOT NULL,
+    privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
+  )`).run();
+  await env.DB.prepare("INSERT INTO policy_acceptances(id,user_id,terms_version,privacy_version,accepted_at,method) VALUES(?,?,?,?,?,?)")
+    .bind(randomToken(16), userId, POLICY_VERSION, POLICY_VERSION, now(), method).run();
+}
 
 const json = (data: any, init: ResponseInit = {}) =>
   new Response(JSON.stringify(data), {
@@ -580,6 +590,7 @@ async function authSignup(req: Request, env: Env) {
   const email = normalizeEmail(body.email);
   const password = String(body.password || "");
 
+  if (body.acceptPolicies !== true) return json({ error: "Please accept the Terms of Service and Privacy Policy to create an account." }, { status: 400 });
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, { status: 400 });
   if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, { status: 400 });
 
@@ -592,6 +603,7 @@ async function authSignup(req: Request, env: Env) {
   await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status,email_verified_at,two_factor_enabled) VALUES(?,?,?,?,?,?,?,?,?)")
     .bind(id, email, hash, "user", createdAt, createdAt, "active", null, 1).run();
 
+  await recordPolicyAcceptance(env, id, "email_signup");
   const verification = await createEmailVerification(env, { id, email });
   if (!verification.sent) {
     return json({ error: "Your account was created, but the verification email could not be sent. Use Resend verification email below.", needsVerification: true, verificationSent: false }, { status: 502 });
@@ -834,6 +846,8 @@ async function googleAuthStart(req: Request, env: Env) {
   if (!env.GOOGLE_LOGIN_CLIENT_ID || !env.GOOGLE_LOGIN_CLIENT_SECRET) {
     return new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: "Google sign-in is not configured yet." }, returnTo).toString(), "cache-control": "no-store" } });
   }
+  const params = new URL(req.url).searchParams;
+  const acceptedPolicies = params.get("terms") === POLICY_VERSION && params.get("privacy") === POLICY_VERSION;
   const state = randomToken(24);
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", env.GOOGLE_LOGIN_CLIENT_ID);
@@ -849,6 +863,7 @@ async function googleAuthStart(req: Request, env: Env) {
   // State and return cookies must therefore be valid on both hosts.
   response.headers.append("set-cookie", cookie("google_login_state", state, 600, req));
   response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req));
+  if (acceptedPolicies) response.headers.append("set-cookie", cookie("google_login_consent", POLICY_VERSION, 600, req));
   return response;
 }
 
@@ -856,6 +871,8 @@ async function googleAuthCallback(req: Request, env: Env) {
   const url = new URL(req.url);
   const clearStateCookie = "google_login_state=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const clearReturnCookie = "google_login_return=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const clearConsentCookie = "google_login_consent=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const consentAccepted = parseCookie(req, "google_login_consent") === POLICY_VERSION;
   const savedReturn = parseCookie(req, "google_login_return");
   const returnTo = savedReturn === "ocean-app" ? "ocean-app" : savedReturn === "/ocean.html" ? "/ocean.html" : "/admin";
   const fail = (message: string) => {
@@ -863,6 +880,7 @@ async function googleAuthCallback(req: Request, env: Env) {
     const response = new Response(null, { status: 302, headers: { location: failureUrl, "cache-control": "no-store" } });
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
+    response.headers.append("set-cookie", clearConsentCookie);
     return response;
   };
   if (!env.GOOGLE_LOGIN_CLIENT_ID || !env.GOOGLE_LOGIN_CLIENT_SECRET) return fail("Google sign-in is not configured yet.");
@@ -912,6 +930,7 @@ async function googleAuthCallback(req: Request, env: Env) {
     if (user && user.status !== "active") return fail("This TaalLab account is disabled. Contact TaalLab for help.");
 
     if (!user) {
+      if (!consentAccepted) return fail("Please return to TaalLab and accept the Terms of Service and Privacy Policy before creating an account.");
       const id = randomToken(16);
       const createdAt = now();
       const passwordHash = await hashPassword(randomToken(32));
@@ -919,6 +938,7 @@ async function googleAuthCallback(req: Request, env: Env) {
         "INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status,email_verified_at,two_factor_enabled) VALUES(?,?,?,?,?,?,?,?,?)"
       ).bind(id, email, passwordHash, "user", createdAt, createdAt, "active", createdAt, 1).run();
       user = { id, email, role: "user", status: "active", email_verified_at: createdAt, two_factor_enabled: 1 };
+      await recordPolicyAcceptance(env, id, "google_signup");
     }
 
     try {
@@ -955,6 +975,7 @@ async function googleAuthCallback(req: Request, env: Env) {
     });
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
+    response.headers.append("set-cookie", clearConsentCookie);
     return response;
   }
 
