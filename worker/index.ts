@@ -331,6 +331,41 @@ async function sendAuthEmail(env: Env, to: string, subject: string, html: string
   return { sent: true, id: data?.id || null };
 }
 
+async function sendMarketingEmail(env: Env, userId: string, subject: string, html: string, text: string) {
+  await ensureMarketingSchema(env);
+  const preference: any = await env.DB.prepare("SELECT email,subscribed FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(userId).first();
+  if (!preference || Number(preference.subscribed) !== 1 || !preference.email) return { sent: false, skipped: true };
+
+  const token = await marketingUnsubscribeToken(env, userId);
+  const unsubscribeUrl = `${origin(env)}/unsubscribe.html?token=${encodeURIComponent(token)}`;
+  const oneClickUrl = `${origin(env)}/api/marketing/unsubscribe?token=${encodeURIComponent(token)}`;
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": `marketing:${userId}:${now()}`,
+    },
+    body: JSON.stringify({
+      from: "TaalLab <contact@taallab.in>",
+      to: [String(preference.email)],
+      subject,
+      html: `${html}<p style="font-size:12px;color:#687080">You received this email because you opted in to TaalLab marketing updates. <a href="${unsubscribeUrl}">Unsubscribe</a>.</p>`,
+      text: `${text}\n\nYou received this email because you opted in to TaalLab marketing updates. Unsubscribe: ${unsubscribeUrl}`,
+      headers: {
+        "List-Unsubscribe": `<${oneClickUrl}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+    }),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.error("Marketing email failed", response.status, data);
+    return { sent: false, error: data?.message || data?.error || `Email provider returned HTTP ${response.status}` };
+  }
+  return { sent: true, id: data?.id || null };
+}
+
 async function createEmailVerification(env: Env, user: any) {
   const recent: any = await env.DB.prepare("SELECT created_at FROM email_verification_tokens WHERE user_id=? ORDER BY created_at DESC LIMIT 1").bind(user.id).first();
   if (recent && now() - Number(recent.created_at) < 60) return { sent:false, rateLimited:true, retryAfter:60-(now()-Number(recent.created_at)) };
@@ -768,8 +803,19 @@ async function updateMarketingPreference(req: Request, env: Env) {
 }
 
 async function unsubscribeMarketing(req: Request, env: Env) {
-  const body = await req.json().catch(() => ({}));
-  const userId = await verifyMarketingUnsubscribeToken(env, String(body.token || ""));
+  const url = new URL(req.url);
+  let token = url.searchParams.get("token") || "";
+  if (!token) {
+    const contentType = req.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const body = await req.json().catch(() => ({}));
+      token = String(body.token || "");
+    } else {
+      const form = await req.formData().catch(() => null);
+      token = String(form?.get("token") || "");
+    }
+  }
+  const userId = await verifyMarketingUnsubscribeToken(env, token);
   if (!userId) return json({ error: "This unsubscribe link is invalid. Please manage your email preferences from Account Settings." }, { status: 400 });
   await ensureMarketingSchema(env);
   const row: any = await env.DB.prepare("SELECT email FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(userId).first();
