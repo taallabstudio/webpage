@@ -246,9 +246,10 @@ function OceanDatabaseBlock({block,updateBlock,allBlocks=[]}){
  const rows=sourceRows.map(r=>Array.from({length:width},(_,i)=>r[i]??""));
  const headers=rows[0]||["Name","Status","Date"];
  const properties=headers.map((name,i)=>({
-  name,type:block.properties?.[i]?.type||(i===0?"title":/status/i.test(name)?"status":/date|due/i.test(name)?"date":"text"),
-  options:block.properties?.[i]?.options||( /status/i.test(name)?["Not started","In progress","Done"]:[]),
-  ...block.properties?.[i],name
+  ...block.properties?.[i],
+  name,
+  type:block.properties?.[i]?.type||(i===0?"title":/status/i.test(name)?"status":/date|due/i.test(name)?"date":"text"),
+  options:block.properties?.[i]?.options||(/status/i.test(name)?["Not started","In progress","Done"]:[])
  }));
  const saveProperties=next=>updateBlock(block.id,{properties:next});
  const beginColumnResize=(index,event)=>{
