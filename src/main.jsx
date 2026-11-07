@@ -26,7 +26,7 @@ function RouteLoader() {
     return () => document.removeEventListener("click", handleButtonClick, true);
   }, []);
   const path = location.pathname.replace(/\/+$/, "") || "/";
-  const isOcean = location.hostname === "app.taallab.work";
+  const isOcean = location.hostname === "ocean.taallab.in";
   const Page = isOcean ? OceanApp : path === "/" ? Landing : AppPages;
   return (
     <Suspense fallback={<div className="route-loading" role="status">Loading…</div>}>
