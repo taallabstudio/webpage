@@ -312,10 +312,10 @@ function cleanCustomer(body: any) {
     pincode: value("pincode", 12).replace(/\s/g, ""),
     country: value("country", 80) || "India",
   };
-  if (customer.fullName.length < 2 || !/^\+?[0-9]{10,15}$/.test(customer.phone) ||
+  if (customer.fullName.length < 2 || (customer.phone && !/^\+?[0-9]{10,15}$/.test(customer.phone)) ||
       customer.addressLine1.length < 4 || !customer.city || !customer.state ||
       !/^[A-Za-z0-9 -]{4,10}$/.test(customer.pincode) || !customer.country) {
-    throw new Error("Enter your name, valid phone number, full address, city, state and PIN/postal code.");
+    throw new Error("Enter your name, full address, city, state and PIN/postal code. If you provide a phone number, check that it is valid.");
   }
   return customer;
 }
