@@ -1208,8 +1208,8 @@ function DateOfBirthOnboarding({user,onComplete}) {
   if(minor) return <div className="login-page"><section className="login-card" role="status">
     <Logo/><div className="login-icon"><ShieldCheck/></div>
     <h1>Parent or guardian setup needed</h1>
-    <p>Your date of birth indicates that you are under 18. Before you can use account features, a parent or guardian must create or link their adult account and complete the consent process.</p>
-    <div className="success-pill">Your account is waiting for parent or guardian setup. Purchases and payments are disabled.</div>
+    <p>{user?.parental_consent_status==="pending_verification"?"Your parent or guardian has linked this account. TaalLab must complete a separate adult identity and parent/guardian relationship review before account features can be enabled.":"Your date of birth indicates that you are under 18. Before you can use account features, a parent or guardian must create or link their adult account and complete the consent process."}</p>
+    <div className="success-pill">{user?.parental_consent_status==="pending_verification"?"Parent link submitted for review. Your account remains restricted.":"Your account is waiting for parent or guardian setup."} Purchases and payments are disabled.</div>
     <p style={{fontSize:12,color:"var(--muted)"}}>We have saved your date of birth so we can continue this setup. You can sign out safely. You can still access your personal-data export and submit a privacy request.</p>
     <a className="ghost-btn full" style={{marginBottom:10}} href="/account/privacy">Privacy and data requests</a>
     <button className="primary-btn full" onClick={signOut}>Sign out</button>
