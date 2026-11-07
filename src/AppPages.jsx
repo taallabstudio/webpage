@@ -678,6 +678,23 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [privacyBusy,setPrivacyBusy]=useState(false);
   const [privacyError,setPrivacyError]=useState("");
   const [privacyMessage,setPrivacyMessage]=useState("");
+  const [marketingSubscribed,setMarketingSubscribed]=useState(false);
+  const [marketingLoading,setMarketingLoading]=useState(true);
+  const [marketingSaving,setMarketingSaving]=useState(false);
+  const [marketingMessage,setMarketingMessage]=useState("");
+  const [marketingError,setMarketingError]=useState("");
+  useEffect(()=>{
+    api("/account/marketing-preference").then(d=>setMarketingSubscribed(!!d.subscribed)).catch(e=>setMarketingError(e.message)).finally(()=>setMarketingLoading(false));
+  },[user?.id]);
+
+  async function changeMarketingPreference(next){
+    setMarketingSaving(true);setMarketingError("");setMarketingMessage("");
+    try{
+      const result=await api("/account/marketing-preference",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({subscribed:next})});
+      setMarketingSubscribed(!!result.subscribed);setMarketingMessage(result.message||"Email preference updated.");
+    }catch(e){setMarketingError(e.message||"Could not update your email preference.");}
+    finally{setMarketingSaving(false);}
+  }
 
   async function downloadPersonalData(){
     setPrivacyBusy(true);setPrivacyError("");setPrivacyMessage("");
@@ -791,6 +808,17 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
         {profileError&&<div className="error-box">{profileError}</div>}{profileMessage&&<div className="success-pill">{profileMessage}</div>}
         <button className="primary-btn" disabled={profileSaving}>{profileSaving?"Saving profile…":"Save profile"}</button>
       </form>
+    </section>
+    <section className="panel" style={{maxWidth:720,padding:24,marginTop:18}}>
+      <h2>Email preferences</h2>
+      <p className="muted" style={{marginTop:6}}>Choose separately whether TaalLab may send you occasional product news and marketing emails. Account verification, security and purchase emails are not affected.</p>
+      <label className="policy-consent" style={{marginTop:14}}>
+        <input type="checkbox" checked={marketingSubscribed} disabled={marketingLoading||marketingSaving} onChange={e=>changeMarketingPreference(e.target.checked)}/>
+        <span>Send me occasional product news and marketing emails. <small>You can unsubscribe here or through the unsubscribe link in any marketing email.</small></span>
+      </label>
+      {marketingLoading&&<p className="muted" role="status">Loading email preferences…</p>}
+      {marketingError&&<div className="error-box" role="alert">{marketingError}</div>}
+      {marketingMessage&&<div className="success-pill" role="status">{marketingMessage}</div>}
     </section>
     <section className="panel" style={{maxWidth:720,padding:24,marginTop:18}}>
       <h2>Privacy &amp; personal data</h2>
