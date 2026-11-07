@@ -13,7 +13,7 @@ This is an implementation review, not a legal opinion or a certification of comp
 - Account correction/deletion requests can be submitted from account settings and reviewed in the authenticated admin queue. Fulfilment is a human-reviewed process; a request is not an automatic erasure.
 - A retention schedule is documented. Parent invitation tokens expire after 24 hours and invitation metadata is removed 30 days after expiry. Withdrawn parent-child link rows, consent records and audit events are eligible for deletion after two years, subject to legal holds and obligations. Child permission settings are deleted on withdrawal.
 - Child accounts cannot purchase or initiate payments. This is enforced server-side in store order creation and payment verification.
-- Parent linking requires a separate adult-classified account with verified email, parent/legal-guardian attestation, an expiring single-use invitation to the child's verified email, and acceptance from the child's own signed-in account.
+- Parent linking requires a separate adult-classified account with verified email, parent/legal-guardian attestation, an expiring single-use invitation to the child's verified email, and acceptance from the child's own signed-in account. Acceptance remains pending; an authorised TaalLab administrator must record an independent manual identity, age and relationship review before child access is enabled. Parent toggles remain disabled while verification is pending.
 - Four child permissions are independently controlled and default off: tutorial viewing, lesson-material downloads, comments/discussions, and uploads/sharing. Consent withdrawal revokes the link, deletes permission settings and active child sessions, and records the withdrawal.
 - Keyboard focus indicators are present globally. The studio navigation dropdown opens on focus as well as hover; the mobile navigation button exposes `aria-expanded`. Skip links were added to the studio homepage and shop.
 - Small-text colour values in the main app stylesheet and shop stylesheet were darkened in selected muted-text roles to improve contrast.
@@ -34,7 +34,7 @@ No marketing campaign sender, marketing list or newsletter subscription flow was
 
 ## Remaining P1 actions / external verification
 
-1. Obtain local legal review of child age assurance, parental authority, consent wording, data minimisation, retention and withdrawal. The current parent process is not government-ID or independent legal-identity verification.
+1. Obtain local legal review of child age assurance, parental authority, approved evidence and staff procedure for the manual review gate, consent wording, data minimisation, retention and withdrawal. The application does not perform government-ID verification.
 2. The repository has no tutorial catalogue, lesson-material library, comments/discussions feature or tutorial playback route. The child tutorial access endpoint checks the parent permission and a valid entitlement, but there is no content catalogue/player or entitlement-granting workflow to connect yet. The other three permission flags are ready for future content routes; do not claim those capabilities are live until those routes enforce them server-side.
 3. Add automated tests for parent invitation expiry/replay, child account ownership, consent withdrawal, each permission, and adult-only payment enforcement.
 4. Manually test keyboard-only navigation, screen-reader labels, contrast on every route, zoom/reflow and mobile layouts. Source review is not a substitute for WCAG testing.
