@@ -479,6 +479,7 @@ function UserPortal({user}) {
     <aside className="sidebar"><Logo/><div className="side-links">
       <button className={page==="transfers"?"active":""} onClick={()=>setPage("transfers")}><FolderOpen/> My Transfers</button>
       <button className={page==="settings"?"active":""} onClick={()=>setPage("settings")}><Settings/> Account</button>
+      {user?.account_type==="adult" && <button className={page==="parent"?"active":""} onClick={()=>setPage("parent")}><ShieldCheck/> Parent controls</button>}
     </div>
     <div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div>
     <button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
@@ -512,7 +513,7 @@ function UserPortal({user}) {
               </tr>)}
             </tbody></table></div>}
         </section>
-      </div> : <AccountSettings user={user} onPasswordChanged={()=>{}}/>}
+      </div> : page==="parent" ? <ParentDashboard user={user}/> : <AccountSettings user={user} onPasswordChanged={()=>{}}/>
     </main>
   </div>;
 }
@@ -1095,6 +1096,57 @@ function PurchasedProducts() {
     {error && purchases.length > 0 && <p className="error-text">{error}</p>}
   </section>;
 }
+
+function ParentDashboard({user}) {
+  const [data,setData]=useState({children:[],invites:[]});
+  const [email,setEmail]=useState("");
+  const [authority,setAuthority]=useState(false);
+  const [loading,setLoading]=useState(true);
+  const [busy,setBusy]=useState("");
+  const [error,setError]=useState("");
+  const [notice,setNotice]=useState("");
+  async function load(){setLoading(true);setError("");try{setData(await api("/parent/dashboard"))}catch(e){setError(e.message||"Could not load parent controls.")}finally{setLoading(false)}}
+  useEffect(()=>{load()},[]);
+  async function invite(e){e.preventDefault();if(!authority||busy)return;setBusy("invite");setError("");setNotice("");try{await api("/parent/invites",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({childEmail:email,parentalAuthorityConfirmed:true})});setEmail("");setAuthority(false);setNotice("Invitation sent to the child's verified email. They must sign in and accept it.");await load()}catch(e){setError(e.message||"Could not send the invitation.")}finally{setBusy("")}}
+  async function toggle(child,key,value){setBusy(child.id+key);setError("");setNotice("");try{await api("/parent/children/"+encodeURIComponent(child.id)+"/permissions",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({[key]:value})});setData(d=>({...d,children:d.children.map(c=>c.id===child.id?{...c,[key]:value?1:0}:c)}));setNotice("Permission updated and recorded.")}catch(e){setError(e.message||"Could not update this permission.");await load()}finally{setBusy("")}}
+  async function withdraw(child){if(!confirm("Withdraw consent for this child? All four permissions will be switched off and the child's active sessions will be signed out."))return;setBusy(child.id+"withdraw");setError("");setNotice("");try{await api("/parent/children/"+encodeURIComponent(child.id)+"/withdraw",{method:"POST"});setNotice("Consent withdrawn. The child account is now restricted.");await load()}catch(e){setError(e.message||"Could not withdraw consent.")}finally{setBusy("")}}
+  const controls=[["tutorial_access","Tutorial viewing","Allow the child to watch tutorials when an entitlement exists."],["lesson_downloads","Lesson-material downloads","Allow downloads of lesson notes and materials."],["comments","Comments and discussions","Allow the child to post comments or join discussions."],["uploads_sharing","Uploading and sharing","Allow the child to upload and share content where supported."]];
+  return <div className="admin-content parent-controls-page">
+    <div className="page-head"><div><span className="eyebrow">FAMILY ACCOUNT</span><h1>Parent controls</h1><p>Link a child's verified TaalLab account and manage each permission separately.</p></div></div>
+    <section className="panel" style={{padding:24,marginBottom:20}}><div className="panel-head"><div><h2>Link a child account</h2><p>Enter the email address already verified on the child's TaalLab account.</p></div></div>
+      <form onSubmit={invite} style={{display:"grid",gap:14,maxWidth:620}}>
+        <label>Child's account email<input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="child@example.com" required/></label>
+        <label className="upload-rights-confirmation"><input type="checkbox" checked={authority} onChange={e=>setAuthority(e.target.checked)}/><span>I confirm that I am this child's parent or legal guardian and have authority to request this account link. I understand that this is an attestation, not an independent identity check.</span></label>
+        <div><button className="primary-btn" disabled={!authority||!email||busy==="invite"}>{busy==="invite"?"Sending invitation…":"Send parent-link invitation"}</button></div>
+      </form>
+    </section>
+    {error&&<div className="error-box" role="alert" style={{marginBottom:16}}>{error}</div>}
+    {notice&&<div className="success-box" role="status" style={{marginBottom:16}}>{notice}</div>}
+    <section className="panel" style={{padding:24,marginBottom:20}}><div className="panel-head"><div><h2>Linked children</h2><p>{data.children.length} active linked account{data.children.length===1?"":"s"}</p></div><button className="ghost-btn" onClick={load} disabled={loading}><RefreshCw size={16}/> Refresh</button></div>
+      {loading?<div className="loading">Loading parent controls…</div>:!data.children.length?<div className="empty-state"><ShieldCheck/><h3>No linked child accounts</h3><p>Send an invitation above. Permissions remain off until you enable them here.</p></div>:data.children.map(child=><article className="child-permission-card" key={child.id}>
+        <div className="child-permission-heading"><div><h3>{child.display_name||child.email}</h3><p>{child.email} · Linked {new Date(child.linked_at*1000).toLocaleDateString()}</p></div><span className="status active">Linked</span></div>
+        <div className="child-permission-list">{controls.map(([key,label,description])=><label className="child-permission-row" key={key}><span><strong>{label}</strong><small>{description}</small></span><input type="checkbox" role="switch" aria-label={label+" for "+child.email} checked={Number(child[key])===1} disabled={Boolean(busy)} onChange={e=>toggle(child,key,e.target.checked)}/></label>)}</div>
+        <div className="child-permission-footer"><span className="muted">Purchases and payments are always disabled for child accounts.</span><button className="danger-btn" disabled={Boolean(busy)} onClick={()=>withdraw(child)}>Withdraw consent</button></div>
+      </article>)}
+    </section>
+    {!!data.invites.length&&<section className="panel" style={{padding:24}}><div className="panel-head"><div><h2>Pending invitations</h2><p>Each invitation expires after 24 hours.</p></div></div>{data.invites.map(invite=><div className="pending-parent-invite" key={invite.id}><span>{invite.child_email}</span><small>Expires {new Date(invite.expires_at*1000).toLocaleString()}</small></div>)}</section>}
+    <p className="muted" style={{fontSize:12,marginTop:18}}>Adult status is based on the date of birth entered on the adult account and verified email ownership. It is not government-ID or independent legal-identity verification. For applicable legal requirements, TaalLab still needs a suitable parental-verification provider or documented manual process.</p>
+  </div>;
+}
+
+function ParentLinkAcceptance() {
+  const [user,setUser]=useState(null),[checking,setChecking]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[done,setDone]=useState(false);
+  const token=new URLSearchParams(location.search).get("token")||"";
+  async function refresh(){try{const d=await api("/auth/me");setUser(d.authenticated?d.user:null)}catch{setUser(null)}finally{setChecking(false)}}
+  useEffect(()=>{refresh()},[]);
+  async function accept(){if(busy||!token)return;setBusy(true);setError("");try{await api("/parent/invites/accept",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token})});setDone(true)}catch(e){setError(e.message||"Could not accept this invitation.")}finally{setBusy(false)}}
+  if(checking)return <div className="loading"><RefreshCw className="spin"/> Checking invitation…</div>;
+  if(!user)return <div className="login-page"><section className="login-card"><Logo/><h1>Sign in to accept</h1><p>Sign in using the child's TaalLab account, then return to this invitation link.</p><Login onLogin={refresh}/></section></div>;
+  if(done)return <div className="login-page"><section className="login-card" role="status"><Logo/><div className="login-icon"><Check/></div><h1>Parent account linked</h1><p>The link is active. All optional permissions start switched off. A parent can enable each permission separately from Parent controls.</p><a className="primary-btn full" href="/account">Continue to account</a></section></div>;
+  if(user.account_type!=="child"||!user.date_of_birth||!user.email_verified_at)return <div className="login-page"><section className="login-card"><Logo/><h1>This invitation is for a child account</h1><p>Sign in with the child's own email-verified account after completing the date-of-birth step.</p><a className="ghost-btn full" href="/account">Go to account</a></section></div>;
+  return <div className="login-page"><section className="login-card"><Logo/><div className="login-icon"><ShieldCheck/></div><h1>Review parent link</h1><p>Accepting this request links your child account to the adult account that sent the invitation. The parent will manage separate access settings. You can ask the parent to withdraw consent at any time.</p>{error&&<div className="error-box" role="alert">{error}</div>}<button className="primary-btn full" onClick={accept} disabled={busy||!token}>{busy?"Linking account…":"Accept parent link"}</button><a className="ghost-btn full" style={{marginTop:10}} href="/account">Cancel</a></section></div>;
+}
+
 function DateOfBirthOnboarding({user,onComplete}) {
   const [dateOfBirth,setDateOfBirth]=useState("");
   const [busy,setBusy]=useState(false);
@@ -1182,6 +1234,8 @@ function App(){
   if(path === "/admin") return <Admin/>;
 
   if(path === "/account") return <UserDashboard/>;
+
+  if(path === "/account/parent-link") return <ParentLinkAcceptance/>;
 
   if(path === "/account/settings") return <AccountPage/>;
 
