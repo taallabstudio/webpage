@@ -829,9 +829,8 @@ async function acceptParentInvite(req: Request, env: Env) {
   return json({ok:true,message:"Parent account linked. All optional child permissions start switched off."});
 }
 
-async function updateChildPermissions(req: Request, env: Env, childId: string) {
+async function updateChildPermissions(req: Request, env: Env, childId: string, body: any) {
   const parent=await requireAdultParent(req,env);
-  const body=await req.json().catch(()=>({}));
   const entries=CHILD_PERMISSION_KEYS.filter((key:string)=>Object.prototype.hasOwnProperty.call(body,key));
   if(entries.length!==1 || typeof body[entries[0]]!=="boolean") return json({error:"Update one permission at a time using a true or false value."},{status:400});
   const permission=entries[0], enabled=body[permission] as boolean;
@@ -2634,9 +2633,10 @@ export default {
       if (url.pathname === "/api/parent/dashboard" && req.method === "GET") return getParentDashboard(req, env);
       if (url.pathname === "/api/parent/invites" && req.method === "POST") return createParentInvite(req, env);
       if (url.pathname === "/api/parent/invites/accept" && req.method === "POST") return acceptParentInvite(req, env);
-      if (url.pathname === "/api/parent/children/permissions" && req.method === "PATCH") {
+      const parentPermissionMatch=url.pathname.match(/^\\/api\\/parent\\/children\\/([^/]+)\\/permissions$/);
+      if (parentPermissionMatch && req.method === "PATCH") {
         const body=await req.json().catch(()=>({}));
-        return updateChildPermissions(req, env, String(body.childId||""));
+        return updateChildPermissions(req, env, parentPermissionMatch[1], body);
       }
       const parentWithdrawMatch=url.pathname.match(/^\\/api\\/parent\\/children\\/([^/]+)\\/withdraw$/);
       if (parentWithdrawMatch && req.method === "POST") return withdrawChildConsent(req, env, parentWithdrawMatch[1]);
