@@ -649,6 +649,9 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [securityMessage,setSecurityMessage]=useState("");
   const [securityError,setSecurityError]=useState("");
   const [securitySaving,setSecuritySaving]=useState(false);
+  const [privacyBusy,setPrivacyBusy]=useState(false);
+  const [privacyError,setPrivacyError]=useState("");
+  const [privacyMessage,setPrivacyMessage]=useState("");
 
   async function change(e){
     e.preventDefault();setMessage("");setError("");
@@ -658,6 +661,16 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
     }catch(e){setError(e.message)}
   }
 
+  async function requestDeletion(){
+    if(privacyBusy)return;
+    if(!confirm("Send an account deletion request to TaalLab? Your account will remain active until the request is reviewed. Some payment or legal records may need to be retained."))return;
+    setPrivacyBusy(true);setPrivacyError("");setPrivacyMessage("");
+    try{
+      const result=await api("/account/privacy-request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"deletion"})});
+      setPrivacyMessage(result.alreadyOpen?"You already have an open request ("+result.requestId+").":"Your request has been submitted. Reference: "+result.requestId+". We will contact you at your account email.");
+    }catch(e){setPrivacyError(e.message||"Could not submit your request.");}
+    finally{setPrivacyBusy(false);}
+  }
   async function saveSecurity(e){
     e.preventDefault();setSecurityMessage("");setSecurityError("");setSecuritySaving(true);
     try{
@@ -730,6 +743,17 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
         {profileError&&<div className="error-box">{profileError}</div>}{profileMessage&&<div className="success-pill">{profileMessage}</div>}
         <button className="primary-btn" disabled={profileSaving}>{profileSaving?"Saving profile…":"Save profile"}</button>
       </form>
+    </section>
+    <section className="panel" style={{maxWidth:720,padding:24,marginTop:18}}>
+      <h2>Privacy and your data</h2>
+      <p className="muted" style={{marginTop:6}}>Download a copy of the account information TaalLab holds, or ask us to delete your account. File contents are not included in the export; download any transfers you need before they expire.</p>
+      <div style={{display:"flex",flexWrap:"wrap",gap:10,marginTop:16}}>
+        <a className="ghost-btn" href="/api/account/data-export">Download my data</a>
+        <button type="button" className="danger-btn" onClick={requestDeletion} disabled={privacyBusy}>{privacyBusy?"Submitting request…":"Request account deletion"}</button>
+      </div>
+      <p className="muted" style={{fontSize:12,marginTop:12}}>Deletion requests are reviewed and identity-checked. Certain transaction, security or dispute records may need to be retained where required by law.</p>
+      {privacyError&&<div className="error-box" style={{marginTop:12}}>{privacyError}</div>}
+      {privacyMessage&&<div className="success-pill" style={{marginTop:12}}>{privacyMessage}</div>}
     </section>
     <SecurityMethods user={user}/>
     <section className="panel" style={{maxWidth:620,padding:24,marginTop:18}}><h2>Change password</h2><form onSubmit={change}>
