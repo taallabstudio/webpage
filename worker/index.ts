@@ -46,6 +46,11 @@ async function recordPolicyAcceptance(env: Env, userId: string, method: string) 
     .bind(randomToken(16), userId, POLICY_VERSION, POLICY_VERSION, now(), method).run();
 }
 
+async function recordAgeConfirmation(env: Env, userId: string, method: string) {
+  await env.DB.prepare("INSERT INTO age_confirmations(user_id,confirmed_at,method) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET confirmed_at=excluded.confirmed_at,method=excluded.method")
+    .bind(userId,now(),method).run();
+}
+
 async function recordMarketingPreference(env: Env, userId: string, email: string, consent: boolean, source: string) {
   const timestamp = now();
   await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,email,consent,consented_at,unsubscribed_at,updated_at,source)
@@ -327,6 +332,9 @@ async function ensureSupportSchema(env: Env) {
     token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,used_at INTEGER
   )`).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_marketing_unsubscribe_user ON marketing_unsubscribe_tokens(user_id,expires_at)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS age_confirmations (
+    user_id TEXT PRIMARY KEY,confirmed_at INTEGER NOT NULL,method TEXT NOT NULL
+  )`).run();
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
     id TEXT PRIMARY KEY, user_id TEXT NOT NULL, terms_version TEXT NOT NULL,
     privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
@@ -708,6 +716,7 @@ async function authSignup(req: Request, env: Env) {
     .bind(id, email, hash, "user", createdAt, createdAt, "active", null, 1).run();
 
   await recordPolicyAcceptance(env, id, "email_signup");
+  await recordAgeConfirmation(env,id,"email_signup_self_attestation");
   if (body.marketingConsent === true) await recordMarketingPreference(env,id,email,true,"email_signup");
   const verification = await createEmailVerification(env, { id, email });
   if (!verification.sent) {
@@ -833,6 +842,7 @@ async function createManagedUser(req: Request, env: Env) {
   const createdAt = now();
   await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status,email_verified_at,two_factor_enabled) VALUES(?,?,?,?,?,?,?,?,?)")
     .bind(id, email, hash, role, createdAt, createdAt, "active", null, 1).run();
+  await recordAgeConfirmation(env,id,"admin_created_account_attestation");
 
   const verification = await createEmailVerification(env, { id, email });
   if (!verification.sent) {
@@ -1057,6 +1067,7 @@ async function googleAuthCallback(req: Request, env: Env) {
       ).bind(id, email, passwordHash, "user", createdAt, createdAt, "active", createdAt, 1).run();
       user = { id, email, role: "user", status: "active", email_verified_at: createdAt, two_factor_enabled: 1 };
       await recordPolicyAcceptance(env, id, "google_signup");
+      await recordAgeConfirmation(env,id,"google_signup_self_attestation");
     }
 
     try {
@@ -1675,7 +1686,7 @@ async function accountDataExport(req: Request, env: Env) {
   const user = await requireUser(req, env);
   await ensureOceanSchema(env);
   const userId = String(user.id);
-  const [transfers, files, googleIdentities, policyAcceptances, privacyRequests, marketingPreference, pages, comments, shares, assets, calendar, totp, passkeys, store] = await Promise.all([
+  const [transfers, files, googleIdentities, policyAcceptances, privacyRequests, marketingPreference, ageConfirmation, pages, comments, shares, assets, calendar, totp, passkeys, store] = await Promise.all([
     env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(userId).all(),
     env.DB.prepare(`SELECT f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status
       FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC`).bind(userId).all(),
@@ -1683,6 +1694,7 @@ async function accountDataExport(req: Request, env: Env) {
     env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at").bind(userId).all(),
     env.DB.prepare("SELECT request_type,status,details,created_at,updated_at,resolved_at FROM privacy_requests WHERE user_id=? ORDER BY created_at").bind(userId).all(),
     env.DB.prepare("SELECT consent,consented_at,unsubscribed_at,updated_at,source FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(userId).first(),
+    env.DB.prepare("SELECT confirmed_at,method FROM age_confirmations WHERE user_id=? LIMIT 1").bind(userId).first(),
     env.DB.prepare("SELECT id,parent_id,title,icon,cover,blocks_json,is_favorite,is_archived,created_at,updated_at,is_folder,is_shared,general_access,cover_credit,cover_credit_url,cover_source_url FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(userId).all(),
     env.DB.prepare("SELECT id,page_id,user_id,body,created_at FROM ocean_comments WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(userId, userId).all(),
     env.DB.prepare("SELECT page_id,user_id,permission,created_at,updated_at FROM ocean_page_shares WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(userId, userId).all(),
@@ -1709,6 +1721,7 @@ async function accountDataExport(req: Request, env: Env) {
     policyAcceptances: policyAcceptances.results || [],
     privacyRequests: privacyRequests.results || [],
     marketingPreference: marketingPreference || { consent: 0 },
+    ageConfirmation: ageConfirmation || null,
     transfers: transfers.results || [],
     transferFiles: files.results || [],
     ocean: { pages: pages.results || [], comments: comments.results || [], shares: shares.results || [], assets: assets.results || [] },
@@ -2606,6 +2619,7 @@ export default {
             await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status) VALUES(?,?,?,?,?,?,?)")
               .bind(recipientId, recipientEmail, hash, "user", created, created, "active")
               .run();
+            await recordAgeConfirmation(env,recipientId,"admin_transfer_recipient_attestation");
             recipientCreated = true;
           }
         }
