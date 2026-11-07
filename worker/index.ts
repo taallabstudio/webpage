@@ -966,6 +966,12 @@ async function googleAuthCallback(req: Request, env: Env) {
   }
 
   if (!user || user.status !== "active") return fail("This TaalLab account is unavailable. Contact TaalLab for help.");
+  await ensureSupportSchema(env);
+  const acceptedPolicy: any = await env.DB.prepare("SELECT id FROM policy_acceptances WHERE user_id=? LIMIT 1").bind(user.id).first();
+  if (!acceptedPolicy) {
+    if (savedConsent !== "1") return fail("Please accept the Terms of Service and Privacy Policy before continuing with Google.");
+    await recordPolicyAcceptance(env, user.id, "google-signin", now());
+  }
   if (!user.email_verified_at) {
     await env.DB.prepare("UPDATE users SET email_verified_at=?,updated_at=? WHERE id=?").bind(now(), now(), user.id).run();
     user.email_verified_at = now();
@@ -987,6 +993,7 @@ async function googleAuthCallback(req: Request, env: Env) {
     });
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
+    response.headers.append("set-cookie", clearConsentCookie);
     return response;
   }
 
@@ -1004,12 +1011,14 @@ async function googleAuthCallback(req: Request, env: Env) {
     const response = new Response(null, { status: 302, headers: { location: "ocean://oauth/callback?code=" + encodeURIComponent(appCode), "cache-control": "no-store" } });
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
+    response.headers.append("set-cookie", clearConsentCookie);
     return response;
   }
   const sid = await createUserSession(env, user.id);
   const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, {}, returnTo).toString(), "cache-control": "no-store" } });
   response.headers.append("set-cookie", clearStateCookie);
   response.headers.append("set-cookie", clearReturnCookie);
+    response.headers.append("set-cookie", clearConsentCookie);
   attachSessionCookie(response, sid, req);
   return response;
 }
