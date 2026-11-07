@@ -46,6 +46,76 @@ async function recordPolicyAcceptance(env: Env, userId: string, method: string) 
     .bind(randomToken(16), userId, POLICY_VERSION, POLICY_VERSION, now(), method).run();
 }
 
+async function recordMarketingPreference(env: Env, userId: string, email: string, consent: boolean, source: string) {
+  const timestamp = now();
+  await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,email,consent,consented_at,unsubscribed_at,updated_at,source)
+    VALUES(?,?,?,?,?,?,?)
+    ON CONFLICT(user_id) DO UPDATE SET email=excluded.email,consent=excluded.consent,
+      consented_at=CASE WHEN excluded.consent=1 THEN excluded.consented_at ELSE marketing_preferences.consented_at END,
+      unsubscribed_at=CASE WHEN excluded.consent=1 THEN NULL WHEN marketing_preferences.consent=1 THEN excluded.updated_at ELSE marketing_preferences.unsubscribed_at END,
+      updated_at=excluded.updated_at,source=excluded.source`)
+    .bind(userId,email,consent?1:0,consent?timestamp:null,consent?null:timestamp,timestamp,source).run();
+}
+
+async function createMarketingUnsubscribeUrl(env: Env, userId: string) {
+  const token = randomToken(32), tokenHash = await hashText(token), createdAt = now();
+  await env.DB.prepare("INSERT INTO marketing_unsubscribe_tokens(token_hash,user_id,created_at,expires_at) VALUES(?,?,?,?)")
+    .bind(tokenHash,userId,createdAt,createdAt+365*86400).run();
+  return `${origin(env)}/api/marketing/unsubscribe?token=${encodeURIComponent(token)}`;
+}
+
+async function sendMarketingEmail(env: Env, user: {id:string;email:string}, subject: string, html: string, textBody: string) {
+  const preference: any = await env.DB.prepare("SELECT consent FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(user.id).first();
+  if (!preference || Number(preference.consent)!==1) return { sent:false, skipped:"no_marketing_consent" };
+  const unsubscribeUrl = await createMarketingUnsubscribeUrl(env,user.id);
+  const safeUrl = escapeHtml(unsubscribeUrl);
+  const response = await fetch("https://api.resend.com/emails",{
+    method:"POST",headers:{"Authorization":`Bearer ${env.RESEND_API_KEY}`,"Content-Type":"application/json"},
+    body:JSON.stringify({
+      from:"TaalLab <contact@taallab.in>",to:[user.email],subject,
+      html:html+`<hr><p style="font-size:12px;color:#66717d">You are receiving this email because you opted in to TaalLab updates. <a href="${safeUrl}">Unsubscribe</a>.</p>`,
+      text:textBody+`\n\nYou are receiving this email because you opted in to TaalLab updates. Unsubscribe: ${unsubscribeUrl}`,
+      headers:{"List-Unsubscribe":`<${unsubscribeUrl}>`,"List-Unsubscribe-Post":"List-Unsubscribe=One-Click"}
+    })
+  });
+  const data:any=await response.json().catch(()=>({}));
+  if(!response.ok){console.error("Marketing email failed",response.status,data);return {sent:false,error:"email_delivery_failed"};}
+  return {sent:true,id:data.id||null};
+}
+
+async function getMarketingPreference(req: Request, env: Env) {
+  const user=await requireUser(req,env);
+  const row:any=await env.DB.prepare("SELECT consent,consented_at,unsubscribed_at,updated_at,source FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(user.id).first();
+  return json({consent:!!Number(row?.consent||0),consentedAt:row?.consented_at||null,unsubscribedAt:row?.unsubscribed_at||null,source:row?.source||null});
+}
+
+async function updateMarketingPreference(req: Request, env: Env) {
+  const user=await requireUser(req,env),body:any=await req.json().catch(()=>({}));
+  if(typeof body.consent!=="boolean")return json({error:"Choose whether you want to receive marketing emails."},{status:400});
+  await recordMarketingPreference(env,String(user.id),String(user.email),body.consent,"account_settings");
+  return json({ok:true,consent:body.consent,updatedAt:now()});
+}
+
+async function handleMarketingUnsubscribe(req: Request, env: Env) {
+  const url=new URL(req.url);
+  if(req.method==="GET")return Response.redirect(`${origin(env)}/unsubscribe.html?token=${encodeURIComponent(url.searchParams.get("token")||"")}`,302);
+  if(req.method!=="POST")return json({error:"Method not allowed."},{status:405});
+  let body:any={};
+  if((req.headers.get("content-type")||"").includes("application/json"))body=await req.json().catch(()=>({}));
+  else body=Object.fromEntries(new URLSearchParams(await req.text().catch(()=>"")));
+  const token=String(url.searchParams.get("token")||body.token||"").trim();
+  if(!token)return json({error:"This unsubscribe link is invalid."},{status:400});
+  const tokenHash=await hashText(token);
+  const row:any=await env.DB.prepare("SELECT user_id,expires_at,used_at FROM marketing_unsubscribe_tokens WHERE token_hash=? LIMIT 1").bind(tokenHash).first();
+  if(!row||row.used_at||Number(row.expires_at)<=now())return json({error:"This unsubscribe link is invalid or has expired. Manage email preferences in Account Settings."},{status:410});
+  const timestamp=now();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE marketing_preferences SET consent=0,unsubscribed_at=?,updated_at=?,source='email_unsubscribe' WHERE user_id=?").bind(timestamp,timestamp,row.user_id),
+    env.DB.prepare("UPDATE marketing_unsubscribe_tokens SET used_at=? WHERE token_hash=? AND used_at IS NULL").bind(timestamp,tokenHash),
+  ]);
+  return json({ok:true,message:"You have been unsubscribed from TaalLab marketing emails."});
+}
+
 const json = (data: any, init: ResponseInit = {}) =>
   new Response(JSON.stringify(data), {
     ...init,
@@ -249,6 +319,14 @@ async function ensureSupportSchema(env: Env) {
   }
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_user_created ON privacy_requests(user_id,created_at DESC)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_status_created ON privacy_requests(status,created_at)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS marketing_preferences (
+    user_id TEXT PRIMARY KEY,email TEXT NOT NULL,consent INTEGER NOT NULL DEFAULT 0,
+    consented_at INTEGER,unsubscribed_at INTEGER,updated_at INTEGER NOT NULL,source TEXT NOT NULL DEFAULT 'account'
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS marketing_unsubscribe_tokens (
+    token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,used_at INTEGER
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_marketing_unsubscribe_user ON marketing_unsubscribe_tokens(user_id,expires_at)").run();
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
     id TEXT PRIMARY KEY, user_id TEXT NOT NULL, terms_version TEXT NOT NULL,
     privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
@@ -616,6 +694,7 @@ async function authSignup(req: Request, env: Env) {
   const password = String(body.password || "");
 
   if (body.acceptPolicies !== true) return json({ error: "Please accept the Terms of Service and Privacy Policy to create an account." }, { status: 400 });
+  if (body.ageConfirmed !== true) return json({ error: "You must confirm that you are at least 18 years old to create an account." }, { status: 400 });
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, { status: 400 });
   if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, { status: 400 });
 
@@ -629,6 +708,7 @@ async function authSignup(req: Request, env: Env) {
     .bind(id, email, hash, "user", createdAt, createdAt, "active", null, 1).run();
 
   await recordPolicyAcceptance(env, id, "email_signup");
+  if (body.marketingConsent === true) await recordMarketingPreference(env,id,email,true,"email_signup");
   const verification = await createEmailVerification(env, { id, email });
   if (!verification.sent) {
     return json({ error: "Your account was created, but the verification email could not be sent. Use Resend verification email below.", needsVerification: true, verificationSent: false }, { status: 502 });
@@ -873,6 +953,8 @@ async function googleAuthStart(req: Request, env: Env) {
   }
   const params = new URL(req.url).searchParams;
   const acceptedPolicies = params.get("terms") === POLICY_VERSION && params.get("privacy") === POLICY_VERSION;
+  const ageConfirmed = params.get("age") === "1";
+  const marketingConsent = params.get("marketing") === "1";
   const state = randomToken(24);
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", env.GOOGLE_LOGIN_CLIENT_ID);
@@ -889,6 +971,8 @@ async function googleAuthStart(req: Request, env: Env) {
   response.headers.append("set-cookie", cookie("google_login_state", state, 600, req));
   response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req));
   response.headers.append("set-cookie", acceptedPolicies ? cookie("google_login_consent", POLICY_VERSION, 600, req) : cookie("google_login_consent", "", 0, req));
+  response.headers.append("set-cookie", ageConfirmed ? cookie("google_login_age", "1", 600, req) : cookie("google_login_age", "", 0, req));
+  response.headers.append("set-cookie", marketingConsent ? cookie("google_login_marketing", "1", 600, req) : cookie("google_login_marketing", "", 0, req));
   return response;
 }
 
@@ -897,7 +981,11 @@ async function googleAuthCallback(req: Request, env: Env) {
   const clearStateCookie = "google_login_state=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const clearReturnCookie = "google_login_return=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const clearConsentCookie = "google_login_consent=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const clearAgeCookie = "google_login_age=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const clearMarketingCookie = "google_login_marketing=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const consentAccepted = parseCookie(req, "google_login_consent") === POLICY_VERSION;
+  const ageConfirmed = parseCookie(req, "google_login_age") === "1";
+  const marketingConsent = parseCookie(req, "google_login_marketing") === "1";
   const savedReturn = parseCookie(req, "google_login_return");
   const returnTo = savedReturn === "ocean-app" ? "ocean-app" : savedReturn === "/ocean.html" ? "/ocean.html" : "/admin";
   const fail = (message: string) => {
@@ -906,6 +994,8 @@ async function googleAuthCallback(req: Request, env: Env) {
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
     response.headers.append("set-cookie", clearConsentCookie);
+    response.headers.append("set-cookie", clearAgeCookie);
+    response.headers.append("set-cookie", clearMarketingCookie);
     return response;
   };
   if (!env.GOOGLE_LOGIN_CLIENT_ID || !env.GOOGLE_LOGIN_CLIENT_SECRET) return fail("Google sign-in is not configured yet.");
@@ -956,6 +1046,7 @@ async function googleAuthCallback(req: Request, env: Env) {
 
     if (!user) {
       if (!consentAccepted) return fail("Please return to TaalLab and accept the Terms of Service and Privacy Policy before creating an account.");
+      if (!ageConfirmed) return fail("Please confirm that you are at least 18 years old before creating an account.");
       const id = randomToken(16);
       const createdAt = now();
       const passwordHash = await hashPassword(randomToken(32));
@@ -979,6 +1070,7 @@ async function googleAuthCallback(req: Request, env: Env) {
   }
 
   if (!user || user.status !== "active") return fail("This TaalLab account is unavailable. Contact TaalLab for help.");
+  if (marketingConsent) await recordMarketingPreference(env,String(user.id),String(user.email),true,"google_signup");
   if (!user.email_verified_at) {
     await env.DB.prepare("UPDATE users SET email_verified_at=?,updated_at=? WHERE id=?").bind(now(), now(), user.id).run();
     user.email_verified_at = now();
@@ -1565,6 +1657,7 @@ async function cleanup(env: Env) {
     env.DB.prepare("DELETE FROM google_app_login_codes WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM ocean_google_calendar_states WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM booking_rate_limits WHERE last_sent_at<=?").bind(metadataCutoff),
+    env.DB.prepare("DELETE FROM marketing_unsubscribe_tokens WHERE expires_at<=? OR used_at<=?").bind(cutoff,metadataCutoff),
     env.DB.prepare("DELETE FROM files WHERE status='deleted' AND expires_at<=?").bind(metadataCutoff),
     env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=? AND NOT EXISTS (SELECT 1 FROM files WHERE files.transfer_id=transfers.id AND files.status!='deleted')").bind(metadataCutoff),
   ]);
@@ -1574,13 +1667,14 @@ async function accountDataExport(req: Request, env: Env) {
   const user = await requireUser(req, env);
   await ensureOceanSchema(env);
   const userId = String(user.id);
-  const [transfers, files, googleIdentities, policyAcceptances, privacyRequests, pages, comments, shares, assets, calendar, totp, passkeys, store] = await Promise.all([
+  const [transfers, files, googleIdentities, policyAcceptances, privacyRequests, marketingPreference, pages, comments, shares, assets, calendar, totp, passkeys, store] = await Promise.all([
     env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(userId).all(),
     env.DB.prepare(`SELECT f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status
       FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC`).bind(userId).all(),
     env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=?").bind(userId).all(),
     env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at").bind(userId).all(),
     env.DB.prepare("SELECT request_type,status,details,created_at,updated_at,resolved_at FROM privacy_requests WHERE user_id=? ORDER BY created_at").bind(userId).all(),
+    env.DB.prepare("SELECT consent,consented_at,unsubscribed_at,updated_at,source FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(userId).first(),
     env.DB.prepare("SELECT id,parent_id,title,icon,cover,blocks_json,is_favorite,is_archived,created_at,updated_at,is_folder,is_shared,general_access,cover_credit,cover_credit_url,cover_source_url FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(userId).all(),
     env.DB.prepare("SELECT id,page_id,user_id,body,created_at FROM ocean_comments WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(userId, userId).all(),
     env.DB.prepare("SELECT page_id,user_id,permission,created_at,updated_at FROM ocean_page_shares WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(userId, userId).all(),
@@ -1606,6 +1700,7 @@ async function accountDataExport(req: Request, env: Env) {
     },
     policyAcceptances: policyAcceptances.results || [],
     privacyRequests: privacyRequests.results || [],
+    marketingPreference: marketingPreference || { consent: 0 },
     transfers: transfers.results || [],
     transferFiles: files.results || [],
     ocean: { pages: pages.results || [], comments: comments.results || [], shares: shares.results || [], assets: assets.results || [] },
@@ -2408,6 +2503,9 @@ export default {
       if (url.pathname === "/api/account/data-export" && req.method === "GET") return accountDataExport(req, env);
       if (url.pathname === "/api/account/privacy-requests" && req.method === "GET") return listAccountPrivacyRequests(req, env);
       if (url.pathname === "/api/account/privacy-requests/deletion" && req.method === "POST") return submitAccountDeletionRequest(req, env);
+      if (url.pathname === "/api/account/marketing-preferences" && req.method === "GET") return getMarketingPreference(req, env);
+      if (url.pathname === "/api/account/marketing-preferences" && req.method === "POST") return updateMarketingPreference(req, env);
+      if (url.pathname === "/api/marketing/unsubscribe" && (req.method === "GET" || req.method === "POST")) return handleMarketingUnsubscribe(req, env);
       if (url.pathname === "/api/admin/privacy-requests" && req.method === "GET") return listAdminPrivacyRequests(req, env);
       const adminPrivacyRequest = url.pathname.match(/^\/api\/admin\/privacy-requests\/([^/]+)$/);
       if (adminPrivacyRequest && req.method === "PATCH") return updateAdminPrivacyRequest(req, env, adminPrivacyRequest[1]);
