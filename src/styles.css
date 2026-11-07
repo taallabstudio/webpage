@@ -1444,7 +1444,6 @@ html{scroll-behavior:smooth}
 
 
 /* Site-wide typography: Google Roboto across every interface. */
-html, body, body * { font-family: "Roboto", sans-serif !important; }
 
 
 
