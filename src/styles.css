@@ -1617,3 +1617,9 @@ button.button-click-feedback{
 }
 .policy-consent a{color:#075fb8;text-decoration:underline;text-underline-offset:2px}
 .policy-consent:focus-within{outline:2px solid #0878e8;outline-offset:4px;border-radius:4px}
+
+@media(max-width:760px){
+  .sidebar.mobile-open{display:flex;z-index:30;width:min(280px,84vw);box-shadow:18px 0 45px rgba(0,0,0,.2)}
+  .mobile-nav-backdrop{position:fixed;inset:0;z-index:25;border:0;background:rgba(17,22,29,.42);cursor:pointer}
+  .admin-mobile-head button:focus-visible,.mobile-nav-backdrop:focus-visible{outline:3px solid #075fb8;outline-offset:3px}
+}
