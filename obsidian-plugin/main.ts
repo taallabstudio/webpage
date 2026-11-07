@@ -18,6 +18,7 @@ export default class TaalLabObsidianSync extends Plugin {
   private debounceHandle: number | null = null;
   private running = false;
   private rerun = false;
+  private statusBar: HTMLElement;
 
   async onload() {
     await this.loadSettings();
@@ -28,7 +29,8 @@ export default class TaalLabObsidianSync extends Plugin {
     this.registerEvent(this.app.vault.on("modify", file => this.queueSync(file)));
     this.registerEvent(this.app.vault.on("delete", file => this.queueSync(file)));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => this.queueSync(file, oldPath)));
-    this.addStatusBarItem().setText("OCEAN sync ready");
+    this.statusBar = this.addStatusBarItem();
+    this.statusBar.setText("OCEAN sync ready");
   }
 
   onunload() { if (this.debounceHandle !== null) window.clearTimeout(this.debounceHandle); }
@@ -89,7 +91,7 @@ export default class TaalLabObsidianSync extends Plugin {
     if (this.running) { this.rerun = true; return; }
     if (!this.settings.token.trim()) { new Notice("Open OCEAN Sync settings and add your integration token."); return; }
     this.running = true;
-    const status = this.addStatusBarItem();
+    const status = this.statusBar;
     status.setText("OCEAN: syncing…");
     if (!silent) new Notice("Starting full-vault sync to OCEAN…");
     try {
