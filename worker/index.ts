@@ -57,9 +57,17 @@ async function ensureMarketingSchema(env: Env) {
     unsubscribed_at INTEGER,
     updated_at INTEGER NOT NULL
   )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS marketing_consent_events (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    action TEXT NOT NULL CHECK(action IN ('subscribe','unsubscribe')),
+    method TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`).run();
 }
 
-async function recordMarketingConsent(env: Env, userId: string, email: string, subscribed: boolean) {
+async function recordMarketingConsent(env: Env, userId: string, email: string, subscribed: boolean, method = "account_settings") {
   await ensureMarketingSchema(env);
   const timestamp = now();
   if (subscribed) {
@@ -73,6 +81,8 @@ async function recordMarketingConsent(env: Env, userId: string, email: string, s
       ON CONFLICT(user_id) DO UPDATE SET email=excluded.email,subscribed=0,unsubscribed_at=excluded.unsubscribed_at,updated_at=excluded.updated_at`)
       .bind(userId, normalizeEmail(email), timestamp, timestamp).run();
   }
+  await env.DB.prepare("INSERT INTO marketing_consent_events(id,user_id,email,action,method,created_at) VALUES(?,?,?,?,?,?)")
+    .bind(randomToken(16), userId, normalizeEmail(email), subscribed ? "subscribe" : "unsubscribe", method, timestamp).run();
 }
 
 async function marketingUnsubscribeToken(env: Env, userId: string) {
@@ -699,7 +709,7 @@ async function authSignup(req: Request, env: Env) {
     .bind(id, email, hash, "user", createdAt, createdAt, "active", null, 1).run();
 
   await recordPolicyAcceptance(env, id, "email_signup");
-  if (body.marketingConsent === true) await recordMarketingConsent(env, id, email, true);
+  if (body.marketingConsent === true) await recordMarketingConsent(env, id, email, true, "email_signup");
   const verification = await createEmailVerification(env, { id, email });
   if (!verification.sent) {
     return json({ error: "Your account was created, but the verification email could not be sent. Use Resend verification email below.", needsVerification: true, verificationSent: false }, { status: 502 });
@@ -798,7 +808,7 @@ async function updateMarketingPreference(req: Request, env: Env) {
   const user = await requireUser(req, env);
   const body = await req.json().catch(() => ({}));
   if (typeof body.subscribed !== "boolean") return json({ error: "Choose whether you want to receive marketing emails." }, { status: 400 });
-  await recordMarketingConsent(env, user.id, user.email, body.subscribed);
+  await recordMarketingConsent(env, user.id, user.email, body.subscribed, "account_settings");
   return json({ ok: true, subscribed: body.subscribed, message: body.subscribed ? "Marketing email consent saved." : "You have been unsubscribed from marketing emails." });
 }
 
@@ -819,7 +829,7 @@ async function unsubscribeMarketing(req: Request, env: Env) {
   if (!userId) return json({ error: "This unsubscribe link is invalid. Please manage your email preferences from Account Settings." }, { status: 400 });
   await ensureMarketingSchema(env);
   const row: any = await env.DB.prepare("SELECT email FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(userId).first();
-  if (row?.email) await recordMarketingConsent(env, userId, String(row.email), false);
+  if (row?.email) await recordMarketingConsent(env, userId, String(row.email), false, "marketing_email_unsubscribe");
   return json({ ok: true, message: "You have been unsubscribed from TaalLab marketing emails. Essential account and security emails will continue." });
 }
 
@@ -836,7 +846,7 @@ async function requestAccountDeletion(req: Request, env: Env) {
   const createdAt = now();
   await env.DB.prepare("INSERT INTO privacy_requests(id,user_id,email,request_type,status,created_at,updated_at) VALUES(?,?,?,'deletion','pending',?,?)")
     .bind(id, user.id, user.email, createdAt, createdAt).run();
-  await recordMarketingConsent(env, user.id, user.email, false);
+  await recordMarketingConsent(env, user.id, user.email, false, "account_deletion_request");
 
   const safeEmail = escapeHtml(String(user.email || ""));
   const adminMessage = await sendAuthEmail(env, "contact@taallab.in", "Account deletion request — TaalLab", 
