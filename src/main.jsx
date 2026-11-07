@@ -43,7 +43,7 @@ function CookieNotice() {
   }
   if (!visible) return null;
   return <aside className="cookie-notice" role="region" aria-label="Cookie and storage notice">
-    <div><strong>Privacy notice</strong><p>We use a secure sign-in cookie and local storage for essential features such as your cart and app preferences. We do not currently use advertising or analytics cookies. <a href="/privacy.html">Read our Privacy Policy</a>.</p></div>
+    <div><strong>Privacy notice</strong><p>We use a secure sign-in cookie and local storage for essential features such as your cart and app preferences. The current Taal Lab app code does not set advertising or analytics cookies. <a href="/privacy.html">Read our Privacy Policy</a>.</p></div>
     <button type="button" onClick={dismiss}>Got it</button>
   </aside>;
 }
