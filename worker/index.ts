@@ -265,6 +265,46 @@ async function ensureSupportSchema(env: Env) {
   )`).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_user ON privacy_requests(user_id,created_at DESC)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_status ON privacy_requests(status,created_at)").run();
+
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS parent_link_invites (
+    id TEXT PRIMARY KEY, parent_user_id TEXT NOT NULL, child_user_id TEXT NOT NULL,
+    child_email TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL, parent_attested_at INTEGER NOT NULL, consumed_at INTEGER,
+    canceled_at INTEGER
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_parent_invites_parent ON parent_link_invites(parent_user_id,created_at DESC)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS parent_child_links (
+    id TEXT PRIMARY KEY, parent_user_id TEXT NOT NULL, child_user_id TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('active','revoked')), created_at INTEGER NOT NULL,
+    linked_at INTEGER NOT NULL, revoked_at INTEGER
+  )`).run();
+  await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_parent_child_active ON parent_child_links(child_user_id) WHERE status='active'").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_parent_links_parent ON parent_child_links(parent_user_id,status)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS parental_consent_records (
+    id TEXT PRIMARY KEY, parent_user_id TEXT NOT NULL, child_user_id TEXT NOT NULL,
+    policy_version TEXT NOT NULL, scope_json TEXT NOT NULL, verification_method TEXT NOT NULL,
+    consented_at INTEGER NOT NULL, withdrawn_at INTEGER
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_parent_consent_child ON parental_consent_records(child_user_id,consented_at DESC)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS parental_consent_events (
+    id TEXT PRIMARY KEY, parent_user_id TEXT NOT NULL, child_user_id TEXT NOT NULL,
+    event_type TEXT NOT NULL, details_json TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_parent_consent_events_child ON parental_consent_events(child_user_id,created_at DESC)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS child_permissions (
+    child_user_id TEXT PRIMARY KEY, parent_user_id TEXT NOT NULL,
+    tutorial_access INTEGER NOT NULL DEFAULT 0, lesson_downloads INTEGER NOT NULL DEFAULT 0,
+    comments INTEGER NOT NULL DEFAULT 0, uploads_sharing INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS child_permission_events (
+    id TEXT PRIMARY KEY, parent_user_id TEXT NOT NULL, child_user_id TEXT NOT NULL,
+    permission TEXT NOT NULL, enabled INTEGER NOT NULL, changed_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS child_tutorial_entitlements (
+    child_user_id TEXT NOT NULL, tutorial_id TEXT NOT NULL, granted_by_parent_id TEXT NOT NULL,
+    granted_at INTEGER NOT NULL, revoked_at INTEGER, PRIMARY KEY(child_user_id,tutorial_id)
+  )`).run();
 }
 
 function normalizeEmail(value: unknown) {
@@ -369,7 +409,7 @@ async function requireUser(req: Request, env: Env, options: { allowPendingAge?: 
   if (!user) throw json({ error: "Unauthorized" }, { status: 401 });
   if (!options.allowPendingAge && user.role !== "admin" &&
       (!user.date_of_birth || user.account_type === "unclassified" ||
-       (user.account_type === "child" && user.parental_consent_status !== "verified"))) {
+       (user.account_type === "child" && (user.parental_consent_status !== "consented" || !user.parent_user_id)))) {
     throw json({ error: "Complete the age and parent/guardian setup before using this account feature." }, { status: 403 });
   }
   return user;
@@ -708,6 +748,140 @@ async function saveDateOfBirth(req: Request, env: Env) {
 async function currentUser(env: Env, req: Request) {
   const user = await getSessionUser(req, env);
   return user ? json({ authenticated: true, user }) : json({ authenticated: false });
+}
+
+const PARENT_CONSENT_VERSION = "2026-11-07.1";
+const CHILD_PERMISSION_KEYS = ["tutorial_access","lesson_downloads","comments","uploads_sharing"] as const;
+
+async function requireAdultParent(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  if (user.account_type !== "adult" || !user.email_verified_at) {
+    throw json({ error: "A verified adult account is required to manage a child account." }, { status: 403 });
+  }
+  return user;
+}
+
+async function getParentDashboard(req: Request, env: Env) {
+  const parent = await requireAdultParent(req, env);
+  const children: any = await env.DB.prepare(`SELECT u.id,u.email,u.display_name,u.account_type,u.parental_consent_status,
+      l.linked_at,p.tutorial_access,p.lesson_downloads,p.comments,p.uploads_sharing,p.updated_at
+    FROM parent_child_links l JOIN users u ON u.id=l.child_user_id
+    LEFT JOIN child_permissions p ON p.child_user_id=u.id
+    WHERE l.parent_user_id=? AND l.status='active' ORDER BY l.linked_at DESC`).bind(parent.id).all();
+  const invites: any = await env.DB.prepare(`SELECT id,child_email,created_at,expires_at FROM parent_link_invites
+    WHERE parent_user_id=? AND consumed_at IS NULL AND canceled_at IS NULL AND expires_at>? ORDER BY created_at DESC`).bind(parent.id,now()).all();
+  return json({children:children.results||[],invites:invites.results||[],consentVersion:PARENT_CONSENT_VERSION});
+}
+
+async function createParentInvite(req: Request, env: Env) {
+  const parent = await requireAdultParent(req, env);
+  const body = await req.json().catch(() => ({}));
+  if (body.parentalAuthorityConfirmed !== true) return json({error:"Please confirm that you are the child's parent or legal guardian before sending an invitation."},{status:400});
+  const childEmail = normalizeEmail(body.childEmail);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(childEmail)) return json({error:"Enter the email address used by the child's verified TaalLab account."},{status:400});
+  if (childEmail === normalizeEmail(parent.email)) return json({error:"Use the child's own account email address."},{status:400});
+  const daily: any = await env.DB.prepare("SELECT COUNT(*) AS n FROM parent_link_invites WHERE parent_user_id=? AND created_at>?").bind(parent.id,now()-86400).first();
+  if (Number(daily?.n||0)>=5) return json({error:"For safety, you can send up to five child-link invitations per day."},{status:429});
+  const child: any = await env.DB.prepare("SELECT id,email,email_verified_at,account_type,parent_user_id,status FROM users WHERE email=? LIMIT 1").bind(childEmail).first();
+  if (!child || child.status!=="active" || !child.email_verified_at || child.account_type!=="child") {
+    return json({error:"No active, email-verified child account was found for that address. The child must create an account and complete age screening first."},{status:404});
+  }
+  if (child.parent_user_id) return json({error:"This child account is already linked to a parent or guardian."},{status:409});
+  const active: any = await env.DB.prepare("SELECT id FROM parent_child_links WHERE child_user_id=? AND status='active' LIMIT 1").bind(child.id).first();
+  if (active) return json({error:"This child account is already linked to a parent or guardian."},{status:409});
+  const createdAt=now(), token=randomToken(24), tokenHash=await hashText(token), inviteId=randomToken(16);
+  await env.DB.prepare("UPDATE parent_link_invites SET canceled_at=? WHERE child_user_id=? AND consumed_at IS NULL AND canceled_at IS NULL").bind(createdAt,child.id).run();
+  await env.DB.prepare("INSERT INTO parent_link_invites(id,parent_user_id,child_user_id,child_email,token_hash,created_at,expires_at,parent_attested_at) VALUES(?,?,?,?,?,?,?,?)")
+    .bind(inviteId,parent.id,child.id,childEmail,tokenHash,createdAt,createdAt+86400,createdAt).run();
+  const link=origin(env)+"/account/parent-link?token="+encodeURIComponent(token);
+  const safeParent=escapeHtml(String(parent.display_name||parent.email));
+  const html=`<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033"><h2>Parent or guardian link request</h2><p>${safeParent} has requested to link this TaalLab child account to their adult account.</p><p>Sign in to the child's TaalLab account and review the request. The link expires in 24 hours and cannot be used by another account.</p><p><a href="${link}" style="display:inline-block;padding:12px 18px;background:#0878e8;color:#fff;text-decoration:none;border-radius:8px">Review parent link</a></p><p>If you do not recognise this request, ignore this email and contact contact@taallab.in.</p></div>`;
+  const sent=await sendAuthEmail(env,childEmail,"TaalLab parent/guardian link request",html,"A parent or guardian requested to link this TaalLab account. Sign in to the child's account and visit: "+link+" . This link expires in 24 hours.",`parent-link:${inviteId}`);
+  if(!sent.sent){await env.DB.prepare("UPDATE parent_link_invites SET canceled_at=? WHERE id=?").bind(now(),inviteId).run();return json({error:"The invitation could not be emailed. Please try again later."},{status:502});}
+  return json({ok:true,message:"Invitation sent to the child's verified email address.",expiresAt:createdAt+86400});
+}
+
+async function acceptParentInvite(req: Request, env: Env) {
+  const child=await requireUser(req,env,{allowPendingAge:true});
+  if(child.account_type!=="child" || !child.date_of_birth || !child.email_verified_at || child.parental_consent_status==="consented") {
+    return json({error:"This invitation can only be accepted by the signed-in, email-verified child account that is awaiting parent setup."},{status:403});
+  }
+  const body=await req.json().catch(()=>({}));
+  const token=String(body.token||"");
+  if(!/^[a-f0-9]{48}$/.test(token)) return json({error:"This invitation link is invalid."},{status:400});
+  const tokenHash=await hashText(token);
+  const invite: any=await env.DB.prepare("SELECT * FROM parent_link_invites WHERE token_hash=? AND expires_at>? AND consumed_at IS NULL AND canceled_at IS NULL LIMIT 1").bind(tokenHash,now()).first();
+  if(!invite || invite.child_user_id!==child.id || normalizeEmail(invite.child_email)!==normalizeEmail(child.email)) return json({error:"This invitation is invalid, expired or belongs to another account."},{status:404});
+  const parent: any=await env.DB.prepare("SELECT id,email,email_verified_at,account_type,status FROM users WHERE id=? LIMIT 1").bind(invite.parent_user_id).first();
+  if(!parent || parent.status!=="active" || !parent.email_verified_at || parent.account_type!=="adult") return json({error:"The parent account is no longer eligible to manage this child account."},{status:409});
+  const existing: any=await env.DB.prepare("SELECT id FROM parent_child_links WHERE child_user_id=? AND status='active' LIMIT 1").bind(child.id).first();
+  if(existing || child.parent_user_id) return json({error:"This child account is already linked."},{status:409});
+  const timestamp=now(), linkId=randomToken(16), consentId=randomToken(16);
+  const initialScope={tutorial_access:false,lesson_downloads:false,comments:false,uploads_sharing:false,purchases:false,payments:false};
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO parent_child_links(id,parent_user_id,child_user_id,status,created_at,linked_at) VALUES(?,?,?,'active',?,?)").bind(linkId,parent.id,child.id,timestamp,timestamp),
+    env.DB.prepare("INSERT INTO child_permissions(child_user_id,parent_user_id,tutorial_access,lesson_downloads,comments,uploads_sharing,updated_at) VALUES(?,?,0,0,0,0,?)").bind(child.id,parent.id,timestamp),
+    env.DB.prepare("INSERT INTO parental_consent_records(id,parent_user_id,child_user_id,policy_version,scope_json,verification_method,consented_at) VALUES(?,?,?,?,?,?,?)").bind(consentId,parent.id,child.id,PARENT_CONSENT_VERSION,JSON.stringify(initialScope),"adult_age_screened_verified_email_parent_attestation_child_account_acceptance",timestamp),
+    env.DB.prepare("INSERT INTO parental_consent_events(id,parent_user_id,child_user_id,event_type,details_json,created_at) VALUES(?,?,?,'link_accepted',?,?)").bind(randomToken(16),parent.id,child.id,JSON.stringify({policyVersion:PARENT_CONSENT_VERSION,initialPermissions:initialScope}),timestamp),
+    env.DB.prepare("UPDATE users SET parent_user_id=?,parental_consent_status='consented',updated_at=? WHERE id=? AND account_type='child' AND parent_user_id IS NULL").bind(parent.id,timestamp,child.id),
+    env.DB.prepare("UPDATE parent_link_invites SET consumed_at=? WHERE id=? AND consumed_at IS NULL").bind(timestamp,invite.id),
+  ]);
+  return json({ok:true,message:"Parent account linked. All optional child permissions start switched off."});
+}
+
+async function updateChildPermissions(req: Request, env: Env, childId: string) {
+  const parent=await requireAdultParent(req,env);
+  const body=await req.json().catch(()=>({}));
+  const entries=CHILD_PERMISSION_KEYS.filter((key:string)=>Object.prototype.hasOwnProperty.call(body,key));
+  if(entries.length!==1 || typeof body[entries[0]]!=="boolean") return json({error:"Update one permission at a time using a true or false value."},{status:400});
+  const permission=entries[0], enabled=body[permission] as boolean;
+  const link: any=await env.DB.prepare("SELECT id FROM parent_child_links WHERE parent_user_id=? AND child_user_id=? AND status='active' LIMIT 1").bind(parent.id,childId).first();
+  if(!link) return json({error:"This child account is not linked to your account."},{status:404});
+  const current: any=await env.DB.prepare("SELECT * FROM child_permissions WHERE child_user_id=? AND parent_user_id=? LIMIT 1").bind(childId,parent.id).first();
+  if(!current) return json({error:"Child permissions are unavailable. Contact support."},{status:409});
+  if(Number(current[permission])!==Number(enabled)){
+    await env.DB.prepare(`UPDATE child_permissions SET ${permission}=?,updated_at=? WHERE child_user_id=? AND parent_user_id=?`).bind(enabled?1:0,now(),childId,parent.id).run();
+    await env.DB.prepare("INSERT INTO child_permission_events(id,parent_user_id,child_user_id,permission,enabled,changed_at) VALUES(?,?,?,?,?,?)").bind(randomToken(16),parent.id,childId,permission,enabled?1:0,now()).run();
+    const scope={tutorial_access:Boolean(current.tutorial_access),lesson_downloads:Boolean(current.lesson_downloads),comments:Boolean(current.comments),uploads_sharing:Boolean(current.uploads_sharing),purchases:false,payments:false,[permission]:enabled};
+    await env.DB.prepare("INSERT INTO parental_consent_records(id,parent_user_id,child_user_id,policy_version,scope_json,verification_method,consented_at) VALUES(?,?,?,?,?,?,?)").bind(randomToken(16),parent.id,childId,PARENT_CONSENT_VERSION,JSON.stringify(scope),"parent_dashboard_permission_change",now()).run();
+  }
+  return json({ok:true,permission,enabled});
+}
+
+async function withdrawChildConsent(req: Request, env: Env, childId: string) {
+  const parent=await requireAdultParent(req,env);
+  const link: any=await env.DB.prepare("SELECT id FROM parent_child_links WHERE parent_user_id=? AND child_user_id=? AND status='active' LIMIT 1").bind(parent.id,childId).first();
+  if(!link) return json({error:"This child account is not linked to your account."},{status:404});
+  const timestamp=now();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE parent_child_links SET status='revoked',revoked_at=? WHERE id=?").bind(timestamp,link.id),
+    env.DB.prepare("UPDATE parental_consent_records SET withdrawn_at=? WHERE parent_user_id=? AND child_user_id=? AND withdrawn_at IS NULL").bind(timestamp,parent.id,childId),
+    env.DB.prepare("INSERT INTO parental_consent_events(id,parent_user_id,child_user_id,event_type,details_json,created_at) VALUES(?,?,?,'consent_withdrawn',?,?)").bind(randomToken(16),parent.id,childId,JSON.stringify({allPermissionsDisabled:true,sessionRevocation:true}),timestamp),
+    env.DB.prepare("UPDATE child_permissions SET tutorial_access=0,lesson_downloads=0,comments=0,uploads_sharing=0,updated_at=? WHERE child_user_id=? AND parent_user_id=?").bind(timestamp,childId,parent.id),
+    env.DB.prepare("UPDATE users SET parent_user_id=NULL,parental_consent_status='withdrawn',updated_at=? WHERE id=? AND parent_user_id=?").bind(timestamp,childId,parent.id),
+    env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(childId),
+  ]);
+  return json({ok:true,message:"Consent withdrawn. Child permissions are off and existing sessions have been signed out."});
+}
+
+async function getChildPermissions(req: Request, env: Env) {
+  const user=await requireUser(req,env);
+  if(user.account_type!=="child") return json({isChild:false,permissions:null});
+  const permissions: any=await env.DB.prepare("SELECT tutorial_access,lesson_downloads,comments,uploads_sharing FROM child_permissions WHERE child_user_id=? AND parent_user_id=? LIMIT 1").bind(user.id,user.parent_user_id).first();
+  return json({isChild:true,permissions:permissions||{tutorial_access:0,lesson_downloads:0,comments:0,uploads_sharing:0}});
+}
+
+async function checkTutorialAccess(req: Request, env: Env) {
+  const user=await requireUser(req,env);
+  const tutorialId=String(new URL(req.url).searchParams.get("tutorialId")||"").trim();
+  if(!tutorialId || tutorialId.length>160) return json({error:"A valid tutorial ID is required."},{status:400});
+  if(user.account_type==="adult") return json({allowed:true,reason:"adult_account"});
+  if(user.account_type!=="child" || !user.parent_user_id || user.parental_consent_status!=="consented") return json({allowed:false,reason:"parental_consent_required"},{status:403});
+  const permission: any=await env.DB.prepare("SELECT tutorial_access FROM child_permissions WHERE child_user_id=? AND parent_user_id=? LIMIT 1").bind(user.id,user.parent_user_id).first();
+  if(!permission || Number(permission.tutorial_access)!==1) return json({allowed:false,reason:"parent_permission_disabled"},{status:403});
+  const entitlement: any=await env.DB.prepare("SELECT tutorial_id FROM child_tutorial_entitlements WHERE child_user_id=? AND tutorial_id=? AND revoked_at IS NULL LIMIT 1").bind(user.id,tutorialId).first();
+  if(!entitlement) return json({allowed:false,reason:"tutorial_entitlement_required"},{status:403});
+  return json({allowed:true,reason:"parent_permission_and_entitlement"});
 }
 
 async function exportAccountData(req: Request, env: Env) {
@@ -2457,6 +2631,17 @@ export default {
       if ((url.pathname === "/api/auth/logout" || url.pathname === "/api/admin/logout") && req.method === "POST") return authLogout(req, env);
       if (url.pathname === "/api/auth/me" && req.method === "GET") return currentUser(env, req);
       if (url.pathname === "/api/account/date-of-birth" && req.method === "POST") return saveDateOfBirth(req, env);
+      if (url.pathname === "/api/parent/dashboard" && req.method === "GET") return getParentDashboard(req, env);
+      if (url.pathname === "/api/parent/invites" && req.method === "POST") return createParentInvite(req, env);
+      if (url.pathname === "/api/parent/invites/accept" && req.method === "POST") return acceptParentInvite(req, env);
+      if (url.pathname === "/api/parent/children/permissions" && req.method === "PATCH") {
+        const body=await req.json().catch(()=>({}));
+        return updateChildPermissions(req, env, String(body.childId||""));
+      }
+      const parentWithdrawMatch=url.pathname.match(/^\\/api\\/parent\\/children\\/([^/]+)\\/withdraw$/);
+      if (parentWithdrawMatch && req.method === "POST") return withdrawChildConsent(req, env, parentWithdrawMatch[1]);
+      if (url.pathname === "/api/child/permissions" && req.method === "GET") return getChildPermissions(req, env);
+      if (url.pathname === "/api/tutorials/access" && req.method === "GET") return checkTutorialAccess(req, env);
       if (url.pathname === "/api/account/profile" && req.method === "PATCH") return updateAccountProfile(req, env);
       if (url.pathname === "/api/account/password" && req.method === "POST") return changeOwnPassword(req, env);
       if (url.pathname === "/api/account/security" && req.method === "POST") return updateSecuritySettings(req, env);
