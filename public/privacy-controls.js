@@ -80,7 +80,7 @@
   banner.setAttribute("aria-label", "Cookie and privacy preferences");
   banner.setAttribute("aria-live", "polite");
   banner.hidden = !!existing;
-  banner.innerHTML = '<div class="taal-copy"><strong>Privacy and cookie choices</strong><p>Essential storage keeps sign-in and your shopping cart working. We do not currently use advertising or analytics trackers. Optional Google Fonts are requested only if you choose to allow them. <a href="/privacy.html">Privacy Policy</a></p></div><div class="taal-actions"><button type="button" data-choice="essential">Essential only</button><button type="button" class="primary" data-choice="optional">Allow optional fonts</button></div>';
+  banner.innerHTML = '<div class="taal-copy"><strong>Privacy and cookie choices</strong><p>Essential storage keeps sign-in, adult confirmation for public shares and your shopping cart working. We do not currently use advertising or analytics trackers. Optional Google Fonts are requested only if you choose to allow them. <a href="/privacy.html">Privacy Policy</a></p></div><div class="taal-actions"><button type="button" data-choice="essential">Essential only</button><button type="button" class="primary" data-choice="optional">Allow optional fonts</button></div>';
   document.body.appendChild(banner);
 
   const settings = document.createElement("button");
