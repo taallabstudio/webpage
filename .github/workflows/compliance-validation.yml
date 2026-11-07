@@ -34,6 +34,18 @@ jobs:
       - name: Build website and application
         run: npm run build
 
+      - name: Audit installed dependencies
+        run: |
+          npm audit --json > /tmp/taallab-npm-audit.json || true
+          node -e 'const r=require("/tmp/taallab-npm-audit.json"); const v=r.vulnerabilities||{}; console.log("NPM_AUDIT_SUMMARY",JSON.stringify(r.metadata?.vulnerabilities||{})); console.log("NPM_AUDIT_DETAILS",JSON.stringify(Object.entries(v).map(([name,p])=>({name,severity:p.severity,isDirect:p.isDirect,range:p.range,fixAvailable:p.fixAvailable,via:(p.via||[]).map(x=>typeof x==="string"?x:{title:x.title,url:x.url,range:x.range})})),null,2));'
+
+      - name: Upload dependency audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: taallab-npm-audit
+          path: /tmp/taallab-npm-audit.json
+          if-no-files-found: error
+
       - name: Generate third-party dependency licence report
         run: |
           npx --yes license-checker --json > /tmp/taallab-third-party-licenses.json
