@@ -61,6 +61,9 @@ function markdownBlocks(markdown: string) {
 
 async function ensureSchema(env: Env) {
   const statements = [
+    "CREATE TABLE IF NOT EXISTS ocean_pages (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,parent_id TEXT,title TEXT NOT NULL DEFAULT 'Untitled',icon TEXT NOT NULL DEFAULT '',cover TEXT NOT NULL DEFAULT '',blocks_json TEXT NOT NULL DEFAULT '[]',is_favorite INTEGER NOT NULL DEFAULT 0,is_archived INTEGER NOT NULL DEFAULT 0,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS ocean_assets (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,page_id TEXT NOT NULL,storage_key TEXT NOT NULL UNIQUE,file_name TEXT NOT NULL,mime_type TEXT NOT NULL,size INTEGER NOT NULL,created_at INTEGER NOT NULL)",
+    "ALTER TABLE ocean_pages ADD COLUMN is_folder INTEGER NOT NULL DEFAULT 0",
     "CREATE TABLE IF NOT EXISTS ocean_integration_tokens (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,token_hash TEXT NOT NULL UNIQUE,token_prefix TEXT NOT NULL,label TEXT NOT NULL DEFAULT 'Obsidian plugin',created_at INTEGER NOT NULL,last_used_at INTEGER,revoked_at INTEGER)",
     "CREATE INDEX IF NOT EXISTS idx_ocean_integration_tokens_user ON ocean_integration_tokens(user_id,revoked_at)",
     "CREATE TABLE IF NOT EXISTS ocean_obsidian_attachments (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,external_id TEXT NOT NULL,content_hash TEXT NOT NULL,asset_id TEXT NOT NULL,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,deleted_at INTEGER,UNIQUE(user_id,external_id))",
