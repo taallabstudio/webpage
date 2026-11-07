@@ -560,6 +560,17 @@ async function streamProduct(req: Request, env: StoreEnv, token: string) {
   return new Response(response.body, { status: response.status === 206 ? 206 : 200, headers: out });
 }
 
+async function privacyExport(req: Request, env: StoreEnv) {
+  const user = await env.getCustomer?.(req);
+  if (!user) return json({ error: "Please sign in to download your account data." }, 401);
+  await ensureStoreSchema(env);
+  const [profile, orders] = await Promise.all([
+    env.DBStore.prepare("SELECT full_name,phone,address_line1,address_line2,city,state,pincode,country,updated_at FROM store_customer_profiles WHERE user_id=? LIMIT 1").bind(user.id).first(),
+    env.DBStore.prepare(`SELECT id,order_number,product_id,amount,currency,status,customer_email,customer_name,customer_phone,address_line1,address_line2,city,state,pincode,country,coupon_code,discount_amount,created_at,updated_at,paid_at,download_count,last_downloaded_at,terms_version,privacy_version,accepted_at FROM store_orders WHERE user_id=? OR lower(customer_email)=? ORDER BY created_at DESC`).bind(user.id, user.email.toLowerCase()).all(),
+  ]);
+  return json({ profile: profile || null, orders: orders.results || [] });
+}
+
 async function listPurchases(req: Request, env: StoreEnv) {
   const user = await env.getCustomer?.(req);
   if (!user) return json({ error: "Please log in to view purchases." }, 401);
@@ -600,6 +611,7 @@ export async function handleStoreRequest(req: Request, env: StoreEnv): Promise<R
     return new Response(JSON.stringify({ products }), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=20, s-maxage=60, stale-while-revalidate=120" } });
   }
   if (url.pathname === "/api/store/purchases" && req.method === "GET") return listPurchases(req, env);
+  if (url.pathname === "/api/store/privacy-export" && req.method === "GET") return privacyExport(req, env);
   if (url.pathname === "/api/store/purchases/download" && req.method === "POST") return purchaseDownload(req, env);
   if (url.pathname === "/api/store/customer-profile" && req.method === "GET") return customerProfile(req, env);
   if (url.pathname === "/api/store/customer-profile" && req.method === "PUT") return customerProfile(req, env, true);
