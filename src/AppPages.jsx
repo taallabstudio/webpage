@@ -501,6 +501,7 @@ function PrivacyRequestManager(){
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   const [saving,setSaving]=useState("");
+  const [notes,setNotes]=useState({});
   async function load(){
     setLoading(true);setError("");
     try{const d=await api("/admin/privacy-requests");setRequests(d.requests||[]);}
@@ -511,7 +512,7 @@ function PrivacyRequestManager(){
   async function changeStatus(request,status){
     setSaving(request.id);setError("");
     try{
-      await api(`/admin/privacy-requests/${request.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});
+      await api(`/admin/privacy-requests/${request.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status,resolutionNotes:notes[request.id]||""})});
       await load();
     }catch(e){setError(e.message||"Could not update the request.");}
     finally{setSaving("");}
@@ -521,7 +522,7 @@ function PrivacyRequestManager(){
     <div className="panel" style={{padding:20}}>
       <p className="muted">Only mark a deletion request completed after the account, connected content and applicable personal data have actually been handled. Preserve records that must legally remain, and document the reason.</p>
       {error&&<div className="error-box" role="alert">{error}</div>}
-      {loading?<div className="loading">Loading privacy requests…</div>:requests.length===0?<div className="empty-state"><ShieldCheck/><h3>No privacy requests</h3><p>New account deletion requests will appear here.</p></div>:<div className="table-wrap"><table><thead><tr><th>Account</th><th>Request</th><th>Details</th><th>Submitted</th><th>Status</th></tr></thead><tbody>{requests.map(r=><tr key={r.id}><td><strong>{r.email}</strong><small>{r.id}</small></td><td>{r.request_type}</td><td>{r.details||"—"}</td><td>{fmtDate(r.created_at)}</td><td><select aria-label={`Status for request ${r.id}`} value={r.status} disabled={saving===r.id} onChange={e=>changeStatus(r,e.target.value)}><option value="received">Received</option><option value="in_review">In review</option><option value="completed">Completed</option><option value="rejected">Rejected</option></select></td></tr>)}</tbody></table></div>}
+      {loading?<div className="loading">Loading privacy requests…</div>:requests.length===0?<div className="empty-state"><ShieldCheck/><h3>No privacy requests</h3><p>New account deletion requests will appear here.</p></div>:<div className="table-wrap"><table><thead><tr><th>Account</th><th>Request</th><th>Details</th><th>Submitted</th><th>Status</th></tr></thead><tbody>{requests.map(r=><tr key={r.id}><td><strong>{r.email}</strong><small>{r.id}</small></td><td>{r.request_type}</td><td>{r.details||"—"}{r.resolution_notes&&<small>Resolution: {r.resolution_notes}</small>}<input aria-label={`Resolution note for request ${r.id}`} placeholder="Resolution note (required to close)" value={notes[r.id]??r.resolution_notes??""} onChange={e=>setNotes(v=>({...v,[r.id]:e.target.value}))}/></td><td>{fmtDate(r.created_at)}</td><td><select aria-label={`Status for request ${r.id}`} value={r.status} disabled={saving===r.id} onChange={e=>changeStatus(r,e.target.value)}><option value="received">Received</option><option value="in_review">In review</option><option value="completed">Completed</option><option value="rejected">Rejected</option></select></td></tr>)}</tbody></table></div>}
     </div>
   </div>;
 }
