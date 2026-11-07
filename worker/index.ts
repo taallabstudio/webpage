@@ -1665,7 +1665,7 @@ async function cleanup(env: Env) {
   }
 
   await env.DB.batch([
-    env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted' AND NOT EXISTS (SELECT 1 FROM files WHERE files.transfer_id=transfers.id AND files.status='expired')").bind(cutoff),
+    env.DB.prepare("UPDATE transfers SET status=CASE WHEN EXISTS (SELECT 1 FROM files WHERE files.transfer_id=transfers.id AND files.status='expired') THEN 'expired' ELSE 'deleted' END WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM password_reset_tokens WHERE expires_at<=?").bind(cutoff),
