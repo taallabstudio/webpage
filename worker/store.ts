@@ -310,12 +310,14 @@ function cleanCustomer(body: any) {
     city: value("city", 80),
     state: value("state", 80),
     pincode: value("pincode", 12).replace(/\s/g, ""),
-    country: value("country", 80) || "India",
+    country: value("country", 80),
   };
-  if (customer.fullName.length < 2 || !/^\+?[0-9]{10,15}$/.test(customer.phone) ||
-      customer.addressLine1.length < 4 || !customer.city || !customer.state ||
-      !/^[A-Za-z0-9 -]{4,10}$/.test(customer.pincode) || !customer.country) {
-    throw new Error("Enter your name, valid phone number, full address, city, state and PIN/postal code.");
+  const hasBillingAddress = !!(customer.addressLine1 || customer.city || customer.state || customer.pincode || customer.addressLine2);
+  if (customer.fullName.length < 2 ||
+      (customer.phone && !/^\+?[0-9]{10,15}$/.test(customer.phone)) ||
+      (hasBillingAddress && (customer.addressLine1.length < 4 || !customer.city || !customer.state ||
+        !/^[A-Za-z0-9 -]{4,10}$/.test(customer.pincode) || !customer.country))) {
+    throw new Error("Enter a name and, if you provide a billing address, complete the address and postal code. Phone number is optional.");
   }
   return customer;
 }
