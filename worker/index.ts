@@ -35,8 +35,8 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const SETTINGS_REFRESH = "google_refresh_token";
 const SETTINGS_FOLDER = "google_drive_folder_id";
 const now = () => Math.floor(Date.now() / 1000);
-const TERMS_VERSION = "2026-11-07";
-const PRIVACY_VERSION = "2026-11-07.2";
+const TERMS_VERSION = "2026-11-07.1";
+const PRIVACY_VERSION = "2026-11-07.3";
 const POLICY_CONSENT_VERSION = TERMS_VERSION + ":" + PRIVACY_VERSION;
 
 async function recordPolicyAcceptance(env: Env, userId: string, method: string) {
