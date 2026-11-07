@@ -2015,14 +2015,17 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
     const response = await fetch("https://api.unsplash.com/search/photos?"+params.toString(), {headers:{"Authorization":"Client-ID "+env.UNSPLASH_ACCESS_KEY,"Accept-Version":"v1"}});
     const data:any = await response.json().catch(()=>({}));
     if (!response.ok) return json({error:data.errors?.[0] || "Unsplash search failed."},{status:response.status});
-    return json({total:data.total||0,results:(data.results||[]).map((photo:any)=>({id:photo.id,description:photo.alt_description||photo.description||"Unsplash photo",url:photo.urls?.regular||photo.urls?.small||"",thumb:photo.urls?.small||photo.urls?.thumb||"",photographer:photo.user?.name||"Unsplash photographer",photographer_url:photo.user?.links?.html||"https://unsplash.com",unsplash_url:photo.links?.html||"https://unsplash.com"}))});
+    return json({total:data.total||0,results:(data.results||[]).map((photo:any)=>({id:photo.id,description:photo.alt_description||photo.description||"Unsplash photo",url:photo.urls?.regular||photo.urls?.small||"",thumb:photo.urls?.small||photo.urls?.thumb||"",photographer:photo.user?.name||"Unsplash photographer",photographer_url:photo.user?.links?.html||"https://unsplash.com",unsplash_url:photo.links?.html||"https://unsplash.com",download_location:photo.links?.download_location||""}))});
   }
   if (pathname === "/api/ocean/unsplash/track" && req.method === "POST") {
     if (!env.UNSPLASH_ACCESS_KEY) return json({error:"Unsplash is not configured on this Worker."},{status:503});
     const body:any=await req.json().catch(()=>({}));
     const photoId=String(body.photo_id||"").trim();
-    if(!/^[a-zA-Z0-9_-]{5,80}$/.test(photoId))return json({error:"Invalid Unsplash photo."},{status:400});
-    const response=await fetch("https://api.unsplash.com/photos/"+encodeURIComponent(photoId)+"/download",{headers:{"Authorization":"Client-ID "+env.UNSPLASH_ACCESS_KEY,"Accept-Version":"v1"}});
+    const downloadLocation=String(body.download_location||"");
+    let downloadUrl:URL;
+    try{downloadUrl=new URL(downloadLocation);}catch{return json({error:"Invalid Unsplash download location."},{status:400});}
+    if(!/^[a-zA-Z0-9_-]{5,80}$/.test(photoId)||downloadUrl.origin!=="https://api.unsplash.com"||downloadUrl.pathname!=="/photos/"+photoId+"/download")return json({error:"Invalid Unsplash photo or download location."},{status:400});
+    const response=await fetch(downloadUrl.toString(),{headers:{"Authorization":"Client-ID "+env.UNSPLASH_ACCESS_KEY,"Accept-Version":"v1"}});
     if(!response.ok)return json({error:"Unsplash download tracking failed."},{status:response.status});
     return json({ok:true});
   }
