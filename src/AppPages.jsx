@@ -1095,6 +1095,51 @@ function PurchasedProducts() {
     {error && purchases.length > 0 && <p className="error-text">{error}</p>}
   </section>;
 }
+function DateOfBirthOnboarding({user,onComplete}) {
+  const [dateOfBirth,setDateOfBirth]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const [minor,setMinor]=useState(user?.account_type==="child" || user?.parental_consent_status==="pending");
+  const [saved,setSaved]=useState(Boolean(user?.date_of_birth));
+  async function submit(event) {
+    event.preventDefault();
+    if(!dateOfBirth || busy) return;
+    setBusy(true);setError("");
+    try {
+      const result=await api("/account/date-of-birth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dateOfBirth})});
+      setSaved(true);
+      const isChild=result.accountType==="child";
+      setMinor(isChild);
+      if(!isChild) onComplete?.(result.user);
+    } catch(e) { setError(e.message||"Could not save your date of birth."); }
+    finally { setBusy(false); }
+  }
+  async function signOut(){try{await api("/auth/logout",{method:"POST"})}catch{}location.href="/login";}
+  if(minor) return <div className="login-page"><section className="login-card" role="status">
+    <Logo/><div className="login-icon"><ShieldCheck/></div>
+    <h1>Parent or guardian setup needed</h1>
+    <p>Your date of birth indicates that you are under 18. Before you can use account features, a parent or guardian must create or link their adult account and complete the consent process.</p>
+    <div className="success-pill">Your account is waiting for parent or guardian setup. Purchases and payments are disabled.</div>
+    <p style={{fontSize:12,color:"var(--muted)"}}>We have saved your date of birth so we can continue this setup. You can sign out safely.</p>
+    <button className="primary-btn full" onClick={signOut}>Sign out</button>
+  </section></div>;
+  if(saved) return null;
+  const today=new Date().toISOString().slice(0,10);
+  return <div className="login-page"><section className="login-card">
+    <Logo/><div className="login-icon"><ShieldCheck/></div>
+    <h1>Before you continue</h1>
+    <p>Your email is verified. Please enter your date of birth to finish setting up your TaalLab account.</p>
+    <form onSubmit={submit}>
+      <label htmlFor="taal-date-of-birth">Date of birth</label>
+      <input id="taal-date-of-birth" type="date" value={dateOfBirth} onChange={e=>setDateOfBirth(e.target.value)} min="1900-01-01" max={today} required/>
+      <p style={{fontSize:12,color:"var(--muted)",lineHeight:1.6}}>We use this to determine whether your account needs parent or guardian involvement. It is requested only after your email address has been verified.</p>
+      {error&&<div className="error-box">{error}</div>}
+      <button className="primary-btn full" disabled={!dateOfBirth||busy}>{busy?"Saving…":"Continue"}</button>
+    </form>
+    <button className="ghost-btn full" style={{marginTop:12}} onClick={signOut}>Sign out</button>
+  </section></div>;
+}
+
 function AccountPage() {
   const [user,setUser]=useState(null);
   const [checking,setChecking]=useState(true);
@@ -1106,6 +1151,8 @@ function AccountPage() {
   useEffect(()=>{refreshUser()},[]);
   if(checking)return <div className="loading"><RefreshCw className="spin"/> Checking your account…</div>;
   if(!user)return <Login onLogin={refreshUser}/>;
+  if(user.role!=="admin" && !user.date_of_birth) return <DateOfBirthOnboarding user={user} onComplete={refreshUser}/>;
+  if(user.account_type==="child" || user.parental_consent_status==="pending") return <DateOfBirthOnboarding user={user} onComplete={refreshUser}/>;
   return <div className="account-page-shell">
     <header className="account-page-header"><a href="/" className="account-home-link"><Logo studioOnly/></a><SiteAccountMenu user={user} onLogout={async()=>{try{await api("/auth/logout",{method:"POST"})}catch{}setUser(null);location.href="/login"}}/></header>
     <div className="account-content-column"><AccountSettings user={user} onPasswordChanged={refreshUser}/><PurchasedProducts/></div>
@@ -1118,6 +1165,8 @@ function UserDashboard(){
   useEffect(()=>{api("/auth/me").then(d=>{if(!d.authenticated){setUser(null);return}if(d.user?.role==="admin"){location.replace("/admin");return}setUser(d.user)}).catch(()=>setUser(null)).finally(()=>setChecking(false))},[]);
   if(checking)return <div className="loading"><RefreshCw className="spin"/> Checking your account…</div>;
   if(!user)return <Login/>;
+  if(user.role!=="admin" && !user.date_of_birth) return <DateOfBirthOnboarding user={user} onComplete={()=>api("/auth/me").then(d=>setUser(d.authenticated?d.user:null)).catch(()=>setUser(null))}/>;
+  if(user.account_type==="child" || user.parental_consent_status==="pending") return <DateOfBirthOnboarding user={user}/>;
   return <UserPortal user={user}/>;
 }
 
