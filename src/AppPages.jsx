@@ -668,6 +668,25 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
 
   const [driveConnected,setDriveConnected]=useState(null);
   const [driveError,setDriveError]=useState("");
+  useEffect(()=>{api("/account/privacy/preferences").then(d=>setMarketingConsent(!!d.marketingConsent)).catch(e=>setPrivacyError(e.message));},[user?.id]);
+
+  async function exportPersonalData(){
+    setPrivacyBusy(true);setPrivacyError("");setPrivacyMessage("");
+    try{const response=await fetch("/api/account/privacy/export",{credentials:"include",cache:"no-store"});if(!response.ok){const d=await response.json().catch(()=>({}));throw new Error(d.error||"Could not export your information.");}const blob=await response.blob();const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="taallab-personal-data.json";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);setPrivacyMessage("Your personal-data export has been downloaded.");}
+    catch(e){setPrivacyError(e.message||"Could not export your information.");}finally{setPrivacyBusy(false);}
+  }
+  async function saveMarketingPreference(next){
+    setMarketingSaving(true);setPrivacyError("");setPrivacyMessage("");
+    try{const d=await api("/account/privacy/preferences",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({marketingConsent:next})});setMarketingConsent(!!d.marketingConsent);setPrivacyMessage(next?"Optional marketing email preference saved.":"Marketing email preference withdrawn.");}
+    catch(e){setPrivacyError(e.message);}finally{setMarketingSaving(false);}
+  }
+  async function requestDataDeletion(){
+    if(!window.confirm("Submit a request to delete your TaalLab account and associated personal data? Some payment or legal records may need to be retained."))return;
+    setPrivacyBusy(true);setPrivacyError("");setPrivacyMessage("");
+    try{const d=await api("/account/privacy/deletion-request",{method:"POST"});setPrivacyMessage("Your deletion request has been submitted. Reference: "+d.requestId+". TaalLab will contact you if verification is needed.");}
+    catch(e){setPrivacyError(e.message);}finally{setPrivacyBusy(false);}
+  }
+
   useEffect(()=>{
     if(!showGoogleDrive) return;
     api("/google/status").then(d=>setDriveConnected(!!d.connected)).catch(e=>{setDriveConnected(false);setDriveError(e.message)});
@@ -678,6 +697,11 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [profileSaving,setProfileSaving]=useState(false);
   const [profileError,setProfileError]=useState("");
   const [profileMessage,setProfileMessage]=useState("");
+  const [privacyBusy,setPrivacyBusy]=useState(false);
+  const [privacyMessage,setPrivacyMessage]=useState("");
+  const [privacyError,setPrivacyError]=useState("");
+  const [marketingConsent,setMarketingConsent]=useState(false);
+  const [marketingSaving,setMarketingSaving]=useState(false);
   useEffect(()=>{setDisplayName(user?.display_name || user?.email?.split("@")[0] || "");setAvatarData(user?.avatar_data || "")},[user?.id,user?.display_name,user?.avatar_data]);
 
   async function chooseAvatar(file) {
@@ -725,6 +749,25 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
       </form>
     </section>
     <SecurityMethods user={user}/>
+    <section className="panel" style={{maxWidth:720,padding:24,marginTop:18}}>
+      <span className="eyebrow">PRIVACY &amp; DATA</span><h2>Your information</h2>
+      <p className="muted">You can download a copy of the account, transfer, consent and purchase information associated with your TaalLab account, or submit a request for account and personal-data deletion.</p>
+      <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:16}}>
+        <button type="button" className="ghost-btn" onClick={exportPersonalData} disabled={privacyBusy}>{privacyBusy?"Please wait…":"Download my data"}</button>
+        <button type="button" className="ghost-btn" onClick={requestDataDeletion} disabled={privacyBusy}>Request account deletion</button>
+      </div>
+      <div style={{borderTop:"1px solid var(--line,#333)",marginTop:20,paddingTop:18}}>
+        <h3 style={{margin:"0 0 8px"}}>Optional email updates</h3>
+        <label className="consent-line" style={{display:"flex",alignItems:"flex-start",gap:10}}>
+          <input type="checkbox" checked={marketingConsent} disabled={marketingSaving} onChange={e=>saveMarketingPreference(e.target.checked)}/>
+          <span>I'd like to receive occasional product and studio updates by email. This is optional and can be switched off at any time.</span>
+        </label>
+      </div>
+      {privacyError&&<div className="error-box" style={{marginTop:14}}>{privacyError}</div>}
+      {privacyMessage&&<div className="success-pill" style={{marginTop:14}}>{privacyMessage}</div>}
+      <p className="muted" style={{fontSize:12,marginTop:16}}>Deletion requests are reviewed before processing. Certain transaction, tax, fraud-prevention or security records may need to be retained where required by law.</p>
+    </section>
+
     <section className="panel" style={{maxWidth:620,padding:24,marginTop:18}}><h2>Change password</h2><form onSubmit={change}>
       <label>Current password<input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} required/></label>
       <label>New password<input type="password" minLength={8} value={newPassword} onChange={e=>setNewPassword(e.target.value)} required/></label>
