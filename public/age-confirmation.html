@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Age confirmation | TAAL LAB</title>
+  <style>
+    :root{color-scheme:light;--ink:#1d2229;--muted:#5e6874;--line:#e1e6eb;--blue:#006bc4}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#f4f6f8;color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
+    main{width:min(520px,100%);padding:34px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 16px 48px rgba(30,50,70,.08)}
+    h1{font-size:28px;line-height:1.15;letter-spacing:-.04em;margin:0 0 12px}p{color:var(--muted)}
+    label{display:flex;gap:12px;align-items:flex-start;margin:22px 0;font-weight:600}
+    input{width:18px;height:18px;margin:3px 0 0;accent-color:var(--blue)}
+    button{min-height:44px;padding:0 18px;border:0;border-radius:9px;background:#006bc4;color:#fff;font:700 13px system-ui;cursor:pointer}
+    button:disabled{opacity:.55;cursor:not-allowed}a{color:var(--blue)}:focus-visible{outline:3px solid #0068cc;outline-offset:3px}
+    #message{margin-top:14px;min-height:24px}
+  </style>
+  <script src="/privacy-controls.js" defer></script>
+</head>
+<body>
+  <main>
+    <p><strong>TAAL LAB · AGE RESTRICTION</strong></p>
+    <h1>Before you continue</h1>
+    <p>Taal Lab accounts, public pages and file transfers are intended for adults aged 18 and over. We do not offer this service to people under 18 and do not ask for your date of birth.</p>
+    <label><input id="age-confirm" type="checkbox"><span>I confirm that I am at least 18 years old.</span></label>
+    <button id="continue" type="button" disabled>Continue</button>
+    <p id="message" role="status" aria-live="polite"></p>
+    <p><a href="/terms.html">Terms of Service</a> · <a href="/privacy.html">Privacy Policy</a></p>
+  </main>
+  <script>
+    const checkbox=document.getElementById("age-confirm");
+    const button=document.getElementById("continue");
+    const message=document.getElementById("message");
+    const rawReturn=new URLSearchParams(location.search).get("return")||"/";
+    const safeReturn=/^\/(?:f\/[A-Za-z0-9_-]+|p\/[A-Fa-f0-9]+|api\/files\/[A-Za-z0-9_-]+\/preview)$/.test(rawReturn)?rawReturn:"/";
+    checkbox.addEventListener("change",()=>{button.disabled=!checkbox.checked;});
+    button.addEventListener("click",async()=>{
+      if(!checkbox.checked)return;
+      button.disabled=true;message.textContent="Confirming…";
+      try{
+        const response=await fetch("/api/age/confirm",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({ageConfirmed:true})});
+        const result=await response.json().catch(()=>({}));
+        if(!response.ok)throw new Error(result.error||"Could not confirm your age.");
+        location.replace(safeReturn);
+      }catch(error){message.textContent=error.message||"Could not confirm your age.";button.disabled=false;}
+    });
+  </script>
+</body>
+</html>
