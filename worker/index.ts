@@ -884,7 +884,7 @@ async function checkTutorialAccess(req: Request, env: Env) {
 }
 
 async function exportAccountData(req: Request, env: Env) {
-  const user = await requireUser(req, env);
+  const user = await requireUser(req, env, { allowPendingAge: true });
   await ensureOceanSchema(env);
   const [identity, googleIdentity, acceptances, privacyRequests, transfers, files, pages, shares, pageCollaborators, comments, assets, calendar, passkeys, authenticator, recovery, store, parentLinks, parentInvites, consentRecords, consentEvents, permissionEvents] = await Promise.all([
     env.DB.prepare("SELECT id,email,role,created_at,updated_at,email_verified_at,display_name,avatar_data,two_factor_enabled,date_of_birth,account_type,parental_consent_status,parent_user_id FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
@@ -953,7 +953,7 @@ async function exportAccountData(req: Request, env: Env) {
 }
 
 async function createPrivacyRequest(req: Request, env: Env) {
-  const user = await requireUser(req, env);
+  const user = await requireUser(req, env, { allowPendingAge: true });
   const body = await req.json().catch(() => ({}));
   const type = String(body.type || "");
   if (type !== "deletion" && type !== "correction") return json({ error: "Choose a valid privacy request type." }, { status: 400 });
@@ -984,7 +984,7 @@ async function listPrivacyRequests(env: Env) {
 }
 
 async function listOwnPrivacyRequests(req: Request, env: Env) {
-  const user = await requireUser(req, env);
+  const user = await requireUser(req, env, { allowPendingAge: true });
   const rows = await env.DB.prepare("SELECT id,request_type,status,created_at,resolved_at FROM privacy_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 20")
     .bind(user.id).all();
   return json({ requests: rows.results || [] });
