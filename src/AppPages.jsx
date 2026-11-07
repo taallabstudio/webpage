@@ -173,6 +173,7 @@ function Login({onLogin}) {
   const [error,setError]=useState(loginParams.get("google_error")||"");
   const [notice,setNotice]=useState(loginParams.get("verified")==="1" ? "Email verified. You can sign in now." : "");
   const [signup,setSignup]=useState(false);
+  const [acceptTerms,setAcceptTerms]=useState(false);
   const [twoFactor,setTwoFactor]=useState(loginParams.get("google_2fa")==="1");
   const [twoFactorMethod,setTwoFactorMethod]=useState(loginParams.get("method")||"email");
   const [passkeyBusy,setPasskeyBusy]=useState(false);
@@ -190,6 +191,13 @@ function Login({onLogin}) {
     const next=new URLSearchParams(location.search).get("next")||"";
     if(next.startsWith("/checkout.html")&&!next.startsWith("//")) { location.assign(next); return; }
     api("/auth/me").then(result => location.assign(result.user?.role === "admin" ? "/admin" : location.pathname === "/account/settings" ? "/account/settings" : "/account")).catch(() => location.assign("/account"));
+  }
+
+  function signInWithGoogle(){
+    if(!acceptTerms){setError("Please accept the Terms of Service and Privacy Policy before continuing with Google.");return;}
+    const url=new URL("/api/auth/google/start",location.origin);
+    url.searchParams.set("accept_terms","1");
+    location.assign(url.toString());
   }
 
   async function signInWithPasskey(){
@@ -263,10 +271,11 @@ function Login({onLogin}) {
         return;
       }
 
+      if(signup&&!acceptTerms){setError("Please accept the Terms of Service and Privacy Policy before creating an account.");return;}
       const result=await api(signup?"/auth/signup":"/auth/login",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({email,password})
+        body:JSON.stringify({email,password,acceptTerms})
       });
 
       if (result.requiresTwoFactor) {
@@ -403,7 +412,8 @@ function Login({onLogin}) {
     <h1>{signup?"Create account":"Sign in"}</h1>
     <p>{signup?"Create your TaalLab account to receive files shared with you.":"Manage TaalLab transfers securely."}</p>
     {!signup&&<button type="button" className="ghost-btn full" style={{marginBottom:12}} onClick={signInWithPasskey} disabled={passkeyBusy}><ShieldCheck size={17}/>{passkeyBusy?"Waiting for passkey…":"Sign in with a passkey"}</button>}
-    <button type="button" className="google-login-btn" onClick={()=>window.location.assign("/api/auth/google/start")}>
+    <label className="policy-consent" style={{display:"flex",alignItems:"flex-start",gap:10,margin:"12px 0",fontSize:13,lineHeight:1.5,color:"var(--muted,#707782)"}}><input type="checkbox" checked={acceptTerms} onChange={e=>setAcceptTerms(e.target.checked)} style={{marginTop:3}}/><span>I agree to the <a href="/terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a> and acknowledge the <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>. Required for new accounts and Google sign-in.</span></label>
+    <button type="button" className="google-login-btn" onClick={signInWithGoogle}>
       <svg aria-hidden="true" viewBox="0 0 48 48" width="20" height="20"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z" transform="translate(0 4) scale(.92)"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.72 7.18l7.62 5.91c4.45-4.11 7.14-10.17 7.14-17.56Z"/><path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.2A23.9 23.9 0 0 0 0 24c0 3.87.93 7.53 2.56 10.78l7.97-6.19Z" transform="translate(0 2) scale(1)"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.89l-7.62-5.91c-2.12 1.42-4.84 2.26-8.28 2.26-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.2C6.51 42.62 14.62 48 24 48Z" transform="translate(0 -1) scale(.98)"/></svg>
       <span>Continue with Google</span>
     </button>
@@ -419,7 +429,7 @@ function Login({onLogin}) {
     {verificationRequired && <button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendVerification}>
       {resendCooldown>0?`Resend verification in ${resendCooldown}s`:"Resend verification email"}
     </button>}
-    <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSignup(v=>!v);setError("");setNotice("");setVerificationRequired(false);}}>
+    <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSignup(v=>!v);setAcceptTerms(false);setError("");setNotice("");setVerificationRequired(false);}}>
       {signup?"Back to sign in":"Sign up"}
     </button>
   </div></div>;
