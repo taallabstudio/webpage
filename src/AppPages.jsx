@@ -151,8 +151,26 @@ function TransferPage({id}) {
 }
 
 function Preview({file,onClose}) {
+  const modalRef=useRef(null);
+  useEffect(()=>{
+    const modal=modalRef.current;
+    if(!modal)return;
+    const previous=document.activeElement;
+    modal.focus();
+    function onKeyDown(event){
+      if(event.key==="Escape"){event.preventDefault();onClose();return;}
+      if(event.key!=="Tab")return;
+      const focusable=[...modal.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')];
+      if(!focusable.length){event.preventDefault();modal.focus();return;}
+      const first=focusable[0],last=focusable[focusable.length-1];
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    }
+    modal.addEventListener("keydown",onKeyDown);
+    return ()=>{modal.removeEventListener("keydown",onKeyDown);if(previous instanceof HTMLElement)previous.focus();};
+  },[onClose]);
   return <div className="modal-backdrop" onClick={onClose}>
-    <div className="preview-modal" role="dialog" aria-modal="true" aria-label={"Preview "+file.name} onClick={e=>e.stopPropagation()}>
+    <div ref={modalRef} tabIndex={-1} className="preview-modal" role="dialog" aria-modal="true" aria-label={"Preview "+file.name} onClick={e=>e.stopPropagation()}>
       <div className="modal-head"><strong>{file.name}</strong><button type="button" aria-label="Close preview" onClick={onClose}><X/></button></div>
       {file.kind === "audio" ? <audio controls autoPlay src={`/api/files/${file.token}/preview`}/> :
        file.kind === "image" ? <img src={`/api/files/${file.token}/preview`} alt={file.name+" preview"} /> :
