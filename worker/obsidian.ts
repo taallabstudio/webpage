@@ -222,9 +222,18 @@ export async function handleObsidianIntegration(req: Request, env: Env, getSessi
   if (path === "/api/integrations/obsidian/manifest" && req.method === "GET") {
     const notes = await env.DB.prepare("SELECT external_id AS externalId,content_hash AS contentHash,updated_at AS updatedAt FROM ocean_pages WHERE user_id=? AND source='obsidian' AND external_id IS NOT NULL AND external_id NOT LIKE '@folder/%' AND deleted_at IS NULL").bind(user.id).all();
     const attachments = await env.DB.prepare("SELECT external_id AS externalId,content_hash AS contentHash,updated_at AS updatedAt FROM ocean_obsidian_attachments WHERE user_id=? AND deleted_at IS NULL").bind(user.id).all();
-    return json({ notes: notes.results || [], attachments: attachments.results || [] });
+    const folders = await env.DB.prepare("SELECT external_id AS externalId,updated_at AS updatedAt FROM ocean_pages WHERE user_id=? AND source='obsidian' AND is_folder=1 AND external_id LIKE '@folder/Obsidian/%' AND deleted_at IS NULL").bind(user.id).all();
+    return json({ notes: notes.results || [], attachments: attachments.results || [], folders: folders.results || [] });
   }
   if (path === "/api/integrations/obsidian/folders" && req.method === "PUT") return syncFolder(req, env, user);
+  if (path === "/api/integrations/obsidian/folders" && req.method === "DELETE") {
+    const externalId = url.searchParams.get("externalId") || "";
+    let folderPath = "Obsidian";
+    try { if (externalId) folderPath += "/" + safePath(externalId); } catch (error: any) { return json({ error: error.message }, 400); }
+    const timestamp = now();
+    await env.DB.prepare("UPDATE ocean_pages SET deleted_at=?,is_archived=1,updated_at=? WHERE user_id=? AND source='obsidian' AND external_id=?").bind(timestamp,timestamp,user.id,"@folder/"+folderPath).run();
+    return json({ok:true});
+  }
   if (path === "/api/integrations/obsidian/notes" && req.method === "PUT") return syncNote(req, env, user);
   if (path === "/api/integrations/obsidian/notes" && req.method === "DELETE") return deleteNote(req, env, user);
   if (path === "/api/integrations/obsidian/attachments" && req.method === "PUT") return uploadAttachment(req, env, user);
