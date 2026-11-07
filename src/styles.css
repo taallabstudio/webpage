@@ -1597,3 +1597,23 @@ button.button-click-feedback{
   .email-code-boxes{gap:7px}
   .email-code-input{height:50px;font-size:22px;border-radius:10px}
 }
+
+/* Legal-policy consent */
+.policy-consent{
+  display:flex!important;
+  align-items:flex-start;
+  gap:10px;
+  margin:14px 0!important;
+  color:var(--ink,#1d2229);
+  font-size:13px;
+  line-height:1.55;
+}
+.policy-consent input[type="checkbox"]{
+  flex:0 0 auto;
+  width:17px;
+  height:17px;
+  margin:2px 0 0;
+  accent-color:#0878e8;
+}
+.policy-consent a{color:#075fb8;text-decoration:underline;text-underline-offset:2px}
+.policy-consent:focus-within{outline:2px solid #0878e8;outline-offset:4px;border-radius:4px}
