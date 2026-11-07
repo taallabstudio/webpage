@@ -176,8 +176,13 @@ async function ensureSupportSchema(env: Env) {
     token_hash TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL
+    expires_at INTEGER NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0
   )`).run();
+  const verificationColumns: any = await env.DB.prepare("PRAGMA table_info(email_verification_tokens)").all();
+  if (!(verificationColumns.results || []).some((col: any) => col.name === "attempts")) {
+    await env.DB.prepare("ALTER TABLE email_verification_tokens ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0").run();
+  }
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_email_verification_user ON email_verification_tokens(user_id)").run();
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS password_reset_tokens (
     token_hash TEXT PRIMARY KEY,
@@ -257,40 +262,15 @@ async function sendAuthEmail(env: Env, to: string, subject: string, html: string
 }
 
 async function createEmailVerification(env: Env, user: any) {
-  const recent: any = await env.DB.prepare(
-    "SELECT created_at FROM email_verification_tokens WHERE user_id=? ORDER BY created_at DESC LIMIT 1"
-  ).bind(user.id).first();
-  if (recent && now() - Number(recent.created_at) < 60) {
-    return { sent: false, rateLimited: true, retryAfter: 60 - (now() - Number(recent.created_at)) };
-  }
-
+  const recent: any = await env.DB.prepare("SELECT created_at FROM email_verification_tokens WHERE user_id=? ORDER BY created_at DESC LIMIT 1").bind(user.id).first();
+  if (recent && now() - Number(recent.created_at) < 60) return { sent:false, rateLimited:true, retryAfter:60-(now()-Number(recent.created_at)) };
   await env.DB.prepare("DELETE FROM email_verification_tokens WHERE user_id=?").bind(user.id).run();
-  const token = randomToken(32);
-  const tokenHash = await hashText(token);
-  const createdAt = now();
-  await env.DB.prepare(
-    "INSERT INTO email_verification_tokens(token_hash,user_id,created_at,expires_at) VALUES(?,?,?,?)"
-  ).bind(tokenHash, user.id, createdAt, createdAt + 86400).run();
-
-  const link = `${origin(env)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
-  const safeEmail = String(user.email).replace(/[&<>"]/g, (x) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" } as any)[x]);
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033">
-      <h2>Verify your TaalLab email</h2>
-      <p>Confirm that <strong>${safeEmail}</strong> belongs to you so you can access TaalLab.</p>
-      <p style="margin:28px 0"><a href="${link}" style="display:inline-block;background:#147ce5;color:white;text-decoration:none;padding:13px 20px;border-radius:8px;font-weight:600">Verify email address</a></p>
-      <p style="font-size:13px;color:#687080">This verification link expires in 24 hours.</p>
-      <p style="font-size:13px;color:#687080">If you did not create this account, you can ignore this email.</p>
-      <p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.work</p>
-    </div>`;
-  const text = `Verify your TaalLab email: ${link}
-
-This link expires in 24 hours.
-If you did not create this account, you can ignore this email.
-
-TaalLab
-contact@taallab.work`;
-  return sendAuthEmail(env, user.email, "Verify your TaalLab email", html, text, `verify-email:${user.id}:${createdAt}`);
+  const code=randomCode(), tokenHash=await hashText(code), createdAt=now();
+  await env.DB.prepare("INSERT INTO email_verification_tokens(token_hash,user_id,created_at,expires_at,attempts) VALUES(?,?,?,?,0)").bind(tokenHash,user.id,createdAt,createdAt+600).run();
+  const safeEmail=String(user.email).replace(/[&<>"]/g,(x)=>( {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"} as any)[x]);
+  const html=`<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033"><h2>Verify your TaalLab email</h2><p>Enter this code to confirm that <strong>${safeEmail}</strong> belongs to you:</p><div style="font-size:32px;font-weight:700;letter-spacing:8px;margin:24px 0">${code}</div><p style="font-size:13px;color:#687080">This code expires in 10 minutes and can only be used up to five times.</p><p style="font-size:13px;color:#687080">If you did not create this account, ignore this email.</p><p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.work</p></div>`;
+  const text=`Your TaalLab email verification code is: ${code}\n\nThis code expires in 10 minutes and can only be used up to five times.\nIf you did not create this account, ignore this email.\n\nTaalLab\ncontact@taallab.work`;
+  return sendAuthEmail(env,user.email,"Verify your TaalLab email",html,text,`verify-email:${user.id}:${createdAt}`);
 }
 
 async function sendTwoFactorCode(env: Env, user: any, challengeId: string, code: string) {
@@ -543,6 +523,25 @@ async function resendVerification(req: Request, env: Env) {
   if (result.rateLimited) return json({ error: "Please wait before requesting another verification email.", retryAfter: result.retryAfter }, { status: 429 });
   if (!result.sent) return json({ error: "We could not send the verification email. Please try again." }, { status: 502 });
   return json({ ok: true });
+}
+
+async function verifyEmailCode(req: Request, env: Env) {
+  const body=await req.json().catch(()=>({}));
+  const email=normalizeEmail(body.email), code=String(body.code||"").trim();
+  if(!email||!/^\d{6}$/.test(code))return json({error:"Enter the six-digit verification code."},{status:400});
+  const user: any=await env.DB.prepare("SELECT id,email_verified_at,status FROM users WHERE email=? LIMIT 1").bind(email).first();
+  if(!user||user.status!=="active")return json({error:"That verification code is invalid or has expired."},{status:400});
+  if(user.email_verified_at)return json({ok:true,alreadyVerified:true});
+  const row: any=await env.DB.prepare("SELECT token_hash,expires_at,attempts FROM email_verification_tokens WHERE user_id=? LIMIT 1").bind(user.id).first();
+  if(!row||Number(row.expires_at)<=now()||Number(row.attempts)>=5){if(row)await env.DB.prepare("DELETE FROM email_verification_tokens WHERE user_id=?").bind(user.id).run();return json({error:"That verification code has expired. Request a new code."},{status:410});}
+  const attempts=Number(row.attempts||0)+1;
+  if(await hashText(code)!==String(row.token_hash)){
+    if(attempts>=5){await env.DB.prepare("DELETE FROM email_verification_tokens WHERE user_id=?").bind(user.id).run();return json({error:"Too many incorrect codes. Request a new verification code."},{status:429});}
+    await env.DB.prepare("UPDATE email_verification_tokens SET attempts=? WHERE user_id=?").bind(attempts,user.id).run();
+    return json({error:"That code is incorrect. Please try again.",attemptsRemaining:5-attempts},{status:400});
+  }
+  await env.DB.batch([env.DB.prepare("UPDATE users SET email_verified_at=?,updated_at=? WHERE id=?").bind(now(),now(),user.id),env.DB.prepare("DELETE FROM email_verification_tokens WHERE user_id=?").bind(user.id)]);
+  return json({ok:true});
 }
 
 async function verifyEmail(req: Request, env: Env) {
@@ -2209,6 +2208,7 @@ export default {
       if (url.pathname === "/api/auth/2fa/verify" && req.method === "POST") return verifyTwoFactor(req, env);
       if (url.pathname === "/api/auth/2fa/resend" && req.method === "POST") return resendTwoFactor(req, env);
       if (url.pathname === "/api/auth/resend-verification" && req.method === "POST") return resendVerification(req, env);
+      if (url.pathname === "/api/auth/verify-email-code" && req.method === "POST") return verifyEmailCode(req, env);
       if (url.pathname === "/api/auth/verify-email" && req.method === "GET") return verifyEmail(req, env);
       if ((url.pathname === "/api/auth/login" || url.pathname === "/api/admin/login") && req.method === "POST") return authLogin(req, env);
       if ((url.pathname === "/api/auth/logout" || url.pathname === "/api/admin/logout") && req.method === "POST") return authLogout(req, env);
