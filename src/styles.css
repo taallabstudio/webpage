@@ -1614,7 +1614,7 @@ button.button-click-feedback{
 
 
 /* WCAG AA contrast corrections for secondary text on light surfaces. */
-:where(small,.muted,.eyebrow,.section-kicker,.section-heading>p,.studio-copy>p,.booking-intro>p,.booking-detail small,.booking-form label span,.booking-note,.contact-grid span,.stat-card span,.table-wrap th,.table-wrap td small,.message-box small,.expired p,.login-card>p,.dropzone p,.upload-file small,.created-file small,.detail-file small,.service-card p,.hero-copy>p,.hero-note){color:#5f6974!important}
+:where(.landing,.site-section,.contact-section,.admin-layout,.admin-content,.login-page,.created-card,.expired,.message-panel,.upload-grid) :where(small,.muted,.eyebrow,.section-kicker,.section-heading>p,.studio-copy>p,.booking-intro>p,.booking-detail small,.booking-form label span,.booking-note,.contact-grid span,.stat-card span,.table-wrap th,.table-wrap td small,.message-box small,.expired p,.login-card>p,.dropzone p,.upload-file small,.created-file small,.detail-file small,.service-card p,.hero-copy>p,.hero-note){color:#5f6974!important}
 .status.active{color:#1f6a3d!important}
 .status.expired{color:#80500f!important}
 .status.deleted{color:#555e68!important}
