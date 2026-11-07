@@ -178,6 +178,8 @@ function Login({onLogin}) {
   const [passkeyBusy,setPasskeyBusy]=useState(false);
   const [resendCooldown,setResendCooldown]=useState(0);
   const [verificationRequired,setVerificationRequired]=useState(false);
+  const [emailVerificationCode,setEmailVerificationCode]=useState("");
+  const [emailVerificationBusy,setEmailVerificationBusy]=useState(false);
   const [forgotMode,setForgotMode]=useState(false);
   const [resetMode,setResetMode]=useState(location.pathname === "/reset-password");
   const [resetToken,setResetToken]=useState(loginParams.get("token")||"");
@@ -302,6 +304,20 @@ function Login({onLogin}) {
     }
   }
 
+  async function verifyEmailCode(value=emailVerificationCode){
+    const submittedCode=String(value||"").replace(/\D/g,"").slice(0,6);
+    if(submittedCode.length!==6||emailVerificationBusy)return;
+    setEmailVerificationBusy(true);setError("");
+    try{
+      await api("/auth/verify-email-code",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,code:submittedCode})});
+      setEmailVerificationCode("");location.assign("/login?verified=1");
+    }catch(e){setError(e.message||"That verification code is invalid or has expired.");setEmailVerificationCode("");codeInputs.current[0]?.focus();}
+    finally{setEmailVerificationBusy(false);}
+  }
+  useEffect(()=>{
+    if(verificationRequired&&/^\d{6}$/.test(emailVerificationCode)&&!emailVerificationBusy)verifyEmailCode(emailVerificationCode);
+  },[emailVerificationCode,verificationRequired]);
+
   async function resendVerification(){
     setError("");
     try {
@@ -331,6 +347,27 @@ function Login({onLogin}) {
     </form>
     {twoFactorMethod==="email"&&<button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendCode}>{resendCooldown>0?`Resend code in ${resendCooldown}s`:"Resend code"}</button>}
     <button className="ghost-btn full" style={{marginTop:8}} onClick={()=>{setTwoFactor(false);setChallengeId("");setCode("");setError("");setNotice("");}}>Back to sign in</button>
+  </div></div>;
+
+  if(verificationRequired) return <div className="login-page"><div className="login-card">
+    <Logo/><div className="login-icon"><ShieldCheck/></div><h1>Verify your email</h1>
+    <p>Enter the six-digit code we sent to <strong>{email}</strong>.</p>
+    <form onSubmit={e=>{e.preventDefault();verifyEmailCode();}}>
+      <div className="email-code-boxes" role="group" aria-label="Six-digit email verification code">
+        {Array.from({length:6},(_,index)=><input key={index} ref={el=>codeInputs.current[index]=el}
+          className="email-code-input" aria-label={`Digit ${index+1}`} inputMode="numeric"
+          autoComplete={index===0?"one-time-code":"off"} maxLength={1}
+          value={emailVerificationCode[index]||""} autoFocus={index===0} disabled={emailVerificationBusy}
+          onChange={e=>{const digit=e.target.value.replace(/\D/g,"").slice(-1);const next=Array.from({length:6},(_,i)=>emailVerificationCode[i]||"");next[index]=digit;setEmailVerificationCode(next.join(""));if(digit&&index<5)codeInputs.current[index+1]?.focus();}}
+          onPaste={e=>{e.preventDefault();const pasted=e.clipboardData.getData("text").replace(/\D/g,"").slice(0,6);if(pasted){setEmailVerificationCode(pasted);codeInputs.current[Math.min(pasted.length,5)]?.focus();}}}
+          onKeyDown={e=>{if(e.key==="Backspace"&&!emailVerificationCode[index]&&index>0)codeInputs.current[index-1]?.focus();if(e.key==="ArrowLeft"&&index>0)codeInputs.current[index-1]?.focus();if(e.key==="ArrowRight"&&index<5)codeInputs.current[index+1]?.focus();}}
+        />)}
+      </div>
+      {error&&<div className="error-box">{error}</div>}{notice&&<div className="success-pill">{notice}</div>}
+      <button type="submit" className="primary-btn full" disabled={emailVerificationCode.length!==6||emailVerificationBusy}>{emailVerificationBusy?"Verifying…":"Verify email"}</button>
+    </form>
+    <button type="button" className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendVerification}>{resendCooldown>0?`Resend code in ${resendCooldown}s`:"Resend verification code"}</button>
+    <button type="button" className="ghost-btn full" style={{marginTop:8}} onClick={()=>{setVerificationRequired(false);setEmailVerificationCode("");setError("");setNotice("");}}>Back to sign in</button>
   </div></div>;
 
   if(forgotMode) return <div className="login-page"><div className="login-card">
