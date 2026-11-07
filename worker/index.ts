@@ -65,6 +65,7 @@ async function ensureMarketingSchema(env: Env) {
     method TEXT NOT NULL,
     created_at INTEGER NOT NULL
   )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_marketing_events_user_created ON marketing_consent_events(user_id,created_at DESC)").run();
 }
 
 async function recordMarketingConsent(env: Env, userId: string, email: string, subscribed: boolean, method = "account_settings") {
