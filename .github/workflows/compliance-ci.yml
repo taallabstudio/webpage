@@ -1,9 +1,9 @@
-name: Compliance branch build
+name: Main branch validation
 
 on:
   push:
     branches:
-      - compliance/p0-p1-p2-hardening
+      - main
   pull_request:
     branches:
       - main
