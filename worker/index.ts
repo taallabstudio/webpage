@@ -702,6 +702,7 @@ async function exportAccountData(req: Request, env: Env) {
       "This export contains account data available in TaalLab's application databases.",
       "Files themselves are not included; only transfer and file metadata is included.",
       "Google Drive and Google Calendar content stored in your Google account is not copied into this export. Manage that data through Google.",
+      "Studio booking enquiries are delivered to Taal Lab by email and are not stored in the application database. Contact contact@taallab.in if you need a copy of an enquiry.",
       "Payment card and bank credentials are held by the payment provider and are not stored by TaalLab.",
     ],
   };
