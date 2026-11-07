@@ -1597,3 +1597,10 @@ button.button-click-feedback{
   .email-code-boxes{gap:7px}
   .email-code-input{height:50px;font-size:22px;border-radius:10px}
 }
+
+/* Legal consent and privacy controls */
+.signup-consent{display:grid;gap:12px;margin:16px 0 18px;padding:14px;border:1px solid #dce2e8;border-radius:12px;background:#f8fafc}
+.consent-line{display:flex;align-items:flex-start;gap:10px;color:#374151;font-size:13px;line-height:1.55}
+.consent-line input{width:17px;height:17px;min-width:17px;margin:2px 0 0;accent-color:#0878e8}
+.consent-line a{color:#075fb8;text-decoration:underline;text-underline-offset:2px}
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:3px solid #0878e8!important;outline-offset:3px!important}
