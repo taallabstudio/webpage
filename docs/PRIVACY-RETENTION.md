@@ -24,8 +24,8 @@ This schedule records the retention behaviour implemented in the application. It
 | Privacy-request records | As needed to document and respond to the request and meet accountability obligations | Periodic manual review; no fixed automatic purge until an approved accountability period is set |
 | Terms and Privacy acceptance records | As needed to demonstrate which policy versions were accepted | Periodic manual review; no automatic purge currently configured |
 | Parent-link invitations | Single-use token expires after 24 hours; invitation metadata is deleted 30 days after expiry | Hourly Worker cleanup |
-| Active parental-consent records and permission history | While the parent-child link is active; after withdrawal, retained for up to two years unless a legal hold or other legal obligation requires longer | Hourly Worker cleanup removes eligible withdrawn records and events |
-| Child permission settings | While the parent-child link is active; set to off on withdrawal | Withdrawal endpoint disables all four permissions and revokes the link |
+| Parent-child link and parental-consent history | While the link is active; revoked link rows, withdrawn consent records and associated events are retained for up to two years after withdrawal unless a legal hold or other legal obligation requires longer | Hourly Worker cleanup removes eligible revoked links, consent records and events |
+| Child permission settings | Stored only while the parent-child link is active; deleted on withdrawal | Withdrawal endpoint deletes the settings row; missing settings always mean all permissions are off |
 | Booking enquiry emails | In the business mailbox while needed to respond to the enquiry and manage any resulting engagement | Mailbox review and management; automatic mailbox deletion is not configured in this repository |
 | Provider backups and external service records | According to the relevant provider's actual retention/deletion settings and agreements | Verify in each provider console and applicable DPA; do not assume application deletion immediately removes provider backups |
 
