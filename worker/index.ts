@@ -1999,7 +1999,7 @@ async function uploadOceanAsset(req: Request, env: Env, user: any) {
   const uploaded = await fetch(ud.uploadUrl, { method: "POST", headers: { Authorization: ud.authorizationToken, "X-Bz-File-Name": encodeURIComponent(key), "Content-Type": mime, "X-Bz-Content-Sha1": "do_not_verify" }, body: bytes });
   const up: any = await uploaded.json().catch(() => ({}));
   if (!uploaded.ok || !up.fileId) return json({ error: "Backblaze could not store this OCEAN file." }, { status: 502 });
-  await env.DB.prepare("INSERT INTO ocean_assets(id,user_id,page_id,storage_key,file_name,mime_type,size,created_at) VALUES(?,?,?,?,?,?,?,?)").bind(id,user.id,pageId,key,filename,mime,bytes.byteLength,now()).run();
+  await env.DB.prepare("INSERT INTO ocean_assets(id,user_id,page_id,storage_key,file_name,mime_type,size,created_at,synthetic_content) VALUES(?,?,?,?,?,?,?,?,?)").bind(id,user.id,pageId,key,filename,mime,bytes.byteLength,now(),syntheticContent?1:0).run();
   return json({ ok: true, asset: { id, file_name: filename, mime_type: mime, size: bytes.byteLength, synthetic_content: syntheticContent, url: "/api/ocean/assets/" + id } }, { status: 201 });
 }
 async function updateOceanAssetLabel(req: Request, env: Env, user: any, id: string) {
