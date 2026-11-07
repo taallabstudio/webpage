@@ -747,6 +747,13 @@ async function listPrivacyRequests(env: Env) {
   return json({ requests: rows.results || [] });
 }
 
+async function listOwnPrivacyRequests(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  const rows = await env.DB.prepare("SELECT id,request_type,status,created_at,resolved_at FROM privacy_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 20")
+    .bind(user.id).all();
+  return json({ requests: rows.results || [] });
+}
+
 async function updatePrivacyRequest(req: Request, env: Env, requestId: string) {
   await requireAdmin(req, env);
   const body = await req.json().catch(() => ({}));
@@ -2394,6 +2401,7 @@ export default {
       if (url.pathname === "/api/account/security" && req.method === "POST") return updateSecuritySettings(req, env);
 
       if (url.pathname === "/api/account/data-export" && req.method === "GET") return exportAccountData(req, env);
+      if (url.pathname === "/api/account/privacy-requests" && req.method === "GET") return listOwnPrivacyRequests(req, env);
       if (url.pathname === "/api/account/privacy-request" && req.method === "POST") return createPrivacyRequest(req, env);
       if (url.pathname === "/api/admin/privacy-requests" && req.method === "GET") { await requireAdmin(req, env); return listPrivacyRequests(env); }
       const privacyRequestMatch = url.pathname.match(/^\/api\/admin\/privacy-requests\/([^/]+)$/);
