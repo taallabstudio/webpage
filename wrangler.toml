@@ -6,6 +6,7 @@ preview_urls = true
 [vars]
 APP_ORIGIN = "https://taallab.in"
 DEFAULT_EXPIRY_DAYS = "7"
+POLICY_NOTICE_ENABLED = "false"
 B2_BUCKET_NAME = "taallab-product-files"
 GOOGLE_CLIENT_ID = "904278224751-qihnpb2neuqouolbkjese0fg6ntemf83.apps.googleusercontent.com"
 GOOGLE_LOGIN_CLIENT_ID = "904278224751-h85rtgjbr9n29u5p09u59s593kls616p.apps.googleusercontent.com"
