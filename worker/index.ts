@@ -610,7 +610,6 @@ async function authSignup(req: Request, env: Env) {
   await env.DB.prepare("INSERT INTO users(id,email,password_hash,role,created_at,updated_at,status,email_verified_at,two_factor_enabled) VALUES(?,?,?,?,?,?,?,?,?)")
     .bind(id, email, hash, "user", createdAt, createdAt, "active", null, 1).run();
   await recordLegalConsent(env, id, "email_signup", body.marketingConsent === true);
-  await recordLegalConsent(env, id, "email_signup", body.marketingConsent === true);
 
   const verification = await createEmailVerification(env, { id, email });
   if (!verification.sent) {
