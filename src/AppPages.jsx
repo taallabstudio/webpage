@@ -192,6 +192,7 @@ function Login({onLogin}) {
   const [notice,setNotice]=useState(loginParams.get("verified")==="1" ? "Email verified. You can sign in now." : "");
   const [signup,setSignup]=useState(false);
   const [policyAccepted,setPolicyAccepted]=useState(false);
+  const [marketingAccepted,setMarketingAccepted]=useState(false);
   const [twoFactor,setTwoFactor]=useState(loginParams.get("google_2fa")==="1");
   const [twoFactorMethod,setTwoFactorMethod]=useState(loginParams.get("method")||"email");
   const [passkeyBusy,setPasskeyBusy]=useState(false);
@@ -286,7 +287,7 @@ function Login({onLogin}) {
       const result=await api(signup?"/auth/signup":"/auth/login",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({email,password,acceptPolicies:signup&&policyAccepted})
+        body:JSON.stringify({email,password,acceptPolicies:signup&&policyAccepted,marketingConsent:signup&&marketingAccepted})
       });
 
       if (result.requiresTwoFactor) {
@@ -432,6 +433,7 @@ function Login({onLogin}) {
       <label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus required/></label>
       <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} minLength={8} required/></label>
       {signup&&<label className="policy-consent"><input type="checkbox" checked={policyAccepted} onChange={e=>setPolicyAccepted(e.target.checked)} required/><span>I agree to the <a href="/terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a> and acknowledge the <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.</span></label>}
+      {signup&&<label className="policy-consent"><input type="checkbox" checked={marketingAccepted} onChange={e=>setMarketingAccepted(e.target.checked)}/><span>I'd like to receive occasional product news and marketing emails from TaalLab. This is optional and separate from account/service emails. You can unsubscribe at any time. <small>Google sign-up users can manage this choice later in Account Settings.</small></span></label>}
       {error&&<div className="error-box">{error}</div>}
       {notice&&<div className="success-pill">{notice}</div>}
       <button className="primary-btn full">{signup?"Sign up & verify email":"Sign in"}</button>
@@ -440,7 +442,7 @@ function Login({onLogin}) {
     {verificationRequired && <button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendVerification}>
       {resendCooldown>0?`Resend verification in ${resendCooldown}s`:"Resend verification email"}
     </button>}
-    <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSignup(v=>!v);setPolicyAccepted(false);setError("");setNotice("");setVerificationRequired(false);}}>
+    <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSignup(v=>!v);setPolicyAccepted(false);setMarketingAccepted(false);setError("");setNotice("");setVerificationRequired(false);}}>
       {signup?"Back to sign in":"Sign up"}
     </button>
   </div></div>;
