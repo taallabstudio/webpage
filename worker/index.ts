@@ -48,6 +48,52 @@ async function recordPolicyAcceptance(env: Env, userId: string, method: string) 
     .bind(randomToken(16), userId, TERMS_VERSION, PRIVACY_VERSION, now(), method).run();
 }
 
+async function ensureMarketingSchema(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS marketing_preferences (
+    user_id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    subscribed INTEGER NOT NULL DEFAULT 0,
+    consented_at INTEGER,
+    unsubscribed_at INTEGER,
+    updated_at INTEGER NOT NULL
+  )`).run();
+}
+
+async function recordMarketingConsent(env: Env, userId: string, email: string, subscribed: boolean) {
+  await ensureMarketingSchema(env);
+  const timestamp = now();
+  if (subscribed) {
+    await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,email,subscribed,consented_at,unsubscribed_at,updated_at)
+      VALUES(?,?,1,?,NULL,?)
+      ON CONFLICT(user_id) DO UPDATE SET email=excluded.email,subscribed=1,consented_at=excluded.consented_at,unsubscribed_at=NULL,updated_at=excluded.updated_at`)
+      .bind(userId, normalizeEmail(email), timestamp, timestamp).run();
+  } else {
+    await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,email,subscribed,consented_at,unsubscribed_at,updated_at)
+      VALUES(?,?,0,NULL,?,?)
+      ON CONFLICT(user_id) DO UPDATE SET email=excluded.email,subscribed=0,unsubscribed_at=excluded.unsubscribed_at,updated_at=excluded.updated_at`)
+      .bind(userId, normalizeEmail(email), timestamp, timestamp).run();
+  }
+}
+
+async function marketingUnsubscribeToken(env: Env, userId: string) {
+  const issuedAt = now();
+  const payload = `${userId}.${issuedAt}`;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.SESSION_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
+  const hex = [...signature].map(value => value.toString(16).padStart(2, "0")).join("");
+  return `${payload}.${hex}`;
+}
+
+async function verifyMarketingUnsubscribeToken(env: Env, token: string) {
+  const parts = token.split(".");
+  if (parts.length !== 3 || !/^[a-f0-9]{32}$/.test(parts[0]) || !/^\d{1,12}$/.test(parts[1]) || !/^[a-f0-9]{64}$/.test(parts[2])) return null;
+  const payload = `${parts[0]}.${parts[1]}`;
+  const signature = new Uint8Array(parts[2].match(/.{2}/g)!.map(value => parseInt(value, 16)));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.SESSION_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  const valid = await crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(payload));
+  return valid && Number(parts[1]) <= now() ? parts[0] : null;
+}
+
 const json = (data: any, init: ResponseInit = {}) =>
   new Response(JSON.stringify(data), {
     ...init,
