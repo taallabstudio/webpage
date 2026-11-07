@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{color-scheme:light;--bg:#f5f7f8;--panel:rgba(255,255,255,.82);--line:#e1e6eb;--text:#1d2229;--muted:#707985;--blue:#0878e8;--blue-soft:#eaf4ff}
+:root{color-scheme:light;--bg:#f5f7f8;--panel:rgba(255,255,255,.82);--line:#e1e6eb;--text:#1d2229;--muted:#5b6470;--blue:#0068c9;--blue-soft:#eaf4ff}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 Inter,system-ui,sans-serif;min-height:100vh}
@@ -36,7 +36,7 @@ button,a{ -webkit-tap-highlight-color:transparent}
 .hero h1{font-family:"Space Grotesk",sans-serif;font-size:clamp(48px,7.8vw,100px);line-height:.96;letter-spacing:-.075em;max-width:850px;margin:22px 0 20px;font-weight:700}
 .hero h1 em{font-style:normal;color:var(--blue)}
 .hero p{font-size:16px;color:var(--muted);max-width:590px;margin:0;line-height:1.75}
-.section-line{display:flex;align-items:center;gap:14px;margin:45px 0 18px;color:#858e98;font-size:10px;letter-spacing:.15em;font-weight:700;text-transform:uppercase}
+.section-line{display:flex;align-items:center;gap:14px;margin:45px 0 18px;color:#59626d;font-size:10px;letter-spacing:.15em;font-weight:700;text-transform:uppercase}
 .section-line:after{content:"";height:1px;background:var(--line);flex:1}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 .card{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(255,255,255,.95),rgba(250,252,253,.82));border:1px solid rgba(218,225,232,.95);border-radius:22px;padding:25px;min-height:300px;display:flex;flex-direction:column;box-shadow:0 14px 38px rgba(35,49,63,.045);transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease}
@@ -50,7 +50,7 @@ button,a{ -webkit-tap-highlight-color:transparent}
 .price{font-weight:700;font-size:12px}
 .btn{display:inline-flex;justify-content:center;align-items:center;gap:8px;padding:11px 15px;border-radius:999px;background:var(--blue);color:white;font-size:11px;font-weight:700;border:1px solid var(--blue);cursor:pointer;transition:transform .2s,background .2s;white-space:nowrap}
 .btn:hover{background:#066bd0;transform:translateY(-1px)}
-.btn[aria-disabled=true],.btn:disabled{background:#eef0f2;color:#929aa4;border-color:#dfe3e7;cursor:not-allowed;transform:none;opacity:1}
+.btn[aria-disabled=true],.btn:disabled{background:#eef0f2;color:#59626d;border-color:#dfe3e7;cursor:not-allowed;transform:none;opacity:1}
 .notice{display:flex;align-items:flex-start;gap:10px;color:#7a838d;margin-top:24px;font-size:11px;line-height:1.6}
 .notice-mark{flex:none;width:18px;height:18px;display:grid;place-items:center;border:1px solid #d8e4ef;border-radius:50%;color:var(--blue);font-size:11px}
 .error{color:#b7443a}.loading{color:var(--muted);grid-column:1/-1;padding:24px 0}
@@ -109,7 +109,7 @@ footer a{color:#4f5863;font-weight:600}footer a:hover{color:var(--blue)}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap">
 <style>html,body,body *{font-family:"Roboto",sans-serif!important}</style>
 </head>
-<body><div class="page-glow" aria-hidden="true"></div><main class="wrap">
+<body><div class="page-glow" aria-hidden="true"></div><main class="wrap"><a class="skip-link" href="#products">Skip to product catalogue</a>
 <header class="landing-nav">
 <a class="studio-brand" href="/#home" aria-label="TaalLab home"><span class="site-logo"><img src="/logo.png" alt=""></span><span class="site-brand-text">TaalLab</span></a>
 <button class="mobile-nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="shop-navigation">☰</button><nav id="shop-navigation" class="studio-nav" aria-label="Main navigation">
