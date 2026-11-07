@@ -31,7 +31,7 @@
   const dismiss = document.createElement("button");
   dismiss.type = "button";
   dismiss.textContent = "Got it";
-  dismiss.style.cssText = "flex:none;border:0;border-radius:9px;padding:10px 16px;background:#0878e8;color:#fff;font-weight:700;cursor:pointer";
+  dismiss.style.cssText = "flex:none;border:0;border-radius:9px;padding:10px 16px;background:#0068cc;color:#fff;font-weight:700;cursor:pointer";
   dismiss.addEventListener("click", () => {
     try { window.localStorage.setItem(storageKey, "dismissed"); } catch {}
     notice.remove();
