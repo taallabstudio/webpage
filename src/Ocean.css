@@ -1122,6 +1122,9 @@
 .ocean-login-divider{display:flex;align-items:center;gap:12px;margin:0 0 17px;color:#888;font-size:11px}
 .ocean-login-divider:before,.ocean-login-divider:after{content:"";height:1px;flex:1;background:#414141}
 .ocean-auth-card .ocean-google-login{font-family:inherit}
+.ocean-auth-card .ocean-policy-consent{display:flex;grid-template-columns:none;grid-auto-flow:column;align-items:flex-start;gap:9px;margin:0 0 12px;text-align:left;font-size:12px;line-height:1.5;color:#b5b5b5}
+.ocean-auth-card .ocean-policy-consent input{width:15px;height:15px;flex:0 0 15px;margin:2px 0 0;accent-color:#8bb8e8}
+.ocean-auth-card .ocean-policy-consent a{color:#a9cbed;text-decoration:underline;text-underline-offset:2px}
 
 
 /* Android and narrow-screen OCEAN layout fixes */
