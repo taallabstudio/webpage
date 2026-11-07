@@ -751,7 +751,7 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
     <SecurityMethods user={user}/>
     <section className="panel" style={{maxWidth:720,padding:24,marginTop:18}}>
       <span className="eyebrow">PRIVACY &amp; DATA</span><h2>Your information</h2>
-      <p className="muted">You can download a copy of the account, transfer, consent and purchase information associated with your TaalLab account, or submit a request for account and personal-data deletion.</p>
+      <p className="muted">You can download a copy of the account, transfer, OCEAN workspace, consent and purchase information associated with your TaalLab account, or submit a request for account and personal-data deletion.</p>
       <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:16}}>
         <button type="button" className="ghost-btn" onClick={exportPersonalData} disabled={privacyBusy}>{privacyBusy?"Please wait…":"Download my data"}</button>
         <button type="button" className="ghost-btn" onClick={requestDataDeletion} disabled={privacyBusy}>Request account deletion</button>
