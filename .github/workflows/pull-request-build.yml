@@ -27,6 +27,8 @@ jobs:
         run: npm install
       - name: Generate dependency licence inventory
         run: node scripts/audit-dependencies.mjs /tmp/taallab-dependency-licenses.md
+      - name: Check for unconsented analytics and advertising trackers
+        run: node scripts/audit-tracking.mjs
       - name: Build frontend
         run: npm run build
       - name: Bundle Cloudflare Worker without deploying
