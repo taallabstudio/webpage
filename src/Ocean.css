@@ -1437,3 +1437,23 @@ button.button-click-feedback{filter:grayscale(.82) brightness(.91)!important;ani
 .ocean-shell[data-theme="dark"] .ocean-settings-section-heading p{color:#aab5c1}
 .ocean-shell :is(button,a,input,select,textarea,[tabindex]):focus-visible{outline:2px solid #1685ed;outline-offset:2px}
 @media(max-width:760px){.ocean-page-row>.ocean-page-menu-wrap>.ocean-page-more{opacity:.8}.ocean-settings-section-heading{padding:18px}.ocean-settings-section .ocean-managed-user{gap:9px}}
+
+
+/* Final compact account identity and integrated settings sections. */
+.ocean-user{padding:12px 10px 14px}
+.ocean-user-row{align-items:center;gap:8px}
+.ocean-user-profile{align-items:center;gap:10px;padding:7px;min-height:54px}
+.ocean-user-profile>.ocean-avatar{width:34px;height:34px;flex:none}
+.ocean-user-profile>.ocean-user-name{display:flex!important;flex:1 1 auto;min-width:0;flex-direction:column!important;align-items:flex-start!important;justify-content:center;gap:5px!important;white-space:normal;line-height:1.2}
+.ocean-user-profile>.ocean-user-name>strong{display:block;width:100%;max-width:100%;font-size:12px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ocean-user-profile>.ocean-user-name>.ocean-user-role{display:inline-flex!important;flex:none;width:max-content;max-width:100%;margin:0;font-size:9px;line-height:1.4}
+.ocean-user-profile>svg{flex:none;color:#8793a0}
+.ocean-user-settings{width:36px;height:36px;flex:none;border:1px solid #e7ebef;background:#fff}
+.ocean-calendar-settings{margin-top:22px}
+.ocean-calendar-settings .ocean-settings-section-heading{border-bottom:1px solid #edf0f3}
+.ocean-calendar-settings .ocean-admin-heading{display:none}
+.ocean-calendar-settings .ocean-calendar-connection{border:0;border-bottom:1px solid #edf0f3;border-radius:0;box-shadow:none}
+.ocean-calendar-settings .ocean-calendar-events-head,.ocean-calendar-settings .ocean-calendar-event-list,.ocean-calendar-settings .ocean-calendar-form{margin-left:20px;margin-right:20px}
+.ocean-calendar-settings .ocean-access-note{margin:18px 20px 20px}
+.ocean-shell[data-theme="dark"] .ocean-user-settings{background:#202832;border-color:#3a424d;color:#c1cad4}
+.ocean-shell[data-theme="dark"] .ocean-calendar-settings .ocean-settings-section-heading,.ocean-shell[data-theme="dark"] .ocean-calendar-settings .ocean-calendar-connection{border-color:#3a424d}
