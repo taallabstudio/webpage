@@ -1621,3 +1621,28 @@ button.button-click-feedback{
 
 /* Consistent, high-visibility keyboard focus across the transfer app and account pages. */
 :is(button,a[href],input,textarea,select,summary,[tabindex]):focus-visible{outline:3px solid #005fcc;outline-offset:3px}
+
+
+/* Parent dashboard and child permission controls */
+.parent-controls-page .panel{color:var(--ink,#1d2229)}
+.child-permission-card{border:1px solid var(--border,#d7dce3);border-radius:14px;padding:18px;margin-top:16px;background:var(--panel,#fff)}
+.child-permission-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding-bottom:14px;border-bottom:1px solid var(--border,#d7dce3)}
+.child-permission-heading h3{margin:0 0 4px;font-size:17px}
+.child-permission-heading p{margin:0;color:var(--muted,#596574);font-size:13px;overflow-wrap:anywhere}
+.child-permission-list{display:grid}
+.child-permission-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 0;border-bottom:1px solid var(--border,#e0e4e9);cursor:pointer}
+.child-permission-row:last-child{border-bottom:0}
+.child-permission-row>span{display:grid;gap:3px}
+.child-permission-row strong{font-size:14px;color:var(--ink,#1d2229)}
+.child-permission-row small{font-size:12px;line-height:1.45;color:var(--muted,#596574)}
+.child-permission-row input[type="checkbox"][role="switch"]{appearance:none;position:relative;flex:0 0 46px;width:46px;height:27px;margin:0;border:1px solid #657080;border-radius:99px;background:#e2e6eb;cursor:pointer;transition:background .16s,border-color .16s}
+.child-permission-row input[type="checkbox"][role="switch"]::after{content:"";position:absolute;width:19px;height:19px;left:3px;top:3px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0003;transition:transform .16s}
+.child-permission-row input[type="checkbox"][role="switch"]:checked{background:#075fb8;border-color:#075fb8}
+.child-permission-row input[type="checkbox"][role="switch"]:checked::after{transform:translateX(19px)}
+.child-permission-row input[type="checkbox"][role="switch"]:focus-visible{outline:3px solid #005fcc;outline-offset:3px}
+.child-permission-row input[type="checkbox"][role="switch"]:disabled{opacity:.55;cursor:wait}
+.child-permission-footer{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--border,#e0e4e9)}
+.child-permission-footer .muted{font-size:12px}
+.pending-parent-invite{display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-top:1px solid var(--border,#e0e4e9);overflow-wrap:anywhere}
+.pending-parent-invite small{color:var(--muted,#596574)}
+@media(max-width:600px){.child-permission-card{padding:14px}.child-permission-heading{flex-direction:column}.pending-parent-invite{flex-direction:column;gap:4px}}
