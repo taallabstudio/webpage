@@ -863,7 +863,7 @@ async function googleAuthStart(req: Request, env: Env) {
   // State and return cookies must therefore be valid on both hosts.
   response.headers.append("set-cookie", cookie("google_login_state", state, 600, req));
   response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req));
-  if (acceptedPolicies) response.headers.append("set-cookie", cookie("google_login_consent", POLICY_VERSION, 600, req));
+  response.headers.append("set-cookie", acceptedPolicies ? cookie("google_login_consent", POLICY_VERSION, 600, req) : cookie("google_login_consent", "", 0, req));
   return response;
 }
 
@@ -993,12 +993,14 @@ async function googleAuthCallback(req: Request, env: Env) {
     const response = new Response(null, { status: 302, headers: { location: "ocean://oauth/callback?code=" + encodeURIComponent(appCode), "cache-control": "no-store" } });
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
+    response.headers.append("set-cookie", clearConsentCookie);
     return response;
   }
   const sid = await createUserSession(env, user.id);
   const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, {}, returnTo).toString(), "cache-control": "no-store" } });
   response.headers.append("set-cookie", clearStateCookie);
   response.headers.append("set-cookie", clearReturnCookie);
+  response.headers.append("set-cookie", clearConsentCookie);
   attachSessionCookie(response, sid, req);
   return response;
 }
