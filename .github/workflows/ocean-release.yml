@@ -27,6 +27,7 @@ concurrency:
 
 jobs:
   windows:
+    if: github.event_name == 'workflow_dispatch'
     name: Build Windows installer
     runs-on: windows-latest
     steps:
@@ -58,6 +59,7 @@ jobs:
           retention-days: 2
 
   android:
+    if: github.event_name == 'workflow_dispatch'
     name: Build Android APK
     runs-on: ubuntu-latest
     steps:
@@ -108,6 +110,7 @@ jobs:
           retention-days: 2
 
   publish:
+    if: always() && github.event_name == 'workflow_dispatch' && needs.windows.result == 'success' && needs.android.result == 'success'
     name: Publish GitHub Release
     needs: [windows, android]
     runs-on: ubuntu-latest
