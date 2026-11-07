@@ -28,6 +28,8 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install
+      - name: Generate dependency licence inventory
+        run: node scripts/audit-dependencies.mjs /tmp/taallab-dependency-licenses.md
       - name: Build frontend
         run: npm run build
       - name: Bundle Cloudflare Worker without deploying
@@ -38,3 +40,12 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Audit public pages against WCAG
         run: node scripts/accessibility-audit.mjs
+      - name: Upload compliance audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: taallab-compliance-audit-reports
+          path: |
+            /tmp/taallab-dependency-licenses.md
+            /tmp/taallab-accessibility-report.json
+          if-no-files-found: warn
