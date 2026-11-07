@@ -200,6 +200,7 @@ function Landing() {
   }
 
   return <main className="landing" id="home">
+    <a className="skip-link" href="#services">Skip to main content</a>
     <div className="landing-glow" />
     <header className="landing-nav">
       <a className="studio-brand" href="#home" aria-label="TaalLab home"><Logo studioOnly /></a>
