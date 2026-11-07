@@ -20,9 +20,11 @@ This schedule records the retention behaviour implemented in the application. It
 | Paid orders and payment records | Only as long as needed for accounting, tax, payment disputes, fraud prevention and legal obligations | Manual review; confirm exact statutory periods with the accountant/legal adviser before implementing automatic deletion |
 | Booking anti-abuse identifiers (email and IP) | Up to 1 year after last use | Hourly Worker cleanup |
 | Account profile and OCEAN content | While the account remains active; following a verified deletion request, review and erase data no longer needed | Human review through the privacy-request queue; shared content, legal holds and provider-side copies require case-by-case handling |
-| Date of birth and age classification | Stored after email verification and sign-in; retained with the active account while needed for age safeguards and parent/guardian controls | User cannot self-edit after submission; correction requests require support review and identity checks |
 | Privacy-request records | As needed to document and respond to the request and meet accountability obligations | Periodic manual review; no fixed automatic purge until an approved accountability period is set |
 | Terms and Privacy acceptance records | As needed to demonstrate which policy versions were accepted | Periodic manual review; no automatic purge currently configured |
+| Marketing preferences and consent events | Retained while needed to honour opt-in/withdrawal, prevent messages after unsubscribe and demonstrate consent | User preference changes and one-click unsubscribe; no automatic purge currently configured |
+| Date of birth and account-age classification | Collected after email verification for age screening; retain only while needed to apply account restrictions and meet legal obligations | No automatic DOB-specific purge is configured; parent/guardian consent evidence and retention rules remain a release blocker |
+| Upload-rights attestations | Retained with the related transfer metadata | Removed with transfer metadata after the 30-day operational grace period |
 | Booking enquiry emails | In the business mailbox while needed to respond to the enquiry and manage any resulting engagement | Mailbox review and management; automatic mailbox deletion is not configured in this repository |
 | Provider backups and external service records | According to the relevant provider's actual retention/deletion settings and agreements | Verify in each provider console and applicable DPA; do not assume application deletion immediately removes provider backups |
 
@@ -30,9 +32,10 @@ This schedule records the retention behaviour implemented in the application. It
 
 1. The scheduled Worker cleanup runs hourly. It must not delete transfer metadata while a failed Google Drive deletion is still awaiting retry.
 2. A privacy deletion request is an intake and human-review workflow. Do not mark it completed until identity is verified, the appropriate erasure/revocation work is performed, and any retained records are documented.
-3. Never automatically purge paid-order records until TaalLab's accountant/legal adviser confirms the applicable statutory retention period and invoice obligations.
-4. Verify deletion and retention settings in Cloudflare, Google, Resend, Razorpay and Backblaze accounts. Published provider links are not proof that TaalLab has accepted or signed a DPA.
-5. Revisit this schedule before the relevant India DPDP provisions commence and whenever a provider, data category or product feature changes.
+3. Send optional marketing only to verified addresses with an active, recorded opt-in; honour unsubscribe requests without requiring sign-in. Keep suppression records while marketing is sent.
+4. Never automatically purge paid-order records until TaalLab's accountant/legal adviser confirms the applicable statutory retention period and invoice obligations.
+5. Verify deletion and retention settings in Cloudflare, Google, Resend, Razorpay and Backblaze accounts. Published provider links are not proof that TaalLab has accepted or signed a DPA.
+6. Revisit this schedule before the relevant India DPDP provisions commence and whenever a provider, data category or product feature changes.
 
 ## Known manual follow-ups
 
@@ -40,7 +43,4 @@ This schedule records the retention behaviour implemented in the application. It
 - Confirm the legal basis and exact retention period for privacy-request and policy-acceptance records.
 - Review the contact mailbox retention policy for booking enquiries.
 - Verify provider-side deletion, backups, regional processing and DPA settings.
-- The app now asks for date of birth only after email verification and the user's first subsequent sign-in. It classifies accounts as adult or child; child accounts remain pending parent/guardian setup.
-- Child and unclassified accounts are blocked from protected account APIs, store checkout creation and payment verification. Adult-only payment access is enforced in the Worker, not only in the UI.
-- Parent account linking, verifiable parent identity/age checks, consent capture, parent dashboard, consent withdrawal and child-account deletion are NOT implemented yet. Keep child accounts pending and restricted until those controls are completed and legally reviewed.
-- Date of birth is user-supplied age screening, not proof of parent identity, legal age or parental consent.
+- No blanket 18+ account-registration restriction is approved. Keep the product decision under review and implement applicable child-data safeguards, including verifiable parental consent where required, before knowingly processing children's personal data.

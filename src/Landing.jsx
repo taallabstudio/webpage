@@ -378,7 +378,7 @@ function Landing() {
           </a>
         </div>
       </div>
-      <footer><Logo studioOnly/><span>© 2026 TaalLab. Music, recording &amp; production.</span><nav aria-label="Legal information" className="legal-footer-links"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/refunds.html">Refunds</a></nav></footer>
+      <footer><Logo studioOnly/><span>© 2026 TaalLab. Music, recording &amp; production.</span><nav aria-label="Legal information" className="legal-footer-links"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/refunds.html">Refunds</a><a href="/copyright.html">Copyright</a></nav></footer>
     </section>
   </main>;
 }

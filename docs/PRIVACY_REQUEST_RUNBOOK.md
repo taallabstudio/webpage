@@ -25,6 +25,7 @@ Do not mark a request completed merely because the request was received. Review 
 - File transfers, transfer metadata and associated Google Drive objects. Check whether an object is still referenced by another active transfer before deleting it.
 - OCEAN pages, page shares, comments, uploaded assets and Google Calendar connection. Check collaborator ownership and shared-page access before removing content.
 - Digital-store customer profile and order records in the separate store database.
+- Marketing preference and consent-event records. A deletion request immediately opts the account out of marketing; preserve only the minimum suppression record needed to honour that choice, and document its retention basis.
 - Privacy acceptance and request records, which may be needed to demonstrate the handling of the request.
 - Backups, provider-side retention and any legal hold or unresolved payment dispute.
 

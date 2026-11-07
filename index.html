@@ -49,35 +49,6 @@
 .boot-skeleton{min-height:100vh;padding:0 5vw;background:linear-gradient(135deg,#eef2f5,#f9fafb);font-family:system-ui,sans-serif}.boot-nav{height:82px;display:flex;align-items:center;gap:24px}.boot-nav i,.boot-nav span,.boot-hero span,.boot-hero i,.boot-hero b{display:block;border-radius:9px;background:linear-gradient(100deg,#e4e9ee 20%,#f8fafb 40%,#e4e9ee 60%);background-size:200% 100%;animation:boot-shimmer 1.4s linear infinite}.boot-nav i{width:130px;height:28px;margin-right:auto}.boot-nav span{width:58px;height:12px}.boot-hero{min-height:70vh;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:18px}.boot-hero span{width:220px;height:12px}.boot-hero i{width:min(540px,80vw);height:90px}.boot-hero b{width:min(460px,72vw);height:13px}.boot-hero b:last-child{width:min(330px,60vw)}@keyframes boot-shimmer{to{background-position-x:-200%}}@media(prefers-reduced-motion:reduce){.boot-nav i,.boot-nav span,.boot-hero span,.boot-hero i,.boot-hero b{animation:none}}
 </style>
 
-    <script>
-      (() => {
-        try {
-          if (localStorage.getItem("taallab.essential-storage-notice.v1") === "dismissed") return;
-        } catch {}
-        const notice = document.createElement("aside");
-        notice.setAttribute("role", "region");
-        notice.setAttribute("aria-label", "Essential cookie and storage notice");
-        notice.style.cssText = "position:fixed;z-index:10000;left:16px;right:16px;bottom:16px;max-width:760px;margin:0 auto;padding:16px 18px;background:#fff;color:#1d2229;border:1px solid #aeb8c2;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.18);display:flex;align-items:center;gap:16px;flex-wrap:wrap;font:14px/1.55 system-ui,sans-serif";
-        const copy = document.createElement("p");
-        copy.style.cssText = "margin:0;flex:1 1 420px";
-        copy.append("TAAL LAB uses essential session cookies to keep you signed in and local storage for essential preferences. We do not currently use optional advertising or analytics trackers. ");
-        const link = document.createElement("a");
-        link.href = "/privacy.html";
-        link.textContent = "Privacy Policy";
-        link.style.cssText = "color:#075fb8;text-decoration:underline";
-        copy.append(link);
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = "Got it";
-        button.style.cssText = "border:0;border-radius:9px;padding:10px 16px;background:#0878e8;color:#fff;font-weight:700;cursor:pointer";
-        button.addEventListener("click", () => {
-          try { localStorage.setItem("taallab.essential-storage-notice.v1", "dismissed"); } catch {}
-          notice.remove();
-        });
-        notice.append(copy, button);
-        document.body.append(notice);
-      })();
-    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
