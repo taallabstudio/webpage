@@ -29,7 +29,17 @@ Official requirements:
 
 The API key/account must remain controlled by Taal Lab, and the production application registration and any special approval or quota conditions must be checked in the Unsplash developer console. Source code alone cannot prove the account's approval status.
 
-## 3. Local image and brand assets — owner evidence required
+## 3. User-uploaded content and local image/brand assets — owner evidence required
+
+### Upload-time rights confirmation
+
+The TrackDeliver administrator upload form now requires the uploader to affirm that they own the rights to each selected file or have permission from the rights holder to upload and share it with the intended recipient. The control is required before transfer creation and is also checked by the client-side upload handler. This is an uploader attestation, not independent verification of ownership, a licence, model/property releases, or lawful content. Keep the wording and workflow under review as upload surfaces are added; the control currently applies to the TrackDeliver admin transfer uploader, not automatically to product cover management or OCEAN cover selection.
+
+The uploader must not upload material they are not authorised to distribute. Taal Lab should provide a clear complaint/contact route and respond to valid rights complaints. This checkbox does not replace a documented repeat-infringer process or counsel's assessment of applicable Indian intermediary duties or U.S. DMCA safe-harbour eligibility.
+
+### Local image and brand asset evidence
+
+
 
 The repository contains these local assets:
 
@@ -91,6 +101,12 @@ Before changing signup, Taal Lab must choose one product policy:
 2. **Support minors:** build a verifiable parent/guardian consent flow and records before processing a child's data, and assess all child-specific restrictions.
 
 A simple age checkbox is not verifiable parental consent. No child account or parental-consent workflow is represented as implemented by this review.
+
+
+
+## 6A. Product decision — minors may register, safeguards still required
+
+Product owner decision recorded 7 November 2026: **do not impose a blanket 18+ registration restriction**. Registration remains available without a hard age gate. This is not a decision to knowingly process children's personal data without safeguards. Before enabling or knowingly accepting an under-18 user's account or data processing, obtain counsel's advice and implement all safeguards required by applicable law, including verifiable parental consent where required, age-appropriate notices, restrictions on processing/advertising, and a workable escalation and deletion path. Do not represent an ordinary self-declared checkbox as verifiable parental consent. The decision must be revisited before the relevant DPDP provisions commence and when the product audience or law changes.
 
 ## 7. Marketing email — no marketing programme found
 
