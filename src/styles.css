@@ -1621,3 +1621,5 @@ button.button-click-feedback{
 
 /* Consistent, high-visibility keyboard focus across the transfer app and account pages. */
 :is(button,a[href],input,textarea,select,summary,[tabindex]):focus-visible{outline:3px solid #005fcc;outline-offset:3px}
+
+.upload-rights-confirmation{display:flex;align-items:flex-start;gap:10px;margin:14px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#f7f9fb;color:#1d2229;font-size:12px;line-height:1.55}.upload-rights-confirmation input{flex:none;width:17px;height:17px;margin:2px 0 0;accent-color:var(--blue)}.upload-rights-confirmation span{color:#46515d}
