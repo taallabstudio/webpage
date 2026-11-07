@@ -4,7 +4,7 @@ compatibility_date = "2026-10-01"
 preview_urls = true
 
 [vars]
-APP_ORIGIN = "https://taallab.work"
+APP_ORIGIN = "https://taallab.in"
 DEFAULT_EXPIRY_DAYS = "7"
 B2_BUCKET_NAME = "taallab-product-files"
 GOOGLE_CLIENT_ID = "904278224751-qihnpb2neuqouolbkjese0fg6ntemf83.apps.googleusercontent.com"
@@ -22,7 +22,7 @@ database_name = "taallab-store"
 database_id = "acb0d230-3a92-4682-b847-da7e018f7f18"
 
 [previews.vars]
-APP_ORIGIN = "https://taallab.work"
+APP_ORIGIN = "https://taallab.in"
 DEFAULT_EXPIRY_DAYS = "7"
 B2_BUCKET_NAME = "taallab-product-files"
 GOOGLE_CLIENT_ID = "904278224751-qihnpb2neuqouolbkjese0fg6ntemf83.apps.googleusercontent.com"
