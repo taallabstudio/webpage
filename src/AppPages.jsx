@@ -642,6 +642,41 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [securityMessage,setSecurityMessage]=useState("");
   const [securityError,setSecurityError]=useState("");
   const [securitySaving,setSecuritySaving]=useState(false);
+  const [privacyBusy,setPrivacyBusy]=useState(false);
+  const [privacyError,setPrivacyError]=useState("");
+  const [privacyMessage,setPrivacyMessage]=useState("");
+
+  async function downloadPersonalData(){
+    setPrivacyBusy(true);setPrivacyError("");setPrivacyMessage("");
+    try{
+      const [accountResponse,storeResponse]=await Promise.all([
+        fetch("/api/account/data-export",{credentials:"include",cache:"no-store"}),
+        fetch("/api/store/privacy-export",{credentials:"include",cache:"no-store"})
+      ]);
+      const [accountData,storeData]=await Promise.all([
+        accountResponse.json(),storeResponse.json()
+      ]);
+      if(!accountResponse.ok)throw new Error(accountData.error||"Could not export account data.");
+      if(!storeResponse.ok)throw new Error(storeData.error||"Could not export store data.");
+      const payload={...accountData,store:storeData};
+      const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement("a");
+      link.href=url;link.download="taallab-personal-data.json";
+      document.body.append(link);link.click();link.remove();URL.revokeObjectURL(url);
+      setPrivacyMessage("Your account and store data export has been prepared.");
+    }catch(e){setPrivacyError(e.message||"Could not prepare your data export.");}
+    finally{setPrivacyBusy(false);}
+  }
+
+  async function requestDeletion(){
+    setPrivacyBusy(true);setPrivacyError("");setPrivacyMessage("");
+    try{
+      const result=await api("/account/privacy-request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmation:"DELETE MY ACCOUNT"})});
+      setPrivacyMessage("Deletion request "+result.requestId+" has been recorded. Your account has not been deleted; TaalLab will review linked data and any records that must be retained.");
+    }catch(e){setPrivacyError(e.message||"Could not submit your deletion request.");}
+    finally{setPrivacyBusy(false);}
+  }
 
   async function change(e){
     e.preventDefault();setMessage("");setError("");
@@ -723,6 +758,18 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
         {profileError&&<div className="error-box">{profileError}</div>}{profileMessage&&<div className="success-pill">{profileMessage}</div>}
         <button className="primary-btn" disabled={profileSaving}>{profileSaving?"Saving profile…":"Save profile"}</button>
       </form>
+    </section>
+    <section className="panel" style={{maxWidth:720,padding:24,marginTop:18}}>
+      <h2>Privacy &amp; personal data</h2>
+      <p className="muted" style={{marginTop:6}}>Download a copy of the account, transfer, OCEAN and digital-store information associated with this account, or submit a request to delete your account.</p>
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:16}}>
+        <button type="button" className="primary-btn" disabled={privacyBusy} onClick={downloadPersonalData}>{privacyBusy?"Please wait…":"Download my data"}</button>
+        <button type="button" className="ghost-btn" disabled={privacyBusy} onClick={()=>{if(window.confirm("Submit an account deletion request? Your account will not be deleted immediately. TaalLab will review connected data and records that may need to be retained."))void requestDeletion();}}>Request account deletion</button>
+      </div>
+      {privacyError&&<div className="error-box" role="alert" style={{marginTop:12}}>{privacyError}</div>}
+      {privacyMessage&&<div className="success-pill" role="status" style={{marginTop:12}}>{privacyMessage}</div>}
+      <p className="muted" style={{fontSize:12,marginTop:14}}>Deletion requests are reviewed rather than executed instantly, because transfers, shared OCEAN pages and purchase records may involve other users or legal retention requirements. You can also contact <a href="mailto:contact@taallab.in">contact@taallab.in</a>.</p>
+      <p style={{fontSize:12,marginTop:8}}><a href="/privacy.html">Read the Privacy Policy</a></p>
     </section>
     <SecurityMethods user={user}/>
     <section className="panel" style={{maxWidth:620,padding:24,marginTop:18}}><h2>Change password</h2><form onSubmit={change}>
