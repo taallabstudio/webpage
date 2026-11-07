@@ -142,20 +142,23 @@ async function syncNote(req: Request, env: Env, user: User) {
   if (!/\.md$/i.test(externalId)) return json({ error: "Only Markdown notes can be synced as pages." }, 400);
   const content = String(body.content ?? "");
   if (content.length > 350000) return json({ error: "Markdown note exceeds the 350 KB limit." }, 413);
-  const contentHash = String(body.contentHash || await sha256(content));
-  if (!/^[a-f0-9]{64}$/i.test(contentHash)) return json({ error: "Invalid content hash." }, 400);
+  const contentHash = await sha256(content);
+  if (body.contentHash && String(body.contentHash).toLowerCase() !== contentHash) return json({ error: "The Markdown content hash did not match the uploaded content." }, 400);
   let frontmatter: any = body.frontmatter && typeof body.frontmatter === "object" ? body.frontmatter : {};
   const folderPath = externalId.includes("/") ? externalId.split("/").slice(0,-1).join("/") : "";
   const parentId = await ensureFolder(env, user, folderPath ? "Obsidian/" + folderPath : "Obsidian");
   const title = String(body.title || titleFromPath(externalId)).trim().slice(0,160) || "Untitled";
-  const blocks = markdownBlocks(content);
+  const frontmatterJson = JSON.stringify(frontmatter);
+  if (frontmatterJson.length > 20000) return json({ error: "Frontmatter exceeds the 20 KB limit." }, 413);
+  const markdown = content.replace(/^---\\s*\\n[\\s\\S]*?\\n---\\s*(?:\\n|$)/, "");
+  const blocks = markdownBlocks(markdown);
   const timestamp = now();
   const existing: any = await env.DB.prepare("SELECT id FROM ocean_pages WHERE user_id=? AND source='obsidian' AND external_id=? LIMIT 1").bind(user.id, externalId).first();
   let id: string;
   if (existing) {
     id = String(existing.id);
     await env.DB.prepare("UPDATE ocean_pages SET parent_id=?,title=?,blocks_json=?,content_hash=?,source_modified_at=?,frontmatter_json=?,deleted_at=NULL,is_archived=0,updated_at=? WHERE id=? AND user_id=?")
-      .bind(parentId,title,JSON.stringify(blocks),contentHash,Number(body.modifiedAt)||timestamp,JSON.stringify(frontmatter).slice(0,20000),timestamp,id,user.id).run();
+      .bind(parentId,title,JSON.stringify(blocks),contentHash,Number(body.modifiedAt)||timestamp,frontmatterJson,timestamp,id,user.id).run();
   } else {
     id = randomToken(12);
     await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,icon,blocks_json,is_folder,source,external_id,content_hash,source_modified_at,frontmatter_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
