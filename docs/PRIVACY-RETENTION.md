@@ -22,6 +22,8 @@ This schedule records the retention behaviour implemented in the application. It
 | Account profile and OCEAN content | While the account remains active; following a verified deletion request, review and erase data no longer needed | Human review through the privacy-request queue; shared content, legal holds and provider-side copies require case-by-case handling |
 | Privacy-request records | As needed to document and respond to the request and meet accountability obligations | Periodic manual review; no fixed automatic purge until an approved accountability period is set |
 | Terms and Privacy acceptance records | As needed to demonstrate which policy versions were accepted | Periodic manual review; no automatic purge currently configured |
+| Marketing preferences and consent events | Retained while needed to honour opt-in/withdrawal, prevent messages after unsubscribe and demonstrate consent | User preference changes and one-click unsubscribe; no automatic purge currently configured |
+| Upload-rights attestations | Retained with the related transfer metadata | Removed with transfer metadata after the 30-day operational grace period |
 | Booking enquiry emails | In the business mailbox while needed to respond to the enquiry and manage any resulting engagement | Mailbox review and management; automatic mailbox deletion is not configured in this repository |
 | Provider backups and external service records | According to the relevant provider's actual retention/deletion settings and agreements | Verify in each provider console and applicable DPA; do not assume application deletion immediately removes provider backups |
 
@@ -29,9 +31,10 @@ This schedule records the retention behaviour implemented in the application. It
 
 1. The scheduled Worker cleanup runs hourly. It must not delete transfer metadata while a failed Google Drive deletion is still awaiting retry.
 2. A privacy deletion request is an intake and human-review workflow. Do not mark it completed until identity is verified, the appropriate erasure/revocation work is performed, and any retained records are documented.
-3. Never automatically purge paid-order records until TaalLab's accountant/legal adviser confirms the applicable statutory retention period and invoice obligations.
-4. Verify deletion and retention settings in Cloudflare, Google, Resend, Razorpay and Backblaze accounts. Published provider links are not proof that TaalLab has accepted or signed a DPA.
-5. Revisit this schedule before the relevant India DPDP provisions commence and whenever a provider, data category or product feature changes.
+3. Send optional marketing only to verified addresses with an active, recorded opt-in; honour unsubscribe requests without requiring sign-in. Keep suppression records while marketing is sent.
+4. Never automatically purge paid-order records until TaalLab's accountant/legal adviser confirms the applicable statutory retention period and invoice obligations.
+5. Verify deletion and retention settings in Cloudflare, Google, Resend, Razorpay and Backblaze accounts. Published provider links are not proof that TaalLab has accepted or signed a DPA.
+6. Revisit this schedule before the relevant India DPDP provisions commence and whenever a provider, data category or product feature changes.
 
 ## Known manual follow-ups
 
