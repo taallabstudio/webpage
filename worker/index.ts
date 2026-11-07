@@ -2638,18 +2638,23 @@ export default {
         await requireAdmin(req, env);
         const id = adminDelete[1];
         const files = await env.DB.prepare("SELECT id,storage_key FROM files WHERE transfer_id=?").bind(id).all();
-        for (const f of files.results as any[]) {
+        const failedStorageDeletes = new Set<string>();
+        for (const file of files.results as any[]) {
           const refs: any = await env.DB.prepare(
-            "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND transfer_id!=?"
-          ).bind(f.storage_key, id).first();
-          if (Number(refs?.n || 0) === 0) {
-            try { await trashDriveFile(env, f.storage_key); } catch (e) { console.error(e); }
-          }
+            "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND expires_at>? AND transfer_id!=?"
+          ).bind(file.storage_key, now(), id).first();
+          if (Number(refs?.n || 0) > 0) continue;
+          try { await trashDriveFile(env, String(file.storage_key)); }
+          catch (error) { console.error("Transfer deletion will retry storage cleanup", file.id, error); failedStorageDeletes.add(String(file.id)); }
         }
-        await env.DB.batch([
-          env.DB.prepare("UPDATE files SET status='deleted',expires_at=? WHERE transfer_id=?").bind(now(), id),
-          env.DB.prepare("UPDATE transfers SET status='deleted',expires_at=? WHERE id=?").bind(now(), id),
-        ]);
+        const deletedAt = now();
+        const statements = (files.results as any[]).map((file: any) =>
+          env.DB.prepare("UPDATE files SET status=?,expires_at=? WHERE id=?")
+            .bind(failedStorageDeletes.has(String(file.id)) ? "expired" : "deleted", deletedAt, file.id)
+        );
+        statements.push(env.DB.prepare("UPDATE transfers SET status=?,expires_at=? WHERE id=?")
+          .bind(failedStorageDeletes.size ? "expired" : "deleted", deletedAt, id));
+        await env.DB.batch(statements);
         return json({ ok: true });
       }
 
