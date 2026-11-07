@@ -41,8 +41,8 @@ function EssentialStorageNotice() {
   }, []);
   if (!visible) return null;
   return <aside role="region" aria-label="Cookie and storage notice" style={{position:"fixed",zIndex:10000,left:16,right:16,bottom:16,maxWidth:760,margin:"0 auto",padding:"16px 18px",background:"#fff",color:"#1d2229",border:"1px solid #dce2e8",borderRadius:14,boxShadow:"0 12px 40px rgba(0,0,0,.18)",display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
-    <p style={{margin:0,flex:"1 1 420px",fontSize:13,lineHeight:1.55}}>TAAL LAB uses essential session cookies to keep you signed in and local storage to remember your shop cart. <a href="/privacy.html" style={{color:"#075fb8"}}>Privacy Policy</a></p>
-    <button type="button" onClick={()=>{try{localStorage.setItem("taallab.essential-storage-notice.v1","dismissed")}catch{}setVisible(false)}} style={{border:0,borderRadius:9,padding:"10px 16px",background:"#0878e8",color:"#fff",fontWeight:700,cursor:"pointer"}}>Got it</button>
+    <p style={{margin:0,flex:"1 1 420px",fontSize:13,lineHeight:1.55}}>TAAL LAB uses essential session cookies to keep you signed in and local storage to remember your shop cart. <a href="/privacy.html" style={{color:"#075fb8",textDecoration:"underline",textUnderlineOffset:3}}>Privacy Policy</a></p>
+    <button type="button" onClick={()=>{try{localStorage.setItem("taallab.essential-storage-notice.v1","dismissed")}catch{}setVisible(false)}} style={{border:0,borderRadius:9,padding:"10px 16px",background:"#0068c9",color:"#fff",fontWeight:700,cursor:"pointer"}}>Got it</button>
   </aside>;
 }
 
