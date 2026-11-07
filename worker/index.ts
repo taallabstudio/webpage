@@ -2741,11 +2741,16 @@ export default {
   },
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(Promise.all([
-      cleanup(env),
-      env.DB.prepare("DELETE FROM email_verification_tokens WHERE expires_at<=?").bind(now()).run(),
-      env.DB.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").bind(now()).run(),
-      cleanupStoreRetention({ ...env, getCustomer: async () => null }),
-    ]));
+    ctx.waitUntil((async () => {
+      await ensureSupportSchema(env);
+      await ensureAuthMethodsSchema(env);
+      await ensureOceanSchema(env);
+      await Promise.all([
+        cleanup(env),
+        env.DB.prepare("DELETE FROM email_verification_tokens WHERE expires_at<=?").bind(now()).run(),
+        env.DB.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").bind(now()).run(),
+        cleanupStoreRetention({ ...env, getCustomer: async () => null }),
+      ]);
+    })());
   },
 } satisfies ExportedHandler<Env>;
