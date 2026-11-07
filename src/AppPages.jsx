@@ -327,8 +327,8 @@ function Login({onLogin}) {
         body:JSON.stringify({email})
       });
       setResendCooldown(60);
-      setVerificationRequired(false);
-      setNotice("If the account needs verification, a new verification email has been sent.");
+      setEmailVerificationCode("");
+      setNotice("A new verification code has been sent. Check your inbox.");
     } catch(e) {
       setError(e.message);
       if(e.retryAfter) setResendCooldown(e.retryAfter);
