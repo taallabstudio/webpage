@@ -639,11 +639,29 @@ function PrivacyControls({user}) {
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
   const [requests,setRequests]=useState([]);
+  const [marketingConsent,setMarketingConsent]=useState(false);
+  const [marketingLoaded,setMarketingLoaded]=useState(false);
+  const [marketingBusy,setMarketingBusy]=useState(false);
+  const [marketingMessage,setMarketingMessage]=useState("");
+  async function loadMarketingPreference() {
+    try { const result=await api("/account/marketing-preference");setMarketingConsent(Boolean(result.consented)); }
+    catch { setMarketingMessage("Marketing preference could not be loaded. Please try again."); }
+    finally { setMarketingLoaded(true); }
+  }
+  async function changeMarketingPreference(value) {
+    setMarketingBusy(true);setMarketingMessage("");
+    try {
+      await api("/account/marketing-preference",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({consent:value})});
+      setMarketingConsent(value);
+      setMarketingMessage(value?"Your optional marketing preference is saved.":"You are opted out of optional marketing emails.");
+    } catch(e) { setMarketingMessage(e.message||"Could not update your marketing preference."); }
+    finally { setMarketingBusy(false); }
+  }
   async function loadRequests() {
     try { const result=await api("/account/privacy-requests");setRequests(result.requests||[]); }
     catch { /* The request form remains available if history cannot be loaded. */ }
   }
-  useEffect(()=>{loadRequests();},[]);
+  useEffect(()=>{loadRequests();loadMarketingPreference();},[]);
 
   async function submitRequest(event) {
     event.preventDefault();
@@ -662,6 +680,14 @@ function PrivacyControls({user}) {
     <p className="muted" style={{marginTop:6}}>Download a copy of the account information TaalLab holds, or submit a request to correct or delete your personal data.</p>
     <div style={{display:"flex",flexWrap:"wrap",gap:10,marginTop:18}}>
       <a className="primary-btn" href="/api/account/data-export" download><Download size={15}/> Download my data</a>
+    </div>
+    <div style={{marginTop:22,padding:14,border:"1px solid var(--line)",borderRadius:12}}>
+      <label style={{display:"flex",alignItems:"flex-start",gap:10,fontSize:13,lineHeight:1.55}}>
+        <input type="checkbox" checked={marketingConsent} disabled={!marketingLoaded||marketingBusy} onChange={e=>changeMarketingPreference(e.target.checked)} style={{marginTop:3,flex:"0 0 auto"}}/>
+        <span><strong>Optional marketing emails</strong><br/>I agree to receive occasional product and studio updates from TaalLab by email. This is optional and is not required to use the service.</span>
+      </label>
+      <p className="muted" style={{fontSize:12,margin:"8px 0 0 27px"}}>You can withdraw this permission at any time in Account settings or through the unsubscribe link in a marketing email. Essential account, security, purchase and service messages are unaffected.</p>
+      {marketingMessage&&<p className="muted" role="status" style={{fontSize:12,margin:"8px 0 0 27px"}}>{marketingMessage}</p>}
     </div>
     <form onSubmit={submitRequest} style={{marginTop:22}}>
       <label>Request type
