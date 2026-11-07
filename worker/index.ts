@@ -170,6 +170,12 @@ async function ensureSupportSchema(env: Env) {
       if (!exists) throw e;
     }
   }
+  const updatedTransferColumns: any = await env.DB.prepare("PRAGMA table_info(transfers)").all();
+  const hasRightsConfirmedAt = (updatedTransferColumns.results || []).some((col: any) => col.name === "rights_confirmed_at");
+  if (!hasRightsConfirmedAt) await env.DB.prepare("ALTER TABLE transfers ADD COLUMN rights_confirmed_at INTEGER").run();
+  const hasRightsConfirmedBy = (updatedTransferColumns.results || []).some((col: any) => col.name === "rights_confirmed_by");
+  if (!hasRightsConfirmedBy) await env.DB.prepare("ALTER TABLE transfers ADD COLUMN rights_confirmed_by TEXT").run();
+
   const userColumns: any = await env.DB.prepare("PRAGMA table_info(users)").all();
   const hasDisplayName = (userColumns.results || []).some((col: any) => col.name === "display_name");
   if (!hasDisplayName) await env.DB.prepare("ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''").run();
@@ -2463,8 +2469,11 @@ export default {
       }
 
       if (url.pathname === "/api/admin/transfers" && req.method === "POST") {
-        await requireAdmin(req, env);
+        const admin = await requireAdmin(req, env);
         const body = await req.json().catch(() => ({}));
+        if (body.rights_confirmed !== true) {
+          return json({ error: "Confirm that you own or have permission to share these files before creating a transfer." }, { status: 400 });
+        }
         const list = Array.isArray(body.files) ? body.files : [];
         if (!list.length) return json({ error: "No files selected" }, { status: 400 });
 
@@ -2506,8 +2515,8 @@ export default {
           }
         }
 
-        await env.DB.prepare("INSERT INTO transfers(id,created_at,expires_at,message,total_size,file_count,status,user_id) VALUES(?,?,?,?,?,?,?,?)")
-          .bind(transferId, created, expires, String(body.message || "").slice(0, 4000), total, list.length, "active", recipientId || null)
+        await env.DB.prepare("INSERT INTO transfers(id,created_at,expires_at,message,total_size,file_count,status,user_id,rights_confirmed_at,rights_confirmed_by) VALUES(?,?,?,?,?,?,?,?,?,?)")
+          .bind(transferId, created, expires, String(body.message || "").slice(0, 4000), total, list.length, "active", recipientId || null, created, admin.id)
           .run();
 
         const result = [];
