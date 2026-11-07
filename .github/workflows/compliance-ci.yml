@@ -28,6 +28,11 @@ jobs:
           cache: ""
       - name: Install dependencies
         run: npm ci
+      - name: Audit npm dependency vulnerabilities
+        run: |
+          mkdir -p .audit
+          npm audit --json > .audit/npm-audit-all.json || true
+          npm audit --omit=dev --json > .audit/npm-audit-production.json || true
       - name: Generate dependency licence inventory
         run: mkdir -p .audit && npx --yes license-checker --json --out .audit/third-party-licenses.json && node scripts/generate-license-inventory.mjs
       - name: Preserve lockfile and licence inventory
@@ -37,6 +42,8 @@ jobs:
           path: |
             package-lock.json
             .audit/third-party-licenses.json
+            .audit/npm-audit-all.json
+            .audit/npm-audit-production.json
             docs/THIRD-PARTY-LICENSE-INVENTORY.md
           if-no-files-found: error
           retention-days: 14
