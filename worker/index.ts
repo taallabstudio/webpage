@@ -749,10 +749,13 @@ async function getMarketingPreference(req: Request, env: Env) {
   const user = await requireUser(req, env);
   await ensureMarketingSchema(env);
   const row: any = await env.DB.prepare("SELECT subscribed,consented_at,unsubscribed_at,updated_at FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(user.id).first();
+  const subscribed = Number(row?.subscribed || 0) === 1;
+  const token = subscribed ? await marketingUnsubscribeToken(env, user.id) : "";
   return json({
-    subscribed: Number(row?.subscribed || 0) === 1,
+    subscribed,
     consented_at: row?.consented_at || null,
     unsubscribed_at: row?.unsubscribed_at || null,
+    unsubscribe_url: subscribed ? `${origin(env)}/unsubscribe.html?token=${encodeURIComponent(token)}` : null,
   });
 }
 
