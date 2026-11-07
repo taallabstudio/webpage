@@ -869,13 +869,14 @@ async function createPrivacyRequest(req: Request, env: Env) {
   const type = String(body.type || "");
   if (type !== "deletion" && type !== "correction") return json({ error: "Choose a valid privacy request type." }, { status: 400 });
   const description = String(body.description || "").trim().slice(0, 1000);
+  if (type === "deletion") await recordMarketingConsent(env, user.id, user.email, false, "account_deletion_request");
   const existing: any = await env.DB.prepare("SELECT id,status FROM privacy_requests WHERE user_id=? AND request_type=? AND status IN ('open','in_review') ORDER BY created_at DESC LIMIT 1")
     .bind(user.id, type).first();
   if (existing) return json({ ok: true, requestId: existing.id, status: existing.status, alreadyOpen: true });
   const requestId = "PR-" + randomToken(8).toUpperCase();
   await env.DB.prepare("INSERT INTO privacy_requests(id,user_id,request_type,description,status,created_at) VALUES(?,?,?,?, 'open', ?)")
     .bind(requestId, user.id, type, description, now()).run();
-  if (type === "deletion") await recordMarketingConsent(env, user.id, user.email, false, "account_deletion_request");
+
   const label = type === "deletion" ? "Account and personal data deletion" : "Personal data correction";
   const notification = await sendAuthEmail(
     env,
