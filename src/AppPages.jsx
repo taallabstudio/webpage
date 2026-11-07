@@ -610,13 +610,13 @@ function StoreProductManager(){
 function UserManagement({currentUser}) {
   const [users,setUsers]=useState([]);
   const [loading,setLoading]=useState(true);
-  const [form,setForm]=useState({email:"",password:"",role:"user"});
+  const [form,setForm]=useState({email:"",password:"",role:"user",ageConfirmed:false});
   const [error,setError]=useState("");
   async function load(){try{const d=await api("/admin/users");setUsers(d.users)}catch(e){setError(e.message)}finally{setLoading(false)}}
   useEffect(()=>{load()},[]);
   async function create(e){
     e.preventDefault();setError("");
-    try{await api("/admin/users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});setForm({email:"",password:"",role:"user"});load()}catch(e){setError(e.message)}
+    try{await api("/admin/users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});setForm({email:"",password:"",role:"user",ageConfirmed:false});load()}catch(e){setError(e.message)}
   }
   async function update(id,body){
     try{await api("/admin/users/"+id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});load()}catch(e){setError(e.message)}
@@ -628,7 +628,7 @@ function UserManagement({currentUser}) {
         <label>Email<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} required/></label>
         <label>Temporary password<input type="password" minLength={8} value={form.password} onChange={e=>setForm({...form,password:e.target.value})} required/></label>
         <label>Role<select value={form.role} onChange={e=>setForm({...form,role:e.target.value})}><option value="user">User</option><option value="admin">Admin</option></select></label>
-        <button className="primary-btn">Create</button>
+        <label className="policy-consent" style={{gridColumn:"1/-1"}}><input type="checkbox" checked={form.ageConfirmed} onChange={e=>setForm({...form,ageConfirmed:e.target.checked})} required/><span>I confirm this account holder is at least 18 years old.</span></label><button className="primary-btn">Create</button>
       </form>
       {error&&<div className="error-box" style={{marginTop:14}}>{error}</div>}
     </section>
@@ -931,6 +931,7 @@ function Upload({onDone}) {
   const [message,setMessage]=useState("");
   const [recipientId,setRecipientId]=useState("");
   const [recipientEmail,setRecipientEmail]=useState("");
+  const [recipientAdultConfirmed,setRecipientAdultConfirmed]=useState(false);
   const [recipients,setRecipients]=useState([]);
   const [uploading,setUploading]=useState(false);
   useEffect(()=>{api("/admin/users").then(d=>setRecipients((d.users||[]).filter(u=>u.status==="active"))).catch(()=>{})},[]);
@@ -954,7 +955,7 @@ function Upload({onDone}) {
     if(!files.length)return;
     setUploading(true);
     try{
-      const init=await api("/admin/transfers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,user_id:recipientId||null,recipient_email:recipientEmail.trim(),files:files.map(f=>({name:f.name,size:f.size,type:f.type}))})});
+      const init=await api("/admin/transfers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,user_id:recipientId||null,recipient_email:recipientEmail.trim(),recipientAdultConfirmed,files:files.map(f=>({name:f.name,size:f.size,type:f.type}))})});
       setRecipientInfo(init.recipient||null);
       let done=0;
       let nextIndex=0;
@@ -1032,14 +1033,16 @@ function Upload({onDone}) {
     <div className="upload-grid"><section className="panel upload-panel"><div className="dropzone" onDragOver={e=>e.preventDefault()} onDrop={drop}><UploadCloud/><h2>Drop files here</h2><p>or choose multiple files from your computer</p><label className="primary-btn"><Plus/> Select files<input hidden type="file" multiple onChange={addFiles}/></label><small>Files go directly to private R2 storage.</small></div>
       {!!files.length&&<div className="upload-files">{files.map(f=><div className="upload-file" key={f.id}><File/><div><strong>{f.name}</strong><small>{formatBytes(f.size)}</small></div><button className="icon-btn" onClick={()=>setFiles(files.filter(x=>x.id!==f.id))}><X/></button></div>)}</div>}
     </section><section className="panel message-panel">
-      <label>Client email <span className="muted">(optional)</span><input type="email" list="client-users" value={recipientEmail} placeholder="client@example.com — leave blank for link only" onChange={e=>{setRecipientEmail(e.target.value);setRecipientId("")}}/><datalist id="client-users">{recipients.map(u=><option key={u.id} value={u.email}>{u.email}</option>)}</datalist></label>
-      <label>Select existing user <span className="muted">(optional)</span><select value={recipientId} onChange={e=>{const id=e.target.value;setRecipientId(id);const match=recipients.find(u=>u.id===id);if(match)setRecipientEmail(match.email)}}><option value="">No account / enter email manually…</option>{recipients.map(u=><option key={u.id} value={u.id}>{u.email}{u.role==="admin"?" (Admin)":""}</option>)}</select></label>
+      <label>Client email <span className="muted">(optional)</span><input type="email" list="client-users" value={recipientEmail} placeholder="client@example.com — leave blank for link only" onChange={e=>{setRecipientEmail(e.target.value);setRecipientId("");setRecipientAdultConfirmed(false)}}/><datalist id="client-users">{recipients.map(u=><option key={u.id} value={u.email}>{u.email}</option>)}</datalist></label>
+      <label>Select existing user <span className="muted">(optional)</span><select value={recipientId} onChange={e=>{const id=e.target.value;setRecipientId(id);setRecipientAdultConfirmed(false);const match=recipients.find(u=>u.id===id);if(match)setRecipientEmail(match.email)}}><option value="">No account / enter email manually…</option>{recipients.map(u=><option key={u.id} value={u.id}>{u.email}{u.role==="admin"?" (Admin)":""}</option>)}</select></label>
       <small className="muted">Email is optional. If you enter an email, an existing account is reused (and reactivated if disabled); if it does not exist, a receive-only user account is created automatically. Leave it blank for a link-only transfer. Clients can receive files only; they cannot create transfers.</small>
+      {(recipientEmail.trim()||recipientId)&&<label className="policy-consent"><input type="checkbox" checked={recipientAdultConfirmed} onChange={e=>setRecipientAdultConfirmed(e.target.checked)} required/><span>I confirm the client recipient is at least 18 years old.</span></label>
+      <small className="muted"></small>
       <label>Client message<textarea rows="8" placeholder="Add a message for your client…" value={message} onChange={e=>setMessage(e.target.value)}/></label><div className="upload-summary"><span>Expiration</span><strong>7 days after upload</strong><span>Files</span><strong>{files.length}</strong><span>Total size</span><strong>{formatBytes(files.reduce((n,f)=>n+f.size,0))}</strong></div>{uploading?<div className="upload-progress-card" role="status" aria-live="polite">
         <div className="upload-progress-heading"><span className="upload-progress-icon"><RefreshCw className="spin"/></span><div><strong>{progress.done>=progress.total?"Finishing transfer…":`Uploading ${Math.min(4,progress.total-progress.done)} files in parallel`}</strong><small>{progress.done} of {progress.total} files completed</small></div><span className="upload-progress-count">{progress.total?Math.round(progress.done/progress.total*100):0}%</span></div>
         <div className="upload-progress-track"><span style={{width:`${progress.total?Math.round(progress.done/progress.total*100):0}%`}}/></div>
         <p className="upload-progress-detail">{progress.active||"Preparing your files…"}</p>
-      </div>:<button className="primary-btn full upload-submit-btn" disabled={!files.length} onClick={upload}><UploadCloud/> Create transfer</button>}</section></div>
+      </div>:<button className="primary-btn full upload-submit-btn" disabled={!files.length||!!(recipientEmail.trim()||recipientId)&&!recipientAdultConfirmed} onClick={upload}><UploadCloud/> Create transfer</button>}</section></div>
   </div>;
 }
 
