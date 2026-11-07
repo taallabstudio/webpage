@@ -971,7 +971,7 @@ function Upload({onDone}) {
     if(!files.length || !rightsConfirmed)return;
     setUploading(true);
     try{
-      const init=await api("/admin/transfers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,user_id:recipientId||null,recipient_email:recipientEmail.trim(),files:files.map(f=>({name:f.name,size:f.size,type:f.type}))})});
+      const init=await api("/admin/transfers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,user_id:recipientId||null,recipient_email:recipientEmail.trim(),rights_confirmed:true,files:files.map(f=>({name:f.name,size:f.size,type:f.type}))})});
       setRecipientInfo(init.recipient||null);
       let done=0;
       let nextIndex=0;
