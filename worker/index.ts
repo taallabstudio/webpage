@@ -783,7 +783,13 @@ async function updateMarketingPreference(req: Request, env: Env) {
   if (req.method === "GET") {
     const row: any = await env.DB.prepare("SELECT consented_at,withdrawn_at,source,policy_version FROM marketing_preferences WHERE user_id=? LIMIT 1")
       .bind(user.id).first();
-    return json({ consented: Boolean(row?.consented_at && !row?.withdrawn_at), consented_at: row?.consented_at || null });
+    const consented = Boolean(row?.consented_at && !row?.withdrawn_at);
+    const unsubscribeToken = consented ? await getMarketingUnsubscribeToken(env, String(user.id)) : null;
+    return json({
+      consented,
+      consented_at: row?.consented_at || null,
+      unsubscribe_url: unsubscribeToken ? `${origin(env)}/unsubscribe.html?token=${encodeURIComponent(unsubscribeToken)}` : null,
+    });
   }
   const body = await req.json().catch(() => ({}));
   if (body.consent !== true && body.consent !== false) return json({ error: "Choose whether to receive marketing emails." }, { status: 400 });
