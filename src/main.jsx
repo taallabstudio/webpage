@@ -32,6 +32,22 @@ async function handleOceanOAuthUrl(rawUrl) {
   }
 }
 
+function CookieNotice() {
+  const [visible,setVisible] = React.useState(() => {
+    try { return localStorage.getItem("taallab.privacy-notice.dismissed.v1") !== "1"; }
+    catch { return true; }
+  });
+  function dismiss() {
+    setVisible(false);
+    try { localStorage.setItem("taallab.privacy-notice.dismissed.v1","1"); } catch {}
+  }
+  if (!visible) return null;
+  return <aside className="cookie-notice" role="region" aria-label="Cookie and storage notice">
+    <div><strong>Privacy notice</strong><p>We use a secure sign-in cookie and local storage for essential features such as your cart and app preferences. We do not currently use advertising or analytics cookies. <a href="/privacy.html">Read our Privacy Policy</a>.</p></div>
+    <button type="button" onClick={dismiss}>Got it</button>
+  </aside>;
+}
+
 function RouteLoader() {
   useEffect(() => {
     let active = true;
@@ -65,6 +81,7 @@ function RouteLoader() {
   return (
     <Suspense fallback={<div className="route-loading" role="status">Loading…</div>}>
       <Page />
+      <CookieNotice />
     </Suspense>
   );
 }
