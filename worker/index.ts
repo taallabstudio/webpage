@@ -36,7 +36,7 @@ const SETTINGS_REFRESH = "google_refresh_token";
 const SETTINGS_FOLDER = "google_drive_folder_id";
 const now = () => Math.floor(Date.now() / 1000);
 const TERMS_VERSION = "2026-11-07.1";
-const PRIVACY_VERSION = "2026-11-07.3";
+const PRIVACY_VERSION = "2026-11-07.4";
 const POLICY_CONSENT_VERSION = TERMS_VERSION + ":" + PRIVACY_VERSION;
 
 async function recordPolicyAcceptance(env: Env, userId: string, method: string) {
@@ -300,6 +300,12 @@ async function ensureSupportSchema(env: Env) {
     event_type TEXT NOT NULL, details_json TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL
   )`).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_parent_consent_events_child ON parental_consent_events(child_user_id,created_at DESC)").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS marketing_preferences (user_id TEXT PRIMARY KEY,enabled INTEGER NOT NULL DEFAULT 0,consent_version TEXT,consented_at INTEGER,withdrawn_at INTEGER,updated_at INTEGER NOT NULL)").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS marketing_preference_events (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,enabled INTEGER NOT NULL,consent_version TEXT,source TEXT NOT NULL,created_at INTEGER NOT NULL)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_marketing_preference_events_user ON marketing_preference_events(user_id,created_at DESC)").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS marketing_unsubscribe_tokens (token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,created_at INTEGER NOT NULL,used_at INTEGER)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_marketing_unsubscribe_user ON marketing_unsubscribe_tokens(user_id,used_at)").run();
+
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS child_permissions (
     child_user_id TEXT PRIMARY KEY, parent_user_id TEXT NOT NULL,
     tutorial_access INTEGER NOT NULL DEFAULT 0, lesson_downloads INTEGER NOT NULL DEFAULT 0,
@@ -764,6 +770,80 @@ async function currentUser(env: Env, req: Request) {
   return user ? json({ authenticated: true, user }) : json({ authenticated: false });
 }
 
+
+const MARKETING_CONSENT_VERSION = "2026-11-07.1";
+
+async function getMarketingPreference(req: Request, env: Env) {
+  const user=await requireUser(req,env,{allowPendingAge:true});
+  if(user.account_type!=="adult" || !user.email_verified_at) return json({eligible:false,enabled:false});
+  const preference: any=await env.DB.prepare("SELECT enabled,consent_version,consented_at,withdrawn_at FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(user.id).first();
+  return json({eligible:true,enabled:Number(preference?.enabled||0)===1,consentedAt:preference?.consented_at||null,withdrawnAt:preference?.withdrawn_at||null});
+}
+
+async function updateMarketingPreference(req: Request, env: Env) {
+  const user=await requireUser(req,env);
+  if(user.account_type!=="adult" || !user.email_verified_at) return json({error:"Marketing email preferences are available only to adult accounts with a verified email address."},{status:403});
+  const body=await req.json().catch(()=>({}));
+  if(typeof body.enabled!=="boolean") return json({error:"Choose whether to receive optional marketing emails."},{status:400});
+  const timestamp=now(), enabled=body.enabled;
+  if(enabled){
+    await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,enabled,consent_version,consented_at,withdrawn_at,updated_at)
+      VALUES(?,1,?,?,NULL,?) ON CONFLICT(user_id) DO UPDATE SET enabled=1,consent_version=excluded.consent_version,consented_at=excluded.consented_at,withdrawn_at=NULL,updated_at=excluded.updated_at`)
+      .bind(user.id,MARKETING_CONSENT_VERSION,timestamp,timestamp).run();
+  }else{
+    await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,enabled,withdrawn_at,updated_at)
+      VALUES(?,0,?,?) ON CONFLICT(user_id) DO UPDATE SET enabled=0,withdrawn_at=excluded.withdrawn_at,updated_at=excluded.updated_at`)
+      .bind(user.id,timestamp,timestamp).run();
+    await env.DB.prepare("UPDATE marketing_unsubscribe_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL").bind(timestamp,user.id).run();
+  }
+  await env.DB.prepare("INSERT INTO marketing_preference_events(id,user_id,enabled,consent_version,source,created_at) VALUES(?,?,?,?,?,?)")
+    .bind(randomToken(16),user.id,enabled?1:0,enabled?MARKETING_CONSENT_VERSION:null,"account_settings",timestamp).run();
+  return json({ok:true,enabled,message:enabled?"Your optional marketing email preference has been saved. No marketing campaigns are currently being sent.":"You are opted out of marketing emails."});
+}
+
+async function createMarketingUnsubscribeToken(env: Env, userId: string) {
+  const preference: any=await env.DB.prepare("SELECT enabled FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(userId).first();
+  if(Number(preference?.enabled||0)!==1) return null;
+  const token=randomToken(24), tokenHash=await hashText(token);
+  await env.DB.prepare("INSERT INTO marketing_unsubscribe_tokens(token_hash,user_id,created_at) VALUES(?,?,?)").bind(tokenHash,userId,now()).run();
+  return origin(env)+"/api/marketing/unsubscribe?token="+encodeURIComponent(token);
+}
+
+async function handleMarketingUnsubscribe(req: Request, env: Env) {
+  const url=new URL(req.url);
+  let token=String(url.searchParams.get("token")||"");
+  if(req.method==="POST"){
+    const contentType=req.headers.get("Content-Type")||"";
+    if(contentType.includes("application/x-www-form-urlencoded")){
+      const form=new URLSearchParams(await req.text());
+      token=token||String(form.get("token")||"");
+    }else{
+      const body=await req.json().catch(()=>({}));
+      token=token||String(body.token||"");
+    }
+  }
+  const html=(title:string,message:string,form=false)=>new Response(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · TaalLab</title><body style="margin:0;background:#f5f7f8;color:#1d2229;font:16px/1.6 system-ui,sans-serif"><main style="max-width:560px;margin:10vh auto;padding:28px;background:#fff;border:1px solid #dce2e8;border-radius:16px"><h1>${title}</h1><p>${message}</p>${form?`<form method="post" action="/api/marketing/unsubscribe?token=${token}"><input type="hidden" name="List-Unsubscribe" value="One-Click"><button style="padding:12px 18px;border:0;border-radius:9px;background:#075fb8;color:white;font-weight:700">Unsubscribe</button></form>`:""}<p><a href="https://taallab.in">Return to TaalLab</a></p></main></body></html>`,{status:200,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
+  if(req.method==="GET"){
+    if(!/^[a-f0-9]{48}$/.test(token)) return html("Invalid unsubscribe link","This unsubscribe link is invalid or incomplete.");
+    const tokenHash=await hashText(token);
+    const exists: any=await env.DB.prepare("SELECT token_hash FROM marketing_unsubscribe_tokens WHERE token_hash=? AND used_at IS NULL LIMIT 1").bind(tokenHash).first();
+    if(!exists) return html("Already unsubscribed","This link has already been used or is no longer valid.");
+    return html("Unsubscribe from marketing emails","Confirm that you no longer want to receive optional marketing emails from TaalLab.",true);
+  }
+  if(req.method!=="POST") return new Response("Method not allowed",{status:405,headers:{Allow:"GET, POST"}});
+  if(!/^[a-f0-9]{48}$/.test(token)) return html("Invalid unsubscribe link","This unsubscribe link is invalid or incomplete.");
+  const tokenHash=await hashText(token);
+  const record: any=await env.DB.prepare("SELECT user_id FROM marketing_unsubscribe_tokens WHERE token_hash=? AND used_at IS NULL LIMIT 1").bind(tokenHash).first();
+  if(!record) return html("Already unsubscribed","This link has already been used or is no longer valid.");
+  const timestamp=now();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE marketing_preferences SET enabled=0,withdrawn_at=?,updated_at=? WHERE user_id=?").bind(timestamp,timestamp,record.user_id),
+    env.DB.prepare("UPDATE marketing_unsubscribe_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL").bind(timestamp,record.user_id),
+    env.DB.prepare("INSERT INTO marketing_preference_events(id,user_id,enabled,consent_version,source,created_at) VALUES(?,?,0,NULL,'one_click_unsubscribe',?)").bind(randomToken(16),record.user_id,timestamp),
+  ]);
+  return html("You are unsubscribed","TaalLab will not send you optional marketing emails.");
+}
+
 const PARENT_CONSENT_VERSION = "2026-11-07.1";
 const CHILD_PERMISSION_KEYS = ["tutorial_access","lesson_downloads","comments","uploads_sharing"] as const;
 
@@ -940,7 +1020,7 @@ async function checkTutorialAccess(req: Request, env: Env) {
 async function exportAccountData(req: Request, env: Env) {
   const user = await requireUser(req, env, { allowPendingAge: true });
   await ensureOceanSchema(env);
-  const [identity, googleIdentity, acceptances, privacyRequests, transfers, files, pages, shares, pageCollaborators, comments, assets, calendar, passkeys, authenticator, recovery, store, parentLinks, parentInvites, consentRecords, consentEvents, permissionEvents] = await Promise.all([
+  const [identity, googleIdentity, acceptances, privacyRequests, transfers, files, pages, shares, pageCollaborators, comments, assets, calendar, passkeys, authenticator, recovery, store, parentLinks, parentInvites, consentRecords, consentEvents, permissionEvents, marketingPreference, marketingEvents] = await Promise.all([
     env.DB.prepare("SELECT id,email,role,created_at,updated_at,email_verified_at,display_name,avatar_data,two_factor_enabled,date_of_birth,account_type,parental_consent_status,parent_user_id FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at").bind(user.id).all(),
@@ -962,6 +1042,8 @@ async function exportAccountData(req: Request, env: Env) {
     env.DB.prepare("SELECT id,parent_user_id,child_user_id,policy_version,scope_json,verification_method,consented_at,withdrawn_at FROM parental_consent_records WHERE parent_user_id=? OR child_user_id=? ORDER BY consented_at").bind(user.id,user.id).all(),
     env.DB.prepare("SELECT id,parent_user_id,child_user_id,event_type,details_json,created_at FROM parental_consent_events WHERE parent_user_id=? OR child_user_id=? ORDER BY created_at").bind(user.id,user.id).all(),
     env.DB.prepare("SELECT id,parent_user_id,child_user_id,permission,enabled,changed_at FROM child_permission_events WHERE parent_user_id=? OR child_user_id=? ORDER BY changed_at").bind(user.id,user.id).all(),
+    env.DB.prepare("SELECT enabled,consent_version,consented_at,withdrawn_at,updated_at FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(user.id).first(),
+    env.DB.prepare("SELECT id,enabled,consent_version,source,created_at FROM marketing_preference_events WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
   ]);
   const payload = {
     exported_at: new Date().toISOString(),
@@ -974,6 +1056,8 @@ async function exportAccountData(req: Request, env: Env) {
     parental_consent_records: consentRecords.results || [],
     parental_consent_events: consentEvents.results || [],
     child_permission_events: permissionEvents.results || [],
+    marketing_preferences: marketingPreference || null,
+    marketing_preference_events: marketingEvents.results || [],
     transfers: transfers.results || [],
     transfer_files: files.results || [],
     ocean_pages: pages.results || [],
@@ -2700,6 +2784,9 @@ export default {
       if ((url.pathname === "/api/auth/logout" || url.pathname === "/api/admin/logout") && req.method === "POST") return authLogout(req, env);
       if (url.pathname === "/api/auth/me" && req.method === "GET") return currentUser(env, req);
       if (url.pathname === "/api/account/date-of-birth" && req.method === "POST") return saveDateOfBirth(req, env);
+      if (url.pathname === "/api/marketing/unsubscribe" && (req.method === "GET" || req.method === "POST")) return handleMarketingUnsubscribe(req,env);
+      if (url.pathname === "/api/account/marketing-preference" && req.method === "GET") return getMarketingPreference(req,env);
+      if (url.pathname === "/api/account/marketing-preference" && req.method === "POST") return updateMarketingPreference(req,env);
       if (url.pathname === "/api/admin/parental-verifications" && req.method === "GET") return listPendingParentVerifications(req, env);
       const parentVerifyMatch=url.pathname.match(/^\/api\/admin\/parental-verifications\/([^/]+)$/);
       if (parentVerifyMatch && req.method === "PATCH") return verifyParentLinkManually(req, env, parentVerifyMatch[1]);
