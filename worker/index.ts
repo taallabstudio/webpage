@@ -416,10 +416,15 @@ async function getSessionUser(req: Request, env: Env) {
 async function requireUser(req: Request, env: Env, options: { allowPendingAge?: boolean } = {}) {
   const user = await getSessionUser(req, env);
   if (!user) throw json({ error: "Unauthorized" }, { status: 401 });
-  if (!options.allowPendingAge && user.role !== "admin" &&
-      (!user.date_of_birth || user.account_type === "unclassified" ||
-       (user.account_type === "child" && (user.parental_consent_status !== "consented" || !user.parent_user_id)))) {
-    throw json({ error: "Complete the age and parent/guardian setup before using this account feature." }, { status: 403 });
+  if (!options.allowPendingAge && user.role !== "admin") {
+    if (!user.date_of_birth || user.account_type === "unclassified" ||
+        (user.account_type === "child" && (user.parental_consent_status !== "consented" || !user.parent_user_id))) {
+      throw json({ error: "Complete the age and parent/guardian setup before using this account feature." }, { status: 403 });
+    }
+    if (user.account_type === "child") {
+      const activeVerifiedLink: any = await env.DB.prepare("SELECT id FROM parent_child_links WHERE child_user_id=? AND parent_user_id=? AND status='active' AND verification_status='verified' LIMIT 1").bind(user.id,user.parent_user_id).first();
+      if (!activeVerifiedLink) throw json({ error: "Child account access is waiting for parent/guardian verification." }, { status: 403 });
+    }
   }
   return user;
 }
@@ -952,7 +957,7 @@ async function exportAccountData(req: Request, env: Env) {
     env.DB.prepare("SELECT enabled,created_at,updated_at FROM user_totp WHERE user_id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT COUNT(*) AS remaining FROM auth_recovery_codes WHERE user_id=? AND used_at IS NULL").bind(user.id).first(),
     exportCustomerPrivacyData({ ...env, getCustomer: async () => ({ id: String(user.id), email: String(user.email) }) }, String(user.id)),
-    env.DB.prepare("SELECT id,parent_user_id,child_user_id,status,created_at,linked_at,revoked_at FROM parent_child_links WHERE parent_user_id=? OR child_user_id=? ORDER BY created_at").bind(user.id,user.id).all(),
+    env.DB.prepare("SELECT id,parent_user_id,child_user_id,status,created_at,linked_at,revoked_at,parent_attested_at,verification_status,verified_at,verified_by,verification_method FROM parent_child_links WHERE parent_user_id=? OR child_user_id=? ORDER BY created_at").bind(user.id,user.id).all(),
     env.DB.prepare("SELECT id,parent_user_id,child_user_id,child_email,created_at,expires_at,consumed_at,canceled_at FROM parent_link_invites WHERE parent_user_id=? OR child_user_id=? ORDER BY created_at").bind(user.id,user.id).all(),
     env.DB.prepare("SELECT id,parent_user_id,child_user_id,policy_version,scope_json,verification_method,consented_at,withdrawn_at FROM parental_consent_records WHERE parent_user_id=? OR child_user_id=? ORDER BY consented_at").bind(user.id,user.id).all(),
     env.DB.prepare("SELECT id,parent_user_id,child_user_id,event_type,details_json,created_at FROM parental_consent_events WHERE parent_user_id=? OR child_user_id=? ORDER BY created_at").bind(user.id,user.id).all(),
