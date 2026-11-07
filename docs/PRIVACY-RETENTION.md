@@ -19,9 +19,11 @@ This schedule records the retention behaviour implemented in the application. It
 | Unpaid/abandoned digital-store orders | 30 days from creation | Hourly Store cleanup |
 | Paid orders and payment records | Only as long as needed for accounting, tax, payment disputes, fraud prevention and legal obligations | Manual review; confirm exact statutory periods with the accountant/legal adviser before implementing automatic deletion |
 | Booking anti-abuse identifiers (email and IP) | Up to 1 year after last use | Hourly Worker cleanup |
+| Dedicated security-event logs | Not yet implemented as a separate one-year audit log | Engineering/legal gap: design an appropriate security-event log and retention/deletion control before the relevant DPDP Rules take effect; do not treat 30-day transfer metadata as a substitute |
 | Account profile and OCEAN content | While the account remains active; following a verified deletion request, review and erase data no longer needed | Human review through the privacy-request queue; shared content, legal holds and provider-side copies require case-by-case handling |
 | Privacy-request records | As needed to document and respond to the request and meet accountability obligations | Periodic manual review; no fixed automatic purge until an approved accountability period is set |
 | Terms and Privacy acceptance records | As needed to demonstrate which policy versions were accepted | Periodic manual review; no automatic purge currently configured |
+| Marketing preference and consent-event records | While needed to honour the user's current choice and maintain an unsubscribe/suppression record | Retained in the marketing preference store; include in account export and deletion-request review |
 | Booking enquiry emails | In the business mailbox while needed to respond to the enquiry and manage any resulting engagement | Mailbox review and management; automatic mailbox deletion is not configured in this repository |
 | Provider backups and external service records | According to the relevant provider's actual retention/deletion settings and agreements | Verify in each provider console and applicable DPA; do not assume application deletion immediately removes provider backups |
 
@@ -35,6 +37,7 @@ This schedule records the retention behaviour implemented in the application. It
 
 ## Known manual follow-ups
 
+- Design a dedicated security-event log with the required retention and deletion controls; confirm whether existing operational records are sufficient for the applicable DPDP Rules.
 - Confirm statutory retention periods for invoices, paid orders and payment records.
 - Confirm the legal basis and exact retention period for privacy-request and policy-acceptance records.
 - Review the contact mailbox retention policy for booking enquiries.

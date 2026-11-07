@@ -35,8 +35,8 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const SETTINGS_REFRESH = "google_refresh_token";
 const SETTINGS_FOLDER = "google_drive_folder_id";
 const now = () => Math.floor(Date.now() / 1000);
-const TERMS_VERSION = "2026-11-07";
-const PRIVACY_VERSION = "2026-11-07.1";
+const TERMS_VERSION = "2026-11-07.1";
+const PRIVACY_VERSION = "2026-11-07.5";
 const POLICY_CONSENT_VERSION = TERMS_VERSION + ":" + PRIVACY_VERSION;
 
 async function recordPolicyAcceptance(env: Env, userId: string, method: string) {
@@ -49,6 +49,63 @@ async function recordPolicyAcceptance(env: Env, userId: string, method: string) 
   )`).run();
   await env.DB.prepare("INSERT INTO policy_acceptances(id,user_id,terms_version,privacy_version,accepted_at,method) VALUES(?,?,?,?,?,?)")
     .bind(randomToken(16), userId, TERMS_VERSION, PRIVACY_VERSION, now(), method).run();
+}
+
+async function ensureMarketingSchema(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS marketing_preferences (
+    user_id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    subscribed INTEGER NOT NULL DEFAULT 0,
+    consented_at INTEGER,
+    unsubscribed_at INTEGER,
+    updated_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS marketing_consent_events (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    action TEXT NOT NULL CHECK(action IN ('subscribe','unsubscribe')),
+    method TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_marketing_events_user_created ON marketing_consent_events(user_id,created_at DESC)").run();
+}
+
+async function recordMarketingConsent(env: Env, userId: string, email: string, subscribed: boolean, method = "account_settings") {
+  await ensureMarketingSchema(env);
+  const timestamp = now();
+  if (subscribed) {
+    await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,email,subscribed,consented_at,unsubscribed_at,updated_at)
+      VALUES(?,?,1,?,NULL,?)
+      ON CONFLICT(user_id) DO UPDATE SET email=excluded.email,subscribed=1,consented_at=excluded.consented_at,unsubscribed_at=NULL,updated_at=excluded.updated_at`)
+      .bind(userId, normalizeEmail(email), timestamp, timestamp).run();
+  } else {
+    await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,email,subscribed,consented_at,unsubscribed_at,updated_at)
+      VALUES(?,?,0,NULL,?,?)
+      ON CONFLICT(user_id) DO UPDATE SET email=excluded.email,subscribed=0,unsubscribed_at=excluded.unsubscribed_at,updated_at=excluded.updated_at`)
+      .bind(userId, normalizeEmail(email), timestamp, timestamp).run();
+  }
+  await env.DB.prepare("INSERT INTO marketing_consent_events(id,user_id,email,action,method,created_at) VALUES(?,?,?,?,?,?)")
+    .bind(randomToken(16), userId, normalizeEmail(email), subscribed ? "subscribe" : "unsubscribe", method, timestamp).run();
+}
+
+async function marketingUnsubscribeToken(env: Env, userId: string) {
+  const issuedAt = now();
+  const payload = `${userId}.${issuedAt}`;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.SESSION_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
+  const hex = [...signature].map(value => value.toString(16).padStart(2, "0")).join("");
+  return `${payload}.${hex}`;
+}
+
+async function verifyMarketingUnsubscribeToken(env: Env, token: string) {
+  const parts = token.split(".");
+  if (parts.length !== 3 || !/^[a-f0-9]{32}$/.test(parts[0]) || !/^\d{1,12}$/.test(parts[1]) || !/^[a-f0-9]{64}$/.test(parts[2])) return null;
+  const payload = `${parts[0]}.${parts[1]}`;
+  const signature = new Uint8Array(parts[2].match(/.{2}/g)!.map(value => parseInt(value, 16)));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.SESSION_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  const valid = await crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(payload));
+  return valid && Number(parts[1]) <= now() ? parts[0] : null;
 }
 
 const json = (data: any, init: ResponseInit = {}) =>
@@ -285,6 +342,41 @@ async function sendAuthEmail(env: Env, to: string, subject: string, html: string
   const data: any = await response.json().catch(() => ({}));
   if (!response.ok) {
     console.error("Auth email failed", response.status, data);
+    return { sent: false, error: data?.message || data?.error || `Email provider returned HTTP ${response.status}` };
+  }
+  return { sent: true, id: data?.id || null };
+}
+
+async function sendMarketingEmail(env: Env, userId: string, campaignId: string, subject: string, html: string, text: string) {
+  await ensureMarketingSchema(env);
+  const preference: any = await env.DB.prepare("SELECT m.email,m.subscribed,u.email_verified_at FROM marketing_preferences m JOIN users u ON u.id=m.user_id WHERE m.user_id=? LIMIT 1").bind(userId).first();
+  if (!preference || Number(preference.subscribed) !== 1 || !preference.email || !preference.email_verified_at) return { sent: false, skipped: true };
+
+  const token = await marketingUnsubscribeToken(env, userId);
+  const unsubscribeUrl = `${origin(env)}/unsubscribe.html?token=${encodeURIComponent(token)}`;
+  const oneClickUrl = `${origin(env)}/api/marketing/unsubscribe?token=${encodeURIComponent(token)}`;
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": `marketing:${campaignId}:${userId}`,
+    },
+    body: JSON.stringify({
+      from: "TaalLab <contact@taallab.in>",
+      to: [String(preference.email)],
+      subject,
+      html: `${html}<p style="font-size:12px;color:#687080">You received this email because you opted in to TaalLab marketing updates. <a href="${unsubscribeUrl}">Unsubscribe</a>.</p>`,
+      text: `${text}\n\nYou received this email because you opted in to TaalLab marketing updates. Unsubscribe: ${unsubscribeUrl}`,
+      headers: {
+        "List-Unsubscribe": `<${oneClickUrl}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+    }),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.error("Marketing email failed", response.status, data);
     return { sent: false, error: data?.message || data?.error || `Email provider returned HTTP ${response.status}` };
   }
   return { sent: true, id: data?.id || null };
@@ -623,6 +715,7 @@ async function authSignup(req: Request, env: Env) {
     .bind(id, email, hash, "user", createdAt, createdAt, "active", null, 1).run();
 
   await recordPolicyAcceptance(env, id, "email_signup");
+  if (body.marketingConsent === true) await recordMarketingConsent(env, id, email, true, "email_signup");
   const verification = await createEmailVerification(env, { id, email });
   if (!verification.sent) {
     return json({ error: "Your account was created, but the verification email could not be sent. Use Resend verification email below.", needsVerification: true, verificationSent: false }, { status: 502 });
@@ -666,11 +759,14 @@ async function currentUser(env: Env, req: Request) {
 async function exportAccountData(req: Request, env: Env) {
   const user = await requireUser(req, env);
   await ensureOceanSchema(env);
-  const [identity, googleIdentity, acceptances, privacyRequests, transfers, files, pages, shares, pageCollaborators, comments, assets, calendar, passkeys, authenticator, recovery, store] = await Promise.all([
+  await ensureMarketingSchema(env);
+  const [identity, googleIdentity, acceptances, privacyRequests, marketingPreference, marketingEvents, transfers, files, pages, shares, pageCollaborators, comments, assets, calendar, passkeys, authenticator, recovery, store] = await Promise.all([
     env.DB.prepare("SELECT id,email,role,created_at,updated_at,email_verified_at,display_name,avatar_data,two_factor_enabled FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at").bind(user.id).all(),
     env.DB.prepare("SELECT id,request_type,description,status,created_at,resolved_at FROM privacy_requests WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT subscribed,consented_at,unsubscribed_at,updated_at FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(user.id).first(),
+    env.DB.prepare("SELECT action,method,created_at FROM marketing_consent_events WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT f.id,f.transfer_id,f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT id,parent_id,title,icon,cover,cover_credit,cover_credit_url,cover_source_url,public_token,blocks_json,is_favorite,is_folder,is_archived,general_access,created_at,updated_at FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
@@ -690,6 +786,8 @@ async function exportAccountData(req: Request, env: Env) {
     google_sign_in_identity: googleIdentity || null,
     policy_acceptances: acceptances.results || [],
     privacy_requests: privacyRequests.results || [],
+    marketing_preference: marketingPreference || null,
+    marketing_consent_events: marketingEvents.results || [],
     transfers: transfers.results || [],
     transfer_files: files.results || [],
     ocean_pages: pages.results || [],
@@ -722,18 +820,63 @@ async function exportAccountData(req: Request, env: Env) {
   });
 }
 
+async function getMarketingPreference(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  await ensureMarketingSchema(env);
+  const row: any = await env.DB.prepare("SELECT subscribed,consented_at,unsubscribed_at,updated_at FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(user.id).first();
+  const subscribed = Number(row?.subscribed || 0) === 1;
+  const token = subscribed ? await marketingUnsubscribeToken(env, user.id) : "";
+  return json({
+    subscribed,
+    consented_at: row?.consented_at || null,
+    unsubscribed_at: row?.unsubscribed_at || null,
+    unsubscribe_url: subscribed ? `${origin(env)}/unsubscribe.html?token=${encodeURIComponent(token)}` : null,
+  });
+}
+
+async function updateMarketingPreference(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  const body = await req.json().catch(() => ({}));
+  if (typeof body.subscribed !== "boolean") return json({ error: "Choose whether you want to receive marketing emails." }, { status: 400 });
+  await recordMarketingConsent(env, user.id, user.email, body.subscribed, "account_settings");
+  return json({ ok: true, subscribed: body.subscribed, message: body.subscribed ? "Marketing email consent saved." : "You have been unsubscribed from marketing emails." });
+}
+
+async function unsubscribeMarketing(req: Request, env: Env) {
+  const url = new URL(req.url);
+  let token = url.searchParams.get("token") || "";
+  if (!token) {
+    const contentType = req.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const body = await req.json().catch(() => ({}));
+      token = String(body.token || "");
+    } else {
+      const form = await req.formData().catch(() => null);
+      token = String(form?.get("token") || "");
+    }
+  }
+  const userId = await verifyMarketingUnsubscribeToken(env, token);
+  if (!userId) return json({ error: "This unsubscribe link is invalid. Please manage your email preferences from Account Settings." }, { status: 400 });
+  await ensureMarketingSchema(env);
+  const row: any = await env.DB.prepare("SELECT email FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(userId).first();
+  if (row?.email) await recordMarketingConsent(env, userId, String(row.email), false, "marketing_email_unsubscribe");
+  return json({ ok: true, message: "You have been unsubscribed from TaalLab marketing emails. Essential account and security emails will continue." });
+}
+
 async function createPrivacyRequest(req: Request, env: Env) {
   const user = await requireUser(req, env);
   const body = await req.json().catch(() => ({}));
   const type = String(body.type || "");
   if (type !== "deletion" && type !== "correction") return json({ error: "Choose a valid privacy request type." }, { status: 400 });
   const description = String(body.description || "").trim().slice(0, 1000);
+  if (type === "deletion") await recordMarketingConsent(env, user.id, user.email, false, "account_deletion_request");
   const existing: any = await env.DB.prepare("SELECT id,status FROM privacy_requests WHERE user_id=? AND request_type=? AND status IN ('open','in_review') ORDER BY created_at DESC LIMIT 1")
     .bind(user.id, type).first();
   if (existing) return json({ ok: true, requestId: existing.id, status: existing.status, alreadyOpen: true });
   const requestId = "PR-" + randomToken(8).toUpperCase();
   await env.DB.prepare("INSERT INTO privacy_requests(id,user_id,request_type,description,status,created_at) VALUES(?,?,?,?, 'open', ?)")
     .bind(requestId, user.id, type, description, now()).run();
+
   const label = type === "deletion" ? "Account and personal data deletion" : "Personal data correction";
   const notification = await sendAuthEmail(
     env,
@@ -975,6 +1118,7 @@ async function googleAuthStart(req: Request, env: Env) {
   }
   const params = new URL(req.url).searchParams;
   const acceptedPolicies = params.get("terms") === TERMS_VERSION && params.get("privacy") === PRIVACY_VERSION;
+  const marketingAccepted = acceptedPolicies && params.get("marketing") === "1";
   const state = randomToken(24);
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", env.GOOGLE_LOGIN_CLIENT_ID);
@@ -991,6 +1135,7 @@ async function googleAuthStart(req: Request, env: Env) {
   response.headers.append("set-cookie", cookie("google_login_state", state, 600, req));
   response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req));
   response.headers.append("set-cookie", acceptedPolicies ? cookie("google_login_consent", POLICY_CONSENT_VERSION, 600, req) : cookie("google_login_consent", "", 0, req));
+  response.headers.append("set-cookie", marketingAccepted ? cookie("google_login_marketing", "1", 600, req) : cookie("google_login_marketing", "", 0, req));
   return response;
 }
 
@@ -999,6 +1144,8 @@ async function googleAuthCallback(req: Request, env: Env) {
   const clearStateCookie = "google_login_state=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const clearReturnCookie = "google_login_return=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const clearConsentCookie = "google_login_consent=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const clearMarketingCookie = "google_login_marketing=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const marketingConsentAccepted = parseCookie(req, "google_login_marketing") === "1";
   const consentAccepted = parseCookie(req, "google_login_consent") === POLICY_CONSENT_VERSION;
   const savedReturn = parseCookie(req, "google_login_return");
   const returnTo = savedReturn === "ocean-app" ? "ocean-app" : savedReturn === "/ocean.html" ? "/ocean.html" : "/admin";
@@ -1008,6 +1155,7 @@ async function googleAuthCallback(req: Request, env: Env) {
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
     response.headers.append("set-cookie", clearConsentCookie);
+    response.headers.append("set-cookie", clearMarketingCookie);
     return response;
   };
   if (!env.GOOGLE_LOGIN_CLIENT_ID || !env.GOOGLE_LOGIN_CLIENT_SECRET) return fail("Google sign-in is not configured yet.");
@@ -1085,6 +1233,7 @@ async function googleAuthCallback(req: Request, env: Env) {
     await env.DB.prepare("UPDATE users SET email_verified_at=?,updated_at=? WHERE id=?").bind(now(), now(), user.id).run();
     user.email_verified_at = now();
   }
+  if (marketingConsentAccepted) await recordMarketingConsent(env, user.id, user.email, true, "google_signup");
 
   if (Number(user.two_factor_enabled) !== 0) {
     const challenge = await startTwoFactorChallenge(env, user);
@@ -1103,6 +1252,7 @@ async function googleAuthCallback(req: Request, env: Env) {
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
     response.headers.append("set-cookie", clearConsentCookie);
+    response.headers.append("set-cookie", clearMarketingCookie);
     return response;
   }
 
@@ -1121,6 +1271,7 @@ async function googleAuthCallback(req: Request, env: Env) {
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
     response.headers.append("set-cookie", clearConsentCookie);
+    response.headers.append("set-cookie", clearMarketingCookie);
     return response;
   }
   const sid = await createUserSession(env, user.id);
@@ -1128,6 +1279,7 @@ async function googleAuthCallback(req: Request, env: Env) {
   response.headers.append("set-cookie", clearStateCookie);
   response.headers.append("set-cookie", clearReturnCookie);
   response.headers.append("set-cookie", clearConsentCookie);
+  response.headers.append("set-cookie", clearMarketingCookie);
   attachSessionCookie(response, sid, req);
   return response;
 }
@@ -2409,6 +2561,9 @@ export default {
       if (url.pathname === "/api/account/security" && req.method === "POST") return updateSecuritySettings(req, env);
 
       if (url.pathname === "/api/account/data-export" && req.method === "GET") return exportAccountData(req, env);
+       if (url.pathname === "/api/account/marketing-preference" && req.method === "GET") return getMarketingPreference(req, env);
+       if (url.pathname === "/api/account/marketing-preference" && req.method === "PUT") return updateMarketingPreference(req, env);
+       if (url.pathname === "/api/marketing/unsubscribe" && req.method === "POST") return unsubscribeMarketing(req, env);
       if (url.pathname === "/api/account/privacy-requests" && req.method === "GET") return listOwnPrivacyRequests(req, env);
       if (url.pathname === "/api/account/privacy-request" && req.method === "POST") return createPrivacyRequest(req, env);
       if (url.pathname === "/api/admin/privacy-requests" && req.method === "GET") { await requireAdmin(req, env); return listPrivacyRequests(env); }

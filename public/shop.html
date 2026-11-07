@@ -119,7 +119,7 @@ footer a{color:#4f5863;font-weight:600}footer a:hover{color:var(--blue)}
 <a href="/#book-session">Book a Session</a>
 <div class="nav-dropdown"><a href="/#contact">Contact <span class="nav-caret">⌄</span></a><div class="nav-menu nav-menu-right"><a href="/#contact-email">Email</a><a href="https://www.instagram.com/taallabstudio" target="_blank" rel="noopener noreferrer">Instagram</a><a href="/#contact-whatsapp">WhatsApp</a><a href="/#contact-location">Location</a></div></div>
 </nav><div class="landing-auth"><button class="cart-nav-btn" id="open-cart" type="button" aria-label="Open cart" title="Cart">🛒<span class="cart-count" id="cart-count">0</span></button><a class="login-nav-btn secondary" href="/login">Sign up</a><a class="login-nav-btn" href="/login">Login</a></div></header>
-<section class="hero"><div class="eyebrow"><span class="dot"></span> TAAL LAB · DIGITAL STORE</div><h1>Tools for the sound<br><em>in your head.</em></h1><p>Plugins, sample packs and sound libraries made for music creators. Digital downloads are delivered through secure, private links after payment.</p></section>
+<section class="hero"><div class="eyebrow"><span class="dot"></span> TAAL LAB · DIGITAL STORE</div><h1>Tools for the sound<br><em>in your head.</em></h1><p>Plugins, sample packs and sound libraries made for music creators. Digital downloads become available through time-limited private links after payment is verified.</p></section>
 <div class="catalog-tools"><div class="section-line">Made for your next idea</div><label class="sort-control" for="sort-products">Sort products <select id="sort-products"><option value="latest">Latest first</option><option value="featured">Featured</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="name-asc">Name: A to Z</option><option value="name-desc">Name: Z to A</option></select></label></div>
 <div id="products" aria-busy="true"><section class="category-section skeleton-section" aria-label="Loading products"><h2 class="category-heading"><span class="skeleton skeleton-heading"></span></h2><div class="grid" aria-hidden="true"><article class="card skeleton-card"><div class="skeleton skeleton-cover"></div><div class="skeleton skeleton-tag"></div><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-copy"></div><div class="skeleton skeleton-copy skeleton-copy-short"></div><div class="foot skeleton-foot"><span class="skeleton skeleton-price"></span><span class="skeleton skeleton-button"></span></div></article>
 <article class="card skeleton-card"><div class="skeleton skeleton-cover"></div><div class="skeleton skeleton-tag"></div><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-copy"></div><div class="skeleton skeleton-copy skeleton-copy-short"></div><div class="foot skeleton-foot"><span class="skeleton skeleton-price"></span><span class="skeleton skeleton-button"></span></div></article>
@@ -174,24 +174,51 @@ const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",ma
 const cartRead=()=>{try{const v=JSON.parse(localStorage.getItem(CART_KEY)||"[]");return Array.isArray(v)?v:[]}catch{return []}};
 const cartWrite=items=>{localStorage.setItem(CART_KEY,JSON.stringify(items));renderCart();if(typeof renderProducts==="function")renderProducts()};
 window.addEventListener("storage",event=>{if(event.key===CART_KEY){renderCart();renderProducts()}});
-const openCart=()=>{cartBackdrop.classList.add("open");cartBackdrop.setAttribute("aria-hidden","false");document.body.style.overflow="hidden"};
-const closeCart=()=>{cartBackdrop.classList.remove("open");cartBackdrop.setAttribute("aria-hidden","true");document.body.style.overflow=""};
+const cartDrawer=cartBackdrop.querySelector(".cart-drawer");
+const closeCartButton=document.querySelector("#close-cart");
+let cartReturnFocus=null;
+const onCartKeydown=e=>{
+ if(e.key==="Escape"){e.preventDefault();closeCart();return;}
+ if(e.key!=="Tab")return;
+ const focusable=[...cartDrawer.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')];
+ if(!focusable.length){e.preventDefault();return;}
+ const first=focusable[0],last=focusable[focusable.length-1];
+ if(e.shiftKey&&(document.activeElement===first||document.activeElement===cartDrawer)){e.preventDefault();last.focus();}
+ else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+};
+const openCart=()=>{
+ if(cartBackdrop.classList.contains("open"))return;
+ cartReturnFocus=document.activeElement;
+ cartBackdrop.classList.add("open");cartBackdrop.setAttribute("aria-hidden","false");document.body.style.overflow="hidden";
+ document.querySelector("#open-cart").setAttribute("aria-expanded","true");
+ document.addEventListener("keydown",onCartKeydown);
+ closeCartButton.focus();
+};
+const closeCart=()=>{
+ if(!cartBackdrop.classList.contains("open"))return;
+ cartBackdrop.classList.remove("open");cartBackdrop.setAttribute("aria-hidden","true");document.body.style.overflow="";
+ document.querySelector("#open-cart").setAttribute("aria-expanded","false");
+ document.removeEventListener("keydown",onCartKeydown);
+ if(cartReturnFocus instanceof HTMLElement)cartReturnFocus.focus();
+ cartReturnFocus=null;
+};
 document.querySelector("#open-cart").addEventListener("click",openCart);
 document.querySelector("#close-cart").addEventListener("click",closeCart);
 cartCheckout.addEventListener("click",()=>{const items=cartRead().filter(p=>!ownedProductIds.has(p.id));if(items.length)location.href="/checkout.html?products="+encodeURIComponent(items.map(p=>p.id).join(","))});
 cartBackdrop.addEventListener("click",e=>{if(e.target===cartBackdrop)closeCart()});
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCart()});
+
 const navToggle=document.querySelector(".mobile-nav-toggle");
 const siteNav=document.querySelector("#shop-navigation");
 navToggle.addEventListener("click",()=>{const open=siteNav.classList.toggle("mobile-open");navToggle.setAttribute("aria-expanded",String(open));navToggle.setAttribute("aria-label",open?"Close navigation":"Open navigation");navToggle.textContent=open?"×":"☰"});
 siteNav.querySelectorAll("a").forEach(a=>a.addEventListener("click",()=>{siteNav.classList.remove("mobile-open");navToggle.setAttribute("aria-expanded","false");navToggle.textContent="☰"}));
+siteNav.addEventListener("keydown",event=>{if(event.key==="Escape"){event.preventDefault();siteNav.classList.remove("mobile-open");navToggle.setAttribute("aria-expanded","false");navToggle.setAttribute("aria-label","Open navigation");navToggle.textContent="☰";navToggle.focus();}});
 function renderCart(){
  const items=cartRead().filter(p=>!ownedProductIds.has(p.id));
  if(items.length!==cartRead().length)localStorage.setItem(CART_KEY,JSON.stringify(items));
  cartCount.textContent=String(items.length);cartCount.style.display=items.length?"grid":"none";cartItemsRoot.replaceChildren();
  cartSubtotal.textContent=money(items.reduce((sum,p)=>sum+Number(p.price||0),0));
  cartCheckout.disabled=!items.length;cartCheckout.textContent=items.length?"Checkout all items ("+items.length+")":"Your cart is empty";
- cartHint.textContent=items.length?"One secure payment for all items. Purchased products are removed from your cart.":"Add products to your cart to check out together.";
+ cartHint.textContent=items.length?"One payment for all items. Purchased products are removed from your cart.":"Add products to your cart to check out together.";
  if(!items.length){const empty=document.createElement("div");empty.className="cart-empty";empty.textContent="Your cart is empty. Add a product to get started.";cartItemsRoot.append(empty);return}
  for(const p of items){const row=document.createElement("article");row.className="cart-item";const info=document.createElement("div");const name=document.createElement("strong");name.textContent=p.name;const category=document.createElement("small");category.textContent=p.category||"Digital download";info.append(name,category);const price=document.createElement("strong");price.textContent=money(Number(p.price||0));const actions=document.createElement("div");actions.className="cart-item-actions";const remove=document.createElement("button");remove.type="button";remove.className="cart-remove";remove.textContent="Remove";remove.addEventListener("click",()=>cartWrite(cartRead().filter(item=>item.id!==p.id)));actions.append(remove);row.append(info,price,actions);cartItemsRoot.append(row)}
 }
