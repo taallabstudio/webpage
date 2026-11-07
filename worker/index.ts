@@ -422,7 +422,7 @@ async function requireUser(req: Request, env: Env, options: { allowPendingAge?: 
       throw json({ error: "Complete the age and parent/guardian setup before using this account feature." }, { status: 403 });
     }
     if (user.account_type === "child") {
-      const activeVerifiedLink: any = await env.DB.prepare("SELECT id FROM parent_child_links WHERE child_user_id=? AND parent_user_id=? AND status='active' AND verification_status='verified' LIMIT 1").bind(user.id,user.parent_user_id).first();
+      const activeVerifiedLink: any = await env.DB.prepare("SELECT l.id FROM parent_child_links l JOIN users p ON p.id=l.parent_user_id WHERE l.child_user_id=? AND l.parent_user_id=? AND l.status='active' AND l.verification_status='verified' AND p.status='active' AND p.account_type='adult' AND p.email_verified_at IS NOT NULL LIMIT 1").bind(user.id,user.parent_user_id).first();
       if (!activeVerifiedLink) throw json({ error: "Child account access is waiting for parent/guardian verification." }, { status: 403 });
     }
   }
@@ -794,14 +794,14 @@ async function verifyParentLinkManually(req: Request, env: Env, childId: string)
   const admin=await requireAdmin(req,env);
   const body=await req.json().catch(()=>({}));
   if(body.confirmManualVerification!==true) return json({error:"Explicitly confirm that the adult's identity, age and parent/guardian relationship were checked outside this application."},{status:400});
-  const link: any=await env.DB.prepare(`SELECT l.id,l.parent_user_id,l.verification_status,
+  const link: any=await env.DB.prepare(`SELECT l.id,l.parent_user_id,l.verification_status,l.parent_attested_at,
       p.account_type AS parent_account_type,p.email_verified_at AS parent_email_verified_at,p.status AS parent_status,
       c.account_type AS child_account_type,c.email_verified_at AS child_email_verified_at,c.date_of_birth AS child_date_of_birth,c.status AS child_status
     FROM parent_child_links l JOIN users p ON p.id=l.parent_user_id JOIN users c ON c.id=l.child_user_id
     WHERE l.child_user_id=? AND l.status='active' LIMIT 1`).bind(childId).first();
   if(!link) return json({error:"No active parent link was found for this child account."},{status:404});
   if(link.verification_status==="verified") return json({ok:true,message:"This parent link has already been verified."});
-  if(link.parent_account_type!=="adult" || !link.parent_email_verified_at || link.parent_status!=="active" ||
+  if(!Number(link.parent_attested_at||0) || link.parent_account_type!=="adult" || !link.parent_email_verified_at || link.parent_status!=="active" ||
      link.child_account_type!=="child" || !link.child_email_verified_at || !link.child_date_of_birth || link.child_status!=="active") {
     return json({error:"The parent or child account no longer meets the minimum account checks."},{status:409});
   }
