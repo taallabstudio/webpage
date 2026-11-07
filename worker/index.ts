@@ -760,6 +760,10 @@ async function exportAccountData(req: Request, env: Env) {
   )`).run();
 
   await ensureMarketingSchema(env);
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, terms_version TEXT NOT NULL,
+    privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
+  )`).run();
   const [account, transfers, files, acceptances, privacyRequests, marketingPreference, marketingEvents, googleIdentity, pages, shares, comments, assets, calendar] = await Promise.all([
     env.DB.prepare("SELECT id,email,role,status,created_at,updated_at,email_verified_at,two_factor_enabled,display_name,avatar_data FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
