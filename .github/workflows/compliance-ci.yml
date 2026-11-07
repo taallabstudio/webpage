@@ -27,7 +27,7 @@ jobs:
           node-version: 24
           cache: ""
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: Audit npm dependency vulnerabilities
         run: |
           mkdir -p .audit
