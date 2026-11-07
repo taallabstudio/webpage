@@ -18,7 +18,7 @@ Ratios below were calculated using the WCAG relative-luminance contrast formula 
 | Foreground | Background | Contrast |
 |---|---|---:|
 | `#626b76` | `#f4f6f8` | 4.99:1 |
-| `#626b76` | `#f5f7f8` | 4.99:1 |
+| `#626b76` | `#f5f7f8` | 5.03:1 |
 | `#929292` | `#191919` | 5.65:1 |
 | `#9b9b9b` | `#191919` | 6.33:1 |
 | `#a0aab6` | `#171a1f` | 7.41:1 |
