@@ -996,7 +996,14 @@ function OceanApp(){
    if(redo)redoBlocks();else undoBlocks();
    return;
   }
-  if(e.key==="Escape"){setShowSearch(false);setShowPageMenu(false);setShowSlash(false);setSlashFromTyping(false);}
+  const editable=e.target?.matches?.("input,textarea,select,[contenteditable=true]");
+   const navRoot=!editable?e.target?.closest?.("[data-keyboard-nav]"):null;
+   if(navRoot&&["ArrowDown","ArrowUp","ArrowLeft","ArrowRight","Home","End"].includes(e.key)){
+    const items=[...navRoot.querySelectorAll('button:not([disabled]),[role="option"],a[href],input:not([disabled]),select:not([disabled])')].filter(el=>el.offsetParent!==null);
+    const index=items.indexOf(document.activeElement);
+    if(items.length&&index>=0){e.preventDefault();const next=e.key==="Home"?0:e.key==="End"?items.length-1:(index+(e.key==="ArrowDown"||e.key==="ArrowRight"?1:-1)+items.length)%items.length;items[next].focus();return;}
+   }
+   if(e.key==="Escape"){setShowSearch(false);setShowPageMenu(false);setShowSlash(false);setSlashFromTyping(false);setPageMenuId(null);setMoveFolderMenuId(null);}
  };window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);},[page?.id,page?.blocks]);
 
  useEffect(()=>{if(showComments&&page)api("/ocean/pages/"+page.id+"/comments").then(d=>setComments(d.comments||[])).catch(()=>{});},[showComments,page?.id]);
@@ -1022,7 +1029,7 @@ function OceanApp(){
      <span>{p.title}</span>
     </button>
     {folder&&<><button className="ocean-page-add" title="New page in folder" onClick={()=>createPage(p.id,!!p.is_shared)}><Plus size={14}/></button><button className="ocean-page-add" title="New subfolder" onClick={()=>createFolder(p.id,!!p.is_shared)}><FolderPlus size={14}/></button>{String(p.user_id)===String(user?.id)&&<><button className="ocean-page-add" title="Rename folder" onClick={()=>renameFolder(p)}><MoreHorizontal size={14}/></button><button className="ocean-page-add" title="Delete folder" onClick={()=>deleteFolder(p)}><Trash2 size={13}/></button></>}</>}
-    {!folder&&<button className="ocean-page-add" title="Create subpage" onClick={()=>createPage(p.id,!!p.is_shared)}>+</button>}
+    {!folder&&<><button className="ocean-page-add" title="Create subpage" onClick={()=>createPage(p.id,!!p.is_shared)}>+</button>{String(p.user_id)===String(user?.id)&&<div className="ocean-page-menu-wrap"><button className="ocean-page-add ocean-page-more" title="Page options" aria-label={"Options for "+p.title} aria-expanded={pageMenuId===p.id} onClick={e=>{e.stopPropagation();setPageMenuId(pageMenuId===p.id?null:p.id);setMoveFolderMenuId(null);}}><MoreHorizontal size={15}/></button>{pageMenuId===p.id&&<div className="ocean-sidebar-context-menu" data-keyboard-nav><button onClick={()=>setMoveFolderMenuId(moveFolderMenuId===p.id?null:p.id)}><Folder size={14}/> Move to folder <ChevronRight size={13}/></button>{moveFolderMenuId===p.id&&<div className="ocean-sidebar-folder-options" data-keyboard-nav><button onClick={()=>movePageToFolder(p,null)}>Private · Root</button>{pages.filter(f=>f.is_folder&&!!f.is_shared===!!p.is_shared&&f.id!==p.id).map(f=><button key={f.id} onClick={()=>movePageToFolder(p,f.id)}><Folder size={13}/>{f.title}</button>)}{!pages.some(f=>f.is_folder&&!!f.is_shared===!!p.is_shared&&f.id!==p.id)&&<small>No folders yet</small>}</div>}</div>}</div>}</>}
    </div>
    {(!folder||expanded)&&renderSidebarPages(p.id,depth+1,source)}
   </React.Fragment>;
@@ -1344,8 +1351,8 @@ function OceanApp(){
   <aside className={"ocean-sidebar "+(mobileNav?"mobile-open":"")}>
    <div className="ocean-sidebar-top"><a className="ocean-brand" href="/"><span className="ocean-brand-mark"><OceanWaveMark/></span><span>OCEAN</span></a><button title="Close sidebar" aria-label="Close sidebar" onClick={()=>{if(window.matchMedia("(max-width: 760px)").matches)setMobileNav(false);else setCollapsed(v=>!v);}}><PanelLeftClose size={17}/></button></div>
    <button className="ocean-search" onClick={()=>setShowSearch(v=>!v)}><Search size={15}/><span>Search pages</span><kbd>Ctrl K</kbd></button>
-   <nav className="ocean-nav"><button className={activePanel==="page"?"active":""} onClick={()=>setActivePanel("page")}><Inbox size={16}/> Home</button><button onClick={()=>setShowComments(true)}><MessageCircle size={16}/> Comments</button><button className={activePanel==="calendar"?"active":""} onClick={()=>{setActivePanel("calendar");setMobileNav(false);}}><Calendar size={16}/> Google Calendar</button>{user.role==="admin"&&<button className={activePanel==="access"?"active":""} onClick={()=>setActivePanel("access")}><ShieldCheck size={16}/> Access management</button>}</nav>
-   <div className="ocean-side-scroll">
+   <nav className="ocean-nav" data-keyboard-nav><button className={activePanel==="page"?"active":""} onClick={()=>setActivePanel("page")}><Inbox size={16}/> Home</button><button onClick={()=>setShowComments(true)}><MessageCircle size={16}/> Comments</button><button className={activePanel==="calendar"?"active":""} onClick={()=>{setActivePanel("calendar");setMobileNav(false);}}><Calendar size={16}/> Google Calendar</button></nav>
+   <div className="ocean-side-scroll" data-keyboard-nav>
     <div className="ocean-side-label">Favorites <button onClick={()=>createPage()} title="New page"><Plus size={15}/></button></div>
     {favoritePages.map(p=><button key={p.id} className={"ocean-page-link "+(page?.id===p.id?"selected":"")} onClick={()=>{openPage(p.id);setMobileNav(false);}}><span>{pageIconNode(p.icon)}</span><span>{p.title}</span></button>)}
     <div className="ocean-side-label">Private <span className="ocean-side-tools"><button onClick={()=>createFolder()} title="New folder"><FolderPlus size={15}/></button><button onClick={()=>createPage()} title="New page"><Plus size={15}/></button></span></div>
