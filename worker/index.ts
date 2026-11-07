@@ -1559,6 +1559,7 @@ async function handlePreview(env: Env, req: Request, token: string) {
 }
 
 async function cleanup(env: Env) {
+  await ensureSupportSchema(env);
   const cutoff = now();
   const files = await env.DB.prepare("SELECT id,storage_key,transfer_id FROM files WHERE expires_at<=? AND status!='deleted'")
     .bind(cutoff)
