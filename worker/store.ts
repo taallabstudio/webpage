@@ -284,8 +284,8 @@ function publicProduct(product: Product) {
   };
 }
 
-const TERMS_VERSION = "2026-11-07";
-const PRIVACY_VERSION = "2026-11-07";
+const TERMS_VERSION = "2026-11-07.1";
+const PRIVACY_VERSION = "2026-11-07.5";
 
 const TEMP_COUPON = { code: "TAAL10", percent: 10, maxDiscountPaise: 10000, minimumPaise: 100, expiresAt: "2026-10-24T00:00:00+05:30" };
 
@@ -312,10 +312,10 @@ function cleanCustomer(body: any) {
     pincode: value("pincode", 12).replace(/\s/g, ""),
     country: value("country", 80) || "India",
   };
-  if (customer.fullName.length < 2 || !/^\+?[0-9]{10,15}$/.test(customer.phone) ||
+  if (customer.fullName.length < 2 || (customer.phone && !/^\+?[0-9]{10,15}$/.test(customer.phone)) ||
       customer.addressLine1.length < 4 || !customer.city || !customer.state ||
       !/^[A-Za-z0-9 -]{4,10}$/.test(customer.pincode) || !customer.country) {
-    throw new Error("Enter your name, valid phone number, full address, city, state and PIN/postal code.");
+    throw new Error("Enter your name, full address, city, state and PIN/postal code. If you provide a phone number, check that it is valid.");
   }
   return customer;
 }
@@ -560,6 +560,17 @@ async function streamProduct(req: Request, env: StoreEnv, token: string) {
   return new Response(response.body, { status: response.status === 206 ? 206 : 200, headers: out });
 }
 
+async function privacyExport(req: Request, env: StoreEnv) {
+  const user = await env.getCustomer?.(req);
+  if (!user) return json({ error: "Please sign in to download your account data." }, 401);
+  await ensureStoreSchema(env);
+  const [profile, orders] = await Promise.all([
+    env.DBStore.prepare("SELECT full_name,phone,address_line1,address_line2,city,state,pincode,country,updated_at FROM store_customer_profiles WHERE user_id=? LIMIT 1").bind(user.id).first(),
+    env.DBStore.prepare(`SELECT id,order_number,product_id,amount,currency,status,customer_email,customer_name,customer_phone,address_line1,address_line2,city,state,pincode,country,coupon_code,discount_amount,created_at,updated_at,paid_at,download_count,last_downloaded_at,terms_version,privacy_version,accepted_at FROM store_orders WHERE user_id=? OR lower(customer_email)=? ORDER BY created_at DESC`).bind(user.id, user.email.toLowerCase()).all(),
+  ]);
+  return json({ profile: profile || null, orders: orders.results || [] });
+}
+
 async function listPurchases(req: Request, env: StoreEnv) {
   const user = await env.getCustomer?.(req);
   if (!user) return json({ error: "Please log in to view purchases." }, 401);
@@ -600,6 +611,7 @@ export async function handleStoreRequest(req: Request, env: StoreEnv): Promise<R
     return new Response(JSON.stringify({ products }), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=20, s-maxage=60, stale-while-revalidate=120" } });
   }
   if (url.pathname === "/api/store/purchases" && req.method === "GET") return listPurchases(req, env);
+  if (url.pathname === "/api/store/privacy-export" && req.method === "GET") return privacyExport(req, env);
   if (url.pathname === "/api/store/purchases/download" && req.method === "POST") return purchaseDownload(req, env);
   if (url.pathname === "/api/store/customer-profile" && req.method === "GET") return customerProfile(req, env);
   if (url.pathname === "/api/store/customer-profile" && req.method === "PUT") return customerProfile(req, env, true);

@@ -25,7 +25,7 @@ const api = async (path, options={}) => {
 function ProfileAvatar({user,size=38}) {
   const label = String(user?.display_name || user?.email || "TaalLab").trim();
   return <span className="profile-avatar" style={{width:size,height:size,minWidth:size}} aria-label={label} title={label}>
-    {user?.avatar_data ? <img src={user.avatar_data} alt="" /> : <UserRound size={Math.round(size*.55)} strokeWidth={1.8}/>}
+    {user?.avatar_data ? <img src={user.avatar_data} alt={"Profile picture for "+label} /> : <UserRound size={Math.round(size*.55)} strokeWidth={1.8}/>}
   </span>;
 }
 

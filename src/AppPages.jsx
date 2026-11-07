@@ -40,7 +40,7 @@ const api = async (path, options={}) => {
 function ProfileAvatar({user,size=38}) {
   const label = String(user?.display_name || user?.email || "TaalLab").trim();
   return <span className="profile-avatar" style={{width:size,height:size,minWidth:size}} aria-label={label} title={label}>
-    {user?.avatar_data ? <img src={user.avatar_data} alt="" /> : <UserRound size={Math.round(size*.55)} strokeWidth={1.8}/>}
+    {user?.avatar_data ? <img src={user.avatar_data} alt={"Profile picture for "+label} /> : <UserRound size={Math.round(size*.55)} strokeWidth={1.8}/>}
   </span>;
 }
 
@@ -151,11 +151,29 @@ function TransferPage({id}) {
 }
 
 function Preview({file,onClose}) {
+  const modalRef=useRef(null);
+  useEffect(()=>{
+    const modal=modalRef.current;
+    if(!modal)return;
+    const previous=document.activeElement;
+    modal.focus();
+    function onKeyDown(event){
+      if(event.key==="Escape"){event.preventDefault();onClose();return;}
+      if(event.key!=="Tab")return;
+      const focusable=[...modal.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')];
+      if(!focusable.length){event.preventDefault();modal.focus();return;}
+      const first=focusable[0],last=focusable[focusable.length-1];
+      if(event.shiftKey&&(document.activeElement===first||document.activeElement===modal)){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    }
+    modal.addEventListener("keydown",onKeyDown);
+    return ()=>{modal.removeEventListener("keydown",onKeyDown);if(previous instanceof HTMLElement)previous.focus();};
+  },[onClose]);
   return <div className="modal-backdrop" onClick={onClose}>
-    <div className="preview-modal" onClick={e=>e.stopPropagation()}>
-      <div className="modal-head"><strong>{file.name}</strong><button onClick={onClose}><X/></button></div>
+    <div ref={modalRef} tabIndex={-1} className="preview-modal" role="dialog" aria-modal="true" aria-label={"Preview "+file.name} onClick={e=>e.stopPropagation()}>
+      <div className="modal-head"><strong>{file.name}</strong><button type="button" aria-label="Close preview" onClick={onClose}><X/></button></div>
       {file.kind === "audio" ? <audio controls autoPlay src={`/api/files/${file.token}/preview`}/> :
-       file.kind === "image" ? <img src={`/api/files/${file.token}/preview`} alt="" /> :
+       file.kind === "image" ? <img src={`/api/files/${file.token}/preview`} alt={file.name+" preview"} /> :
        file.kind === "video" ? <video controls autoPlay src={`/api/files/${file.token}/preview`}/> :
        <div className="preview-placeholder"><FileText/><p>Preview this file in its native application.</p></div>}
     </div>
@@ -174,6 +192,7 @@ function Login({onLogin}) {
   const [notice,setNotice]=useState(loginParams.get("verified")==="1" ? "Email verified. You can sign in now." : "");
   const [signup,setSignup]=useState(false);
   const [policyAccepted,setPolicyAccepted]=useState(false);
+  const [marketingAccepted,setMarketingAccepted]=useState(false);
   const [twoFactor,setTwoFactor]=useState(loginParams.get("google_2fa")==="1");
   const [twoFactorMethod,setTwoFactorMethod]=useState(loginParams.get("method")||"email");
   const [passkeyBusy,setPasskeyBusy]=useState(false);
@@ -268,7 +287,7 @@ function Login({onLogin}) {
       const result=await api(signup?"/auth/signup":"/auth/login",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({email,password,acceptPolicies:signup&&policyAccepted})
+        body:JSON.stringify({email,password,acceptPolicies:signup&&policyAccepted,marketingConsent:signup&&marketingAccepted})
       });
 
       if (result.requiresTwoFactor) {
@@ -405,7 +424,7 @@ function Login({onLogin}) {
     <h1>{signup?"Create account":"Sign in"}</h1>
     <p>{signup?"Create your TaalLab account to receive files shared with you.":"Manage TaalLab transfers securely."}</p>
     {!signup&&<button type="button" className="ghost-btn full" style={{marginBottom:12}} onClick={signInWithPasskey} disabled={passkeyBusy}><ShieldCheck size={17}/>{passkeyBusy?"Waiting for passkey…":"Sign in with a passkey"}</button>}
-    <button type="button" className="google-login-btn" onClick={()=>{if(signup&&!policyAccepted){setError("Please accept the Terms of Service and Privacy Policy to create an account.");return;}window.location.assign("/api/auth/google/start"+(signup?"?terms=2026-11-07&privacy=2026-11-07":""));}}>
+    <button type="button" className="google-login-btn" onClick={()=>{if(signup&&!policyAccepted){setError("Please accept the Terms of Service and Privacy Policy to create an account.");return;}window.location.assign("/api/auth/google/start"+(signup?"?terms=2026-11-07.1&privacy=2026-11-07.5":""));}}>
       <svg aria-hidden="true" viewBox="0 0 48 48" width="20" height="20"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z" transform="translate(0 4) scale(.92)"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.72 7.18l7.62 5.91c4.45-4.11 7.14-10.17 7.14-17.56Z"/><path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.2A23.9 23.9 0 0 0 0 24c0 3.87.93 7.53 2.56 10.78l7.97-6.19Z" transform="translate(0 2) scale(1)"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.89l-7.62-5.91c-2.12 1.42-4.84 2.26-8.28 2.26-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.2C6.51 42.62 14.62 48 24 48Z" transform="translate(0 -1) scale(.98)"/></svg>
       <span>Continue with Google</span>
     </button>
@@ -414,6 +433,7 @@ function Login({onLogin}) {
       <label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus required/></label>
       <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} minLength={8} required/></label>
       {signup&&<label className="policy-consent"><input type="checkbox" checked={policyAccepted} onChange={e=>setPolicyAccepted(e.target.checked)} required/><span>I agree to the <a href="/terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a> and acknowledge the <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.</span></label>}
+      {signup&&<label className="policy-consent"><input type="checkbox" checked={marketingAccepted} onChange={e=>setMarketingAccepted(e.target.checked)}/><span>I'd like to receive occasional product news and marketing emails from TaalLab. This is optional and separate from account/service emails. You can unsubscribe at any time. <small>Google sign-up users can manage this choice later in Account Settings.</small></span></label>}
       {error&&<div className="error-box">{error}</div>}
       {notice&&<div className="success-pill">{notice}</div>}
       <button className="primary-btn full">{signup?"Sign up & verify email":"Sign in"}</button>
@@ -422,7 +442,7 @@ function Login({onLogin}) {
     {verificationRequired && <button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendVerification}>
       {resendCooldown>0?`Resend verification in ${resendCooldown}s`:"Resend verification email"}
     </button>}
-    <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSignup(v=>!v);setPolicyAccepted(false);setError("");setNotice("");setVerificationRequired(false);}}>
+    <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSignup(v=>!v);setPolicyAccepted(false);setMarketingAccepted(false);setError("");setNotice("");setVerificationRequired(false);}}>
       {signup?"Back to sign in":"Sign up"}
     </button>
   </div></div>;
@@ -500,6 +520,9 @@ function Admin({initialUpload=false}) {
   const [authed,setAuthed]=useState(null);
   const [user,setUser]=useState(null);
   const [page,setPage]=useState(initialUpload ? "upload" : "dashboard");
+  const [mobileNavOpen,setMobileNavOpen]=useState(false);
+  const mobileNavRef=useRef(null);
+  const mobileNavToggleRef=useRef(null);
   const [stats,setStats]=useState(null);
   const [transfers,setTransfers]=useState([]);
   const [selected,setSelected]=useState(null);
@@ -519,18 +542,28 @@ function Admin({initialUpload=false}) {
   if(!authed) return <Login onLogin={refresh}/>;
   if(user?.role!=="admin") { location.replace("/account"); return <div className="loading"><RefreshCw className="spin"/> Redirecting to your account…</div>; }
 
-  async function logout(){await api("/auth/logout",{method:"POST"});setAuthed(false);setUser(null)}
+  function navigateAdmin(next){setPage(next);if(mobileNavOpen){setMobileNavOpen(false);mobileNavToggleRef.current?.focus();}}
+  useEffect(()=>{
+    if(!mobileNavOpen)return;
+    const first=mobileNavRef.current?.querySelector("button");
+    first?.focus();
+    const onKeyDown=(event)=>{if(event.key==="Escape"){event.preventDefault();setMobileNavOpen(false);mobileNavToggleRef.current?.focus();}};
+    document.addEventListener("keydown",onKeyDown);
+    return ()=>document.removeEventListener("keydown",onKeyDown);
+  },[mobileNavOpen]);
+  async function logout(){await api("/auth/logout",{method:"POST"});setAuthed(false);setUser(null);setMobileNavOpen(false);}
   return <div className="admin-layout">
-    <aside className="sidebar"><Logo/><div className="side-links">
-      <button className={page==="dashboard"?"active":""} onClick={()=>setPage("dashboard")}><Gauge/> Dashboard</button>
-      <button className={page==="transfers"?"active":""} onClick={()=>setPage("transfers")}><FolderOpen/> Transfers</button>
-      <button className={page==="products"?"active":""} onClick={()=>setPage("products")}><HardDrive/> Store Products</button>
-      <button className={page==="upload"?"active":""} onClick={()=>setPage("upload")}><UploadCloud/> New Transfer</button>
-      <button className={page==="users"?"active":""} onClick={()=>setPage("users")}><UserRound/> Users</button>
-      <button className={page==="settings"?"active":""} onClick={()=>setPage("settings")}><Settings/> Account</button>
+    <aside id="admin-sidebar" ref={mobileNavRef} className={"sidebar"+(mobileNavOpen?" mobile-open":"")}><Logo/><div className="side-links">
+      <button className={page==="dashboard"?"active":""} onClick={()=>navigateAdmin("dashboard")}><Gauge/> Dashboard</button>
+      <button className={page==="transfers"?"active":""} onClick={()=>navigateAdmin("transfers")}><FolderOpen/> Transfers</button>
+      <button className={page==="products"?"active":""} onClick={()=>navigateAdmin("products")}><HardDrive/> Store Products</button>
+      <button className={page==="upload"?"active":""} onClick={()=>navigateAdmin("upload")}><UploadCloud/> New Transfer</button>
+      <button className={page==="users"?"active":""} onClick={()=>navigateAdmin("users")}><UserRound/> Users</button>
+      <button className={page==="settings"?"active":""} onClick={()=>navigateAdmin("settings")}><Settings/> Account</button>
     </div><div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div><button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
+    {mobileNavOpen&&<button type="button" className="mobile-nav-backdrop" aria-label="Close navigation" onClick={()=>{setMobileNavOpen(false);mobileNavToggleRef.current?.focus();}}/>}
     <main className="admin-main">
-      <div className="admin-mobile-head"><Logo/><button><Menu/></button></div>
+      <div className="admin-mobile-head"><Logo/><button ref={mobileNavToggleRef} type="button" aria-label={mobileNavOpen?"Close navigation":"Open navigation"} aria-expanded={mobileNavOpen} aria-controls="admin-sidebar" onClick={()=>setMobileNavOpen(v=>!v)}>{mobileNavOpen?<X/>:<Menu/>}</button></div>
       {page==="dashboard"&&<Dashboard stats={stats} transfers={transfers} onOpen={setSelected}/>}
       {page==="transfers"&&<Transfers transfers={transfers} onOpen={setSelected}/>}
       {page==="products"&&<StoreProductManager/>}
@@ -642,6 +675,58 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [securityMessage,setSecurityMessage]=useState("");
   const [securityError,setSecurityError]=useState("");
   const [securitySaving,setSecuritySaving]=useState(false);
+  const [privacyBusy,setPrivacyBusy]=useState(false);
+  const [privacyError,setPrivacyError]=useState("");
+  const [privacyMessage,setPrivacyMessage]=useState("");
+  const [marketingSubscribed,setMarketingSubscribed]=useState(false);
+  const [marketingLoading,setMarketingLoading]=useState(true);
+  const [marketingSaving,setMarketingSaving]=useState(false);
+  const [marketingMessage,setMarketingMessage]=useState("");
+  const [marketingError,setMarketingError]=useState("");
+  useEffect(()=>{
+    api("/account/marketing-preference").then(d=>setMarketingSubscribed(!!d.subscribed)).catch(e=>setMarketingError(e.message)).finally(()=>setMarketingLoading(false));
+  },[user?.id]);
+
+  async function changeMarketingPreference(next){
+    setMarketingSaving(true);setMarketingError("");setMarketingMessage("");
+    try{
+      const result=await api("/account/marketing-preference",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({subscribed:next})});
+      setMarketingSubscribed(!!result.subscribed);setMarketingMessage(result.message||"Email preference updated.");
+    }catch(e){setMarketingError(e.message||"Could not update your email preference.");}
+    finally{setMarketingSaving(false);}
+  }
+
+  async function downloadPersonalData(){
+    setPrivacyBusy(true);setPrivacyError("");setPrivacyMessage("");
+    try{
+      const [accountResponse,storeResponse]=await Promise.all([
+        fetch("/api/account/data-export",{credentials:"include",cache:"no-store"}),
+        fetch("/api/store/privacy-export",{credentials:"include",cache:"no-store"})
+      ]);
+      const [accountData,storeData]=await Promise.all([
+        accountResponse.json(),storeResponse.json()
+      ]);
+      if(!accountResponse.ok)throw new Error(accountData.error||"Could not export account data.");
+      if(!storeResponse.ok)throw new Error(storeData.error||"Could not export store data.");
+      const payload={...accountData,store:storeData};
+      const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement("a");
+      link.href=url;link.download="taallab-personal-data.json";
+      document.body.append(link);link.click();link.remove();URL.revokeObjectURL(url);
+      setPrivacyMessage("Your account and store data export has been prepared.");
+    }catch(e){setPrivacyError(e.message||"Could not prepare your data export.");}
+    finally{setPrivacyBusy(false);}
+  }
+
+  async function requestDeletion(){
+    setPrivacyBusy(true);setPrivacyError("");setPrivacyMessage("");
+    try{
+      const result=await api("/account/privacy-request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmation:"DELETE MY ACCOUNT"})});
+      setPrivacyMessage((result.message||"Your deletion request has been recorded.")+" Reference: "+result.requestId+". Your account has not been deleted.");
+    }catch(e){setPrivacyError(e.message||"Could not submit your deletion request.");}
+    finally{setPrivacyBusy(false);}
+  }
 
   async function change(e){
     e.preventDefault();setMessage("");setError("");
@@ -723,6 +808,29 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
         {profileError&&<div className="error-box">{profileError}</div>}{profileMessage&&<div className="success-pill">{profileMessage}</div>}
         <button className="primary-btn" disabled={profileSaving}>{profileSaving?"Saving profile…":"Save profile"}</button>
       </form>
+    </section>
+    <section className="panel" style={{maxWidth:720,padding:24,marginTop:18}}>
+      <h2>Email preferences</h2>
+      <p className="muted" style={{marginTop:6}}>Choose separately whether TaalLab may send you occasional product news and marketing emails. Account verification, security and purchase emails are not affected.</p>
+      <label className="policy-consent" style={{marginTop:14}}>
+        <input type="checkbox" checked={marketingSubscribed} disabled={marketingLoading||marketingSaving} onChange={e=>changeMarketingPreference(e.target.checked)}/>
+        <span>Send me occasional product news and marketing emails. <small>You can unsubscribe here or through the unsubscribe link in any marketing email.</small></span>
+      </label>
+      {marketingLoading&&<p className="muted" role="status">Loading email preferences…</p>}
+      {marketingError&&<div className="error-box" role="alert">{marketingError}</div>}
+      {marketingMessage&&<div className="success-pill" role="status">{marketingMessage}</div>}
+    </section>
+    <section className="panel" style={{maxWidth:720,padding:24,marginTop:18}}>
+      <h2>Privacy &amp; personal data</h2>
+      <p className="muted" style={{marginTop:6}}>Download a copy of the account, transfer, OCEAN and digital-store information associated with this account, or submit a request to delete your account. The export includes database records and file metadata, not uploaded file contents or data held directly by Google or other connected providers.</p>
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:16}}>
+        <button type="button" className="primary-btn" disabled={privacyBusy} onClick={downloadPersonalData}>{privacyBusy?"Please wait…":"Download my data"}</button>
+        <button type="button" className="ghost-btn" disabled={privacyBusy} onClick={()=>{if(window.confirm("Submit an account deletion request? Your account will not be deleted immediately. TaalLab will review connected data and records that may need to be retained.")){const confirmation=window.prompt("To confirm, type DELETE MY ACCOUNT");if(confirmation==="DELETE MY ACCOUNT")void requestDeletion();}}}>Request account deletion</button>
+      </div>
+      {privacyError&&<div className="error-box" role="alert" style={{marginTop:12}}>{privacyError}</div>}
+      {privacyMessage&&<div className="success-pill" role="status" style={{marginTop:12}}>{privacyMessage}</div>}
+      <p className="muted" style={{fontSize:12,marginTop:14}}>Deletion requests are reviewed rather than executed instantly, because transfers, shared OCEAN pages and purchase records may involve other users or legal retention requirements. You can also contact <a href="mailto:contact@taallab.in">contact@taallab.in</a>.</p>
+      <p style={{fontSize:12,marginTop:8}}><a href="/privacy.html">Read the Privacy Policy</a></p>
     </section>
     <SecurityMethods user={user}/>
     <section className="panel" style={{maxWidth:620,padding:24,marginTop:18}}><h2>Change password</h2><form onSubmit={change}>
@@ -829,7 +937,7 @@ function TransferTable({transfers,onOpen}) {
       </td>
       <td>{fmtDate(t.created_at)}</td><td>{fmtDate(t.expires_at)}</td><td>{t.file_count}</td><td>{formatBytes(t.total_size)}</td><td>{t.downloads}</td>
       <td><span className={`status ${t.status}`}>{t.status}</span></td>
-      <td><button className="icon-btn"><MoreHorizontal/></button></td>
+      <td><span className="icon-btn" aria-hidden="true"><MoreHorizontal/></span></td>
     </tr>)}
   </tbody></table></div>;
 }
@@ -937,7 +1045,7 @@ function Upload({onDone}) {
     </div></div>;
   return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">NEW TRANSFER</span><h1>Send files</h1><p>Upload large studio assets and create a private client link.</p></div></div>
     <div className="upload-grid"><section className="panel upload-panel"><div className="dropzone" onDragOver={e=>e.preventDefault()} onDrop={drop}><UploadCloud/><h2>Drop files here</h2><p>or choose multiple files from your computer</p><label className="primary-btn"><Plus/> Select files<input hidden type="file" multiple onChange={addFiles}/></label><small>Files go directly to private R2 storage.</small></div>
-      {!!files.length&&<div className="upload-files">{files.map(f=><div className="upload-file" key={f.id}><File/><div><strong>{f.name}</strong><small>{formatBytes(f.size)}</small></div><button className="icon-btn" onClick={()=>setFiles(files.filter(x=>x.id!==f.id))}><X/></button></div>)}</div>}
+      {!!files.length&&<div className="upload-files">{files.map(f=><div className="upload-file" key={f.id}><File/><div><strong>{f.name}</strong><small>{formatBytes(f.size)}</small></div><button type="button" className="icon-btn" aria-label={"Remove "+f.name} onClick={()=>setFiles(files.filter(x=>x.id!==f.id))}><X/></button></div>)}</div>}
     </section><section className="panel message-panel">
       <label>Client email <span className="muted">(optional)</span><input type="email" list="client-users" value={recipientEmail} placeholder="client@example.com — leave blank for link only" onChange={e=>{setRecipientEmail(e.target.value);setRecipientId("")}}/><datalist id="client-users">{recipients.map(u=><option key={u.id} value={u.email}>{u.email}</option>)}</datalist></label>
       <label>Select existing user <span className="muted">(optional)</span><select value={recipientId} onChange={e=>{const id=e.target.value;setRecipientId(id);const match=recipients.find(u=>u.id===id);if(match)setRecipientEmail(match.email)}}><option value="">No account / enter email manually…</option>{recipients.map(u=><option key={u.id} value={u.id}>{u.email}{u.role==="admin"?" (Admin)":""}</option>)}</select></label>
@@ -954,7 +1062,7 @@ function TransferDetail({transfer,onClose,onChanged}) {
   const [detail,setDetail]=useState(null);
   useEffect(()=>{api(`/admin/transfers/${transfer.id}`).then(setDetail)},[transfer.id]);
   if(!detail)return <div className="detail-drawer"><RefreshCw className="spin"/></div>;
-  return <div className="detail-drawer"><div className="drawer-head"><div><span className="eyebrow">TRANSFER DETAILS</span><h2>{detail.id}</h2></div><button onClick={onClose}><X/></button></div>
+  return <div className="detail-drawer"><div className="drawer-head"><div><span className="eyebrow">TRANSFER DETAILS</span><h2>{detail.id}</h2></div><button type="button" aria-label="Close transfer details" onClick={onClose}><X/></button></div>
     <div className="detail-stats"><span>Created<strong>{fmtDate(detail.created_at)}</strong></span><span>Expires<strong>{fmtDate(detail.expires_at)}</strong></span><span>Total size<strong>{formatBytes(detail.total_size)}</strong></span><span>Downloads<strong>{detail.downloads}</strong></span></div>
     {detail.recipient_email&&<div className="message-box"><MessageSquare size={18}/><p><strong>Client:</strong> {detail.recipient_email}</p></div>}
     {detail.message&&<div className="message-box"><MessageSquare size={18}/><p>“{detail.message}”</p></div>}

@@ -35,7 +35,9 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const SETTINGS_REFRESH = "google_refresh_token";
 const SETTINGS_FOLDER = "google_drive_folder_id";
 const now = () => Math.floor(Date.now() / 1000);
-const POLICY_VERSION = "2026-11-07";
+const TERMS_VERSION = "2026-11-07.1";
+const PRIVACY_VERSION = "2026-11-07.5";
+const GOOGLE_POLICY_ACCEPTANCE = `${TERMS_VERSION}:${PRIVACY_VERSION}`;
 
 async function recordPolicyAcceptance(env: Env, userId: string, method: string) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
@@ -43,7 +45,64 @@ async function recordPolicyAcceptance(env: Env, userId: string, method: string) 
     privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
   )`).run();
   await env.DB.prepare("INSERT INTO policy_acceptances(id,user_id,terms_version,privacy_version,accepted_at,method) VALUES(?,?,?,?,?,?)")
-    .bind(randomToken(16), userId, POLICY_VERSION, POLICY_VERSION, now(), method).run();
+    .bind(randomToken(16), userId, TERMS_VERSION, PRIVACY_VERSION, now(), method).run();
+}
+
+async function ensureMarketingSchema(env: Env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS marketing_preferences (
+    user_id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    subscribed INTEGER NOT NULL DEFAULT 0,
+    consented_at INTEGER,
+    unsubscribed_at INTEGER,
+    updated_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS marketing_consent_events (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    action TEXT NOT NULL CHECK(action IN ('subscribe','unsubscribe')),
+    method TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_marketing_events_user_created ON marketing_consent_events(user_id,created_at DESC)").run();
+}
+
+async function recordMarketingConsent(env: Env, userId: string, email: string, subscribed: boolean, method = "account_settings") {
+  await ensureMarketingSchema(env);
+  const timestamp = now();
+  if (subscribed) {
+    await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,email,subscribed,consented_at,unsubscribed_at,updated_at)
+      VALUES(?,?,1,?,NULL,?)
+      ON CONFLICT(user_id) DO UPDATE SET email=excluded.email,subscribed=1,consented_at=excluded.consented_at,unsubscribed_at=NULL,updated_at=excluded.updated_at`)
+      .bind(userId, normalizeEmail(email), timestamp, timestamp).run();
+  } else {
+    await env.DB.prepare(`INSERT INTO marketing_preferences(user_id,email,subscribed,consented_at,unsubscribed_at,updated_at)
+      VALUES(?,?,0,NULL,?,?)
+      ON CONFLICT(user_id) DO UPDATE SET email=excluded.email,subscribed=0,unsubscribed_at=excluded.unsubscribed_at,updated_at=excluded.updated_at`)
+      .bind(userId, normalizeEmail(email), timestamp, timestamp).run();
+  }
+  await env.DB.prepare("INSERT INTO marketing_consent_events(id,user_id,email,action,method,created_at) VALUES(?,?,?,?,?,?)")
+    .bind(randomToken(16), userId, normalizeEmail(email), subscribed ? "subscribe" : "unsubscribe", method, timestamp).run();
+}
+
+async function marketingUnsubscribeToken(env: Env, userId: string) {
+  const issuedAt = now();
+  const payload = `${userId}.${issuedAt}`;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.SESSION_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
+  const hex = [...signature].map(value => value.toString(16).padStart(2, "0")).join("");
+  return `${payload}.${hex}`;
+}
+
+async function verifyMarketingUnsubscribeToken(env: Env, token: string) {
+  const parts = token.split(".");
+  if (parts.length !== 3 || !/^[a-f0-9]{32}$/.test(parts[0]) || !/^\d{1,12}$/.test(parts[1]) || !/^[a-f0-9]{64}$/.test(parts[2])) return null;
+  const payload = `${parts[0]}.${parts[1]}`;
+  const signature = new Uint8Array(parts[2].match(/.{2}/g)!.map(value => parseInt(value, 16)));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.SESSION_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  const valid = await crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(payload));
+  return valid && Number(parts[1]) <= now() ? parts[0] : null;
 }
 
 const json = (data: any, init: ResponseInit = {}) =>
@@ -148,6 +207,18 @@ async function hashPassword(password: string) {
 
 async function ensureSupportSchema(env: Env) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS privacy_requests (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    request_type TEXT NOT NULL CHECK(request_type IN ('deletion')),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','processing','completed','rejected')),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    completed_at INTEGER,
+    admin_notified_at INTEGER
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_user_status ON privacy_requests(user_id,status,created_at DESC)").run();
   const columns: any = await env.DB.prepare("PRAGMA table_info(files)").all();
   const hasLastDownloaded = (columns.results || []).some((col: any) => col.name === "last_downloaded_at");
   if (!hasLastDownloaded) {
@@ -266,6 +337,41 @@ async function sendAuthEmail(env: Env, to: string, subject: string, html: string
   const data: any = await response.json().catch(() => ({}));
   if (!response.ok) {
     console.error("Auth email failed", response.status, data);
+    return { sent: false, error: data?.message || data?.error || `Email provider returned HTTP ${response.status}` };
+  }
+  return { sent: true, id: data?.id || null };
+}
+
+async function sendMarketingEmail(env: Env, userId: string, subject: string, html: string, text: string) {
+  await ensureMarketingSchema(env);
+  const preference: any = await env.DB.prepare("SELECT email,subscribed FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(userId).first();
+  if (!preference || Number(preference.subscribed) !== 1 || !preference.email) return { sent: false, skipped: true };
+
+  const token = await marketingUnsubscribeToken(env, userId);
+  const unsubscribeUrl = `${origin(env)}/unsubscribe.html?token=${encodeURIComponent(token)}`;
+  const oneClickUrl = `${origin(env)}/api/marketing/unsubscribe?token=${encodeURIComponent(token)}`;
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": `marketing:${userId}:${randomToken(12)}`,
+    },
+    body: JSON.stringify({
+      from: "TaalLab <contact@taallab.in>",
+      to: [String(preference.email)],
+      subject,
+      html: `${html}<p style="font-size:12px;color:#687080">You received this email because you opted in to TaalLab marketing updates. <a href="${unsubscribeUrl}">Unsubscribe</a>.</p>`,
+      text: `${text}\n\nYou received this email because you opted in to TaalLab marketing updates. Unsubscribe: ${unsubscribeUrl}`,
+      headers: {
+        "List-Unsubscribe": `<${oneClickUrl}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+    }),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.error("Marketing email failed", response.status, data);
     return { sent: false, error: data?.message || data?.error || `Email provider returned HTTP ${response.status}` };
   }
   return { sent: true, id: data?.id || null };
@@ -604,6 +710,7 @@ async function authSignup(req: Request, env: Env) {
     .bind(id, email, hash, "user", createdAt, createdAt, "active", null, 1).run();
 
   await recordPolicyAcceptance(env, id, "email_signup");
+  if (body.marketingConsent === true) await recordMarketingConsent(env, id, email, true, "email_signup");
   const verification = await createEmailVerification(env, { id, email });
   if (!verification.sent) {
     return json({ error: "Your account was created, but the verification email could not be sent. Use Resend verification email below.", needsVerification: true, verificationSent: false }, { status: 502 });
@@ -642,6 +749,124 @@ async function authSetup(req: Request, env: Env) {
 async function currentUser(env: Env, req: Request) {
   const user = await getSessionUser(req, env);
   return user ? json({ authenticated: true, user }) : json({ authenticated: false });
+}
+
+async function exportAccountData(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  await ensureOceanSchema(env);
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, terms_version TEXT NOT NULL,
+    privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
+  )`).run();
+
+  await ensureMarketingSchema(env);
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, terms_version TEXT NOT NULL,
+    privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
+  )`).run();
+  const [account, transfers, files, acceptances, privacyRequests, marketingPreference, marketingEvents, googleIdentity, pages, shares, comments, assets, calendar] = await Promise.all([
+    env.DB.prepare("SELECT id,email,role,status,created_at,updated_at,email_verified_at,two_factor_enabled,display_name,avatar_data FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
+    env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
+    env.DB.prepare("SELECT f.id,f.transfer_id,f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC").bind(user.id).all(),
+    env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at DESC").bind(user.id).all(),
+    env.DB.prepare("SELECT id,request_type,status,created_at,updated_at,completed_at FROM privacy_requests WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
+    env.DB.prepare("SELECT subscribed,consented_at,unsubscribed_at,updated_at FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(user.id).first(),
+    env.DB.prepare("SELECT action,method,created_at FROM marketing_consent_events WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
+    env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=? LIMIT 1").bind(user.id).first(),
+    env.DB.prepare("SELECT id,parent_id,title,icon,cover,blocks_json,is_favorite,is_archived,created_at,updated_at,is_folder,is_shared,general_access,cover_credit,cover_credit_url,cover_source_url FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT s.page_id,s.user_id,s.permission,s.created_at,s.updated_at FROM ocean_page_shares s JOIN ocean_pages p ON p.id=s.page_id WHERE p.user_id=? OR s.user_id=? ORDER BY s.created_at").bind(user.id, user.id).all(),
+    env.DB.prepare("SELECT id,page_id,user_id,body,created_at FROM ocean_comments WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(user.id, user.id).all(),
+    env.DB.prepare("SELECT id,page_id,file_name,mime_type,size,created_at FROM ocean_assets WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(user.id, user.id).all(),
+    env.DB.prepare("SELECT email,scope,connected_at,updated_at FROM ocean_google_calendar WHERE user_id=? LIMIT 1").bind(user.id).first(),
+  ]);
+
+  return new Response(JSON.stringify({
+    exported_at: new Date().toISOString(),
+    service: "TAAL LAB",
+    notice: "This export contains account and workspace records available in the TaalLab databases. It excludes passwords, session secrets, OAuth refresh tokens, private storage keys and download tokens.",
+    account, transfers: transfers.results || [], files: files.results || [],
+    policy_acceptances: acceptances.results || [], privacy_requests: privacyRequests.results || [], marketing_preference: marketingPreference || null, marketing_consent_events: marketingEvents.results || [], google_identity: googleIdentity || null,
+    ocean: { pages: pages.results || [], page_shares: shares.results || [], comments: comments.results || [], assets: assets.results || [], google_calendar_connection: calendar || null },
+  }, null, 2), {
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": `attachment; filename="taallab-account-data-${String(user.id).slice(0,8)}.json"`,
+      "cache-control": "no-store, private",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
+async function getMarketingPreference(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  await ensureMarketingSchema(env);
+  const row: any = await env.DB.prepare("SELECT subscribed,consented_at,unsubscribed_at,updated_at FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(user.id).first();
+  const subscribed = Number(row?.subscribed || 0) === 1;
+  const token = subscribed ? await marketingUnsubscribeToken(env, user.id) : "";
+  return json({
+    subscribed,
+    consented_at: row?.consented_at || null,
+    unsubscribed_at: row?.unsubscribed_at || null,
+    unsubscribe_url: subscribed ? `${origin(env)}/unsubscribe.html?token=${encodeURIComponent(token)}` : null,
+  });
+}
+
+async function updateMarketingPreference(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  const body = await req.json().catch(() => ({}));
+  if (typeof body.subscribed !== "boolean") return json({ error: "Choose whether you want to receive marketing emails." }, { status: 400 });
+  await recordMarketingConsent(env, user.id, user.email, body.subscribed, "account_settings");
+  return json({ ok: true, subscribed: body.subscribed, message: body.subscribed ? "Marketing email consent saved." : "You have been unsubscribed from marketing emails." });
+}
+
+async function unsubscribeMarketing(req: Request, env: Env) {
+  const url = new URL(req.url);
+  let token = url.searchParams.get("token") || "";
+  if (!token) {
+    const contentType = req.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const body = await req.json().catch(() => ({}));
+      token = String(body.token || "");
+    } else {
+      const form = await req.formData().catch(() => null);
+      token = String(form?.get("token") || "");
+    }
+  }
+  const userId = await verifyMarketingUnsubscribeToken(env, token);
+  if (!userId) return json({ error: "This unsubscribe link is invalid. Please manage your email preferences from Account Settings." }, { status: 400 });
+  await ensureMarketingSchema(env);
+  const row: any = await env.DB.prepare("SELECT email FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(userId).first();
+  if (row?.email) await recordMarketingConsent(env, userId, String(row.email), false, "marketing_email_unsubscribe");
+  return json({ ok: true, message: "You have been unsubscribed from TaalLab marketing emails. Essential account and security emails will continue." });
+}
+
+async function requestAccountDeletion(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  const body = await req.json().catch(() => ({}));
+  if (body.confirmation !== "DELETE MY ACCOUNT") {
+    return json({ error: "Type DELETE MY ACCOUNT to confirm this request." }, { status: 400 });
+  }
+  const existing: any = await env.DB.prepare("SELECT id,status,created_at FROM privacy_requests WHERE user_id=? AND request_type='deletion' AND status IN ('pending','processing') ORDER BY created_at DESC LIMIT 1").bind(user.id).first();
+  if (existing) return json({ ok: true, requestId: existing.id, status: existing.status, message: "A deletion request is already awaiting review." });
+
+  const id = randomToken(16);
+  const createdAt = now();
+  await env.DB.prepare("INSERT INTO privacy_requests(id,user_id,email,request_type,status,created_at,updated_at) VALUES(?,?,?,'deletion','pending',?,?)")
+    .bind(id, user.id, user.email, createdAt, createdAt).run();
+  await recordMarketingConsent(env, user.id, user.email, false, "account_deletion_request");
+
+  const safeEmail = escapeHtml(String(user.email || ""));
+  const adminMessage = await sendAuthEmail(env, "contact@taallab.in", "Account deletion request — TaalLab", 
+    `<p>A user has submitted an account deletion request.</p><p><strong>Request:</strong> ${id}</p><p><strong>Account:</strong> ${safeEmail}</p><p><strong>Submitted:</strong> ${new Date(createdAt * 1000).toISOString()}</p><p>Review associated transfer, OCEAN and store records, and retain only information required by applicable law or legitimate dispute/security needs. Do not treat this email as proof that deletion has been completed.</p>`,
+    `Account deletion request\nRequest: ${id}\nAccount: ${user.email}\nSubmitted: ${new Date(createdAt * 1000).toISOString()}\nReview related data and retention obligations before processing.`,
+    `privacy-deletion-admin:${id}`);
+  if (adminMessage.sent) await env.DB.prepare("UPDATE privacy_requests SET admin_notified_at=? WHERE id=?").bind(now(), id).run();
+  await sendAuthEmail(env, String(user.email), "We received your TaalLab privacy request",
+    `<p>We received your account deletion request.</p><p><strong>Reference:</strong> ${id}</p><p>Your account has not been deleted yet. We will review linked workspace, transfer and purchase records and any information that must be retained by law. Contact <a href="mailto:contact@taallab.in">contact@taallab.in</a> with this reference if you need help.</p>`,
+    `We received your TaalLab account deletion request. Reference: ${id}. Your account has not been deleted yet. Contact contact@taallab.in with this reference if you need help.`,
+    `privacy-deletion-user:${id}`);
+
+  return json({ ok: true, requestId: id, status: "pending", notificationSent: adminMessage.sent, message: "Your request has been recorded for review. Your account and data have not yet been deleted." });
 }
 
 async function updateAccountProfile(req: Request, env: Env) {
@@ -847,7 +1072,7 @@ async function googleAuthStart(req: Request, env: Env) {
     return new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: "Google sign-in is not configured yet." }, returnTo).toString(), "cache-control": "no-store" } });
   }
   const params = new URL(req.url).searchParams;
-  const acceptedPolicies = params.get("terms") === POLICY_VERSION && params.get("privacy") === POLICY_VERSION;
+  const acceptedPolicies = params.get("terms") === TERMS_VERSION && params.get("privacy") === PRIVACY_VERSION;
   const state = randomToken(24);
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", env.GOOGLE_LOGIN_CLIENT_ID);
@@ -863,7 +1088,7 @@ async function googleAuthStart(req: Request, env: Env) {
   // State and return cookies must therefore be valid on both hosts.
   response.headers.append("set-cookie", cookie("google_login_state", state, 600, req));
   response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req));
-  response.headers.append("set-cookie", acceptedPolicies ? cookie("google_login_consent", POLICY_VERSION, 600, req) : cookie("google_login_consent", "", 0, req));
+  response.headers.append("set-cookie", acceptedPolicies ? cookie("google_login_consent", GOOGLE_POLICY_ACCEPTANCE, 600, req) : cookie("google_login_consent", "", 0, req));
   return response;
 }
 
@@ -872,7 +1097,7 @@ async function googleAuthCallback(req: Request, env: Env) {
   const clearStateCookie = "google_login_state=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const clearReturnCookie = "google_login_return=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const clearConsentCookie = "google_login_consent=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
-  const consentAccepted = parseCookie(req, "google_login_consent") === POLICY_VERSION;
+  const consentAccepted = parseCookie(req, "google_login_consent") === GOOGLE_POLICY_ACCEPTANCE;
   const savedReturn = parseCookie(req, "google_login_return");
   const returnTo = savedReturn === "ocean-app" ? "ocean-app" : savedReturn === "/ocean.html" ? "/ocean.html" : "/admin";
   const fail = (message: string) => {
@@ -1354,8 +1579,11 @@ async function trashDriveFile(env: Env, fileId: string) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ trashed: true }),
   });
+  if (response.status === 404) return;
   if (!response.ok) {
-    console.error("Drive delete failed", fileId, await response.text());
+    const detail = await response.text().catch(() => "");
+    console.error("Drive trash operation failed", fileId, response.status, detail);
+    throw new Error(`Google Drive trash operation failed (HTTP ${response.status}).`);
   }
 }
 
@@ -1504,7 +1732,27 @@ async function handlePreview(env: Env, req: Request, token: string) {
   return streamDriveFile(env, f.storage_key, req, f.original_name, f.mime_type, false);
 }
 
+async function notifyPendingPrivacyRequests(env: Env) {
+  await ensureSupportSchema(env);
+  const pending = await env.DB.prepare("SELECT id,email,created_at FROM privacy_requests WHERE request_type='deletion' AND status='pending' AND admin_notified_at IS NULL ORDER BY created_at LIMIT 10").all();
+  for (const request of pending.results as any[]) {
+    const safeEmail = escapeHtml(String(request.email || ""));
+    const sent = await sendAuthEmail(env, "contact@taallab.in", "Account deletion request — TaalLab",
+      `<p>A user has submitted an account deletion request.</p><p><strong>Request:</strong> ${escapeHtml(String(request.id))}</p><p><strong>Account:</strong> ${safeEmail}</p><p><strong>Submitted:</strong> ${new Date(Number(request.created_at) * 1000).toISOString()}</p><p>Review linked records and retention obligations before processing. Do not treat this email as proof that deletion has been completed.</p>`,
+      `Account deletion request\nRequest: ${request.id}\nAccount: ${request.email}\nReview linked records and retention obligations.`,
+      `privacy-deletion-admin:${request.id}`);
+    if (sent.sent) await env.DB.prepare("UPDATE privacy_requests SET admin_notified_at=? WHERE id=? AND admin_notified_at IS NULL").bind(now(), request.id).run();
+  }
+}
+
 async function cleanup(env: Env) {
+  await ensureSupportSchema(env);
+  await ensureOceanSchema(env);
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS google_app_login_codes (
+    code_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+  )`).run();
   const cutoff = now();
   const files = await env.DB.prepare("SELECT id,storage_key,transfer_id FROM files WHERE expires_at<=? AND status!='deleted'")
     .bind(cutoff)
@@ -1512,23 +1760,41 @@ async function cleanup(env: Env) {
 
   for (const f of files.results as any[]) {
     const refs: any = await env.DB.prepare(
-      "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND id!=?"
-    ).bind(f.storage_key, f.id).first();
+      "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND id!=? AND expires_at>?"
+    ).bind(f.storage_key, f.id, cutoff).first();
 
-    if (Number(refs?.n || 0) > 0) continue;
+    if (Number(refs?.n || 0) > 0) {
+      await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(f.id).run();
+      continue;
+    }
 
     try {
       await trashDriveFile(env, f.storage_key);
+      await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(f.id).run();
     } catch (e) {
-      console.error("Drive delete failed", f.storage_key, e);
+      // Leave the record eligible for retry on the next scheduled run.
+      console.error("Drive trash operation failed; will retry", f.storage_key, e);
     }
   }
 
   await env.DB.batch([
-    env.DB.prepare("UPDATE files SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM email_verification_tokens WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM password_reset_tokens WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM google_app_login_codes WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM ocean_google_calendar_states WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM booking_rate_limits WHERE last_sent_at<=?").bind(cutoff - 365 * 86400),
+  ]);
+
+  // Keep expired transfer metadata for a short recovery/dispute window, then purge it.
+  // File objects are removed above; only records expired for more than 30 days are purged here.
+  const metadataCutoff = cutoff - 365 * 86400;
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM files WHERE transfer_id IN (SELECT id FROM transfers WHERE status='deleted' AND expires_at<=?) AND status='deleted'").bind(metadataCutoff),
+    env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=? AND NOT EXISTS (SELECT 1 FROM files f WHERE f.transfer_id=transfers.id AND f.status!='deleted')").bind(metadataCutoff),
   ]);
 }
 
@@ -2178,7 +2444,7 @@ export default {
         const blocks=JSON.parse(publicPage.blocks_json||"[]");
         const esc=(value:any)=>String(value??"").replace(/[&<>"]/g,(ch:string)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]!));
         const content=blocks.map((block:any)=>{const tag=({heading1:"h1",heading2:"h2",heading3:"h3",quote:"blockquote",bullet:"p",numbered:"p",todo:"p",callout:"aside",code:"pre"} as any)[block.type]||"p";return "<"+tag+">"+esc(block.text||"")+"</"+tag+">";}).join("");
-        return new Response("<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>"+esc(publicPage.title)+" — OCEAN</title><style>body{margin:0;background:#f7f8fa;color:#202832;font:16px/1.7 system-ui,sans-serif}.page{max-width:760px;margin:8vh auto;padding:48px;background:white;border:1px solid #e5e9ef;border-radius:16px}h1{line-height:1.2}blockquote,aside{border-left:3px solid #2586e8;padding:8px 18px;background:#f4f8fd}pre{white-space:pre-wrap;background:#f2f4f7;padding:16px;border-radius:8px}@media(max-width:700px){.page{margin:0;padding:28px 20px;border:0;border-radius:0}}</style></head><body><main class=page><h1>"+esc(publicPage.icon||"")+" "+esc(publicPage.title)+"</h1>"+content+"<p style='color:#87909b;font-size:12px;margin-top:40px'>Published with OCEAN by TaalLab</p></main></body></html>",{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
+        return new Response("<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>"+esc(publicPage.title)+" — OCEAN</title><style>body{margin:0;background:#f7f8fa;color:#202832;font:16px/1.7 system-ui,sans-serif}.page{max-width:760px;margin:8vh auto;padding:48px;background:white;border:1px solid #e5e9ef;border-radius:16px}h1{line-height:1.2}blockquote,aside{border-left:3px solid #2586e8;padding:8px 18px;background:#f4f8fd}pre{white-space:pre-wrap;background:#f2f4f7;padding:16px;border-radius:8px}@media(max-width:700px){.page{margin:0;padding:28px 20px;border:0;border-radius:0}}</style></head><body><main class=page><h1>"+esc(publicPage.icon||"")+" "+esc(publicPage.title)+"</h1>"+content+"<p style='color:#87909b;font-size:12px;margin-top:40px'>Published with OCEAN by TaalLab</p></main><script src='/privacy-notice.js' defer></script></body></html>",{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
       }
       if (url.pathname.startsWith("/api/ocean/")) {
         const oceanResponse = await handleOceanRequest(req, env, url.pathname);
@@ -2258,6 +2524,11 @@ export default {
       if ((url.pathname === "/api/auth/login" || url.pathname === "/api/admin/login") && req.method === "POST") return authLogin(req, env);
       if ((url.pathname === "/api/auth/logout" || url.pathname === "/api/admin/logout") && req.method === "POST") return authLogout(req, env);
       if (url.pathname === "/api/auth/me" && req.method === "GET") return currentUser(env, req);
+      if (url.pathname === "/api/account/data-export" && req.method === "GET") return exportAccountData(req, env);
+      if (url.pathname === "/api/account/marketing-preference" && req.method === "GET") return getMarketingPreference(req, env);
+      if (url.pathname === "/api/account/marketing-preference" && req.method === "PUT") return updateMarketingPreference(req, env);
+      if (url.pathname === "/api/marketing/unsubscribe" && req.method === "POST") return unsubscribeMarketing(req, env);
+      if (url.pathname === "/api/account/privacy-request" && req.method === "POST") return requestAccountDeletion(req, env);
       if (url.pathname === "/api/account/profile" && req.method === "PATCH") return updateAccountProfile(req, env);
       if (url.pathname === "/api/account/password" && req.method === "POST") return changeOwnPassword(req, env);
       if (url.pathname === "/api/account/security" && req.method === "POST") return updateSecuritySettings(req, env);
@@ -2587,10 +2858,9 @@ export default {
   },
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(Promise.all([
-      cleanup(env),
-      env.DB.prepare("DELETE FROM email_verification_tokens WHERE expires_at<=?").bind(now()).run(),
-      env.DB.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").bind(now()).run(),
-    ]));
+    ctx.waitUntil((async () => {
+      await cleanup(env);
+      await notifyPendingPrivacyRequests(env);
+    })());
   },
 } satisfies ExportedHandler<Env>;
