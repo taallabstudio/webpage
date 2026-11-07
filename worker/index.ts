@@ -666,11 +666,12 @@ async function exportAccountData(req: Request, env: Env) {
     privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
   )`).run();
 
-  const [account, transfers, files, acceptances, googleIdentity, pages, shares, comments, assets, calendar] = await Promise.all([
+  const [account, transfers, files, acceptances, privacyRequests, googleIdentity, pages, shares, comments, assets, calendar] = await Promise.all([
     env.DB.prepare("SELECT id,email,role,status,created_at,updated_at,email_verified_at,two_factor_enabled,display_name,avatar_data FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT f.id,f.transfer_id,f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at DESC").bind(user.id).all(),
+    env.DB.prepare("SELECT id,request_type,status,created_at,updated_at,completed_at FROM privacy_requests WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT id,parent_id,title,icon,cover,blocks_json,is_favorite,is_archived,created_at,updated_at,is_folder,is_shared,general_access,cover_credit,cover_credit_url,cover_source_url FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
     env.DB.prepare("SELECT s.page_id,s.user_id,s.permission,s.created_at,s.updated_at FROM ocean_page_shares s JOIN ocean_pages p ON p.id=s.page_id WHERE p.user_id=? OR s.user_id=? ORDER BY s.created_at").bind(user.id, user.id).all(),
@@ -684,7 +685,7 @@ async function exportAccountData(req: Request, env: Env) {
     service: "TAAL LAB",
     notice: "This export contains account and workspace records available in the TaalLab databases. It excludes passwords, session secrets, OAuth refresh tokens, private storage keys and download tokens.",
     account, transfers: transfers.results || [], files: files.results || [],
-    policy_acceptances: acceptances.results || [], google_identity: googleIdentity || null,
+    policy_acceptances: acceptances.results || [], privacy_requests: privacyRequests.results || [], google_identity: googleIdentity || null,
     ocean: { pages: pages.results || [], page_shares: shares.results || [], comments: comments.results || [], assets: assets.results || [], google_calendar_connection: calendar || null },
   }, null, 2), {
     headers: {
