@@ -331,8 +331,8 @@ function cleanCustomer(body: any) {
     pincode: value("pincode", 12).replace(/\s/g, ""),
     country: value("country", 80),
   };
-  if (customer.fullName.length < 2 || !/^\+?[0-9]{10,15}$/.test(customer.phone)) {
-    throw new Error("Enter your name and a valid phone number.");
+  if (customer.fullName.length < 2 || (customer.phone && !/^\\+?[0-9]{10,15}$/.test(customer.phone))) {
+    throw new Error("Enter your name and, if provided, a valid phone number.");
   }
   const hasBillingAddress = [customer.addressLine1, customer.addressLine2, customer.city, customer.state, customer.pincode, customer.country].some(Boolean);
   if (hasBillingAddress && (customer.addressLine1.length < 4 || !customer.city || !customer.state ||
