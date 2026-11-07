@@ -336,6 +336,7 @@ async function ensureSupportSchema(env: Env) {
     token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,used_at INTEGER
   )`).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_marketing_unsubscribe_user ON marketing_unsubscribe_tokens(user_id,expires_at)").run();
+  try { await env.DB.prepare("ALTER TABLE files ADD COLUMN synthetic_content INTEGER NOT NULL DEFAULT 0").run(); } catch {}
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS age_confirmations (
     user_id TEXT PRIMARY KEY,confirmed_at INTEGER NOT NULL,method TEXT NOT NULL
   )`).run();
@@ -1731,7 +1732,7 @@ async function accountDataExport(req: Request, env: Env) {
     env.DB.prepare("SELECT id,parent_id,title,icon,cover,blocks_json,is_favorite,is_archived,created_at,updated_at,is_folder,is_shared,general_access,cover_credit,cover_credit_url,cover_source_url FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(userId).all(),
     env.DB.prepare("SELECT id,page_id,user_id,body,created_at FROM ocean_comments WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(userId, userId).all(),
     env.DB.prepare("SELECT page_id,user_id,permission,created_at,updated_at FROM ocean_page_shares WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(userId, userId).all(),
-    env.DB.prepare("SELECT id,page_id,file_name,mime_type,size,created_at FROM ocean_assets WHERE user_id=? ORDER BY created_at").bind(userId).all(),
+    env.DB.prepare("SELECT id,page_id,file_name,mime_type,size,created_at,synthetic_content FROM ocean_assets WHERE user_id=? ORDER BY created_at").bind(userId).all(),
     env.DB.prepare("SELECT email,scope,connected_at,updated_at FROM ocean_google_calendar WHERE user_id=? LIMIT 1").bind(userId).first(),
     env.DB.prepare("SELECT enabled,created_at,updated_at,pending_expires_at FROM user_totp WHERE user_id=? LIMIT 1").bind(userId).first(),
     env.DB.prepare("SELECT name,device_type,backed_up,created_at,last_used_at FROM passkey_credentials WHERE user_id=? ORDER BY created_at").bind(userId).all(),
@@ -1897,7 +1898,7 @@ async function ensureOceanSchema(env: Env) {
       created_at INTEGER NOT NULL
     )`),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_comments_page ON ocean_comments(page_id,created_at)"),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS ocean_assets (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,page_id TEXT NOT NULL,storage_key TEXT NOT NULL UNIQUE,file_name TEXT NOT NULL,mime_type TEXT NOT NULL,size INTEGER NOT NULL,created_at INTEGER NOT NULL)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS ocean_assets (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,page_id TEXT NOT NULL,storage_key TEXT NOT NULL UNIQUE,file_name TEXT NOT NULL,mime_type TEXT NOT NULL,size INTEGER NOT NULL,created_at INTEGER NOT NULL,synthetic_content INTEGER NOT NULL DEFAULT 0)`),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ocean_assets_user_page ON ocean_assets(user_id,page_id,created_at)"),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS ocean_google_calendar (
       user_id TEXT PRIMARY KEY,
@@ -1925,7 +1926,8 @@ async function ensureOceanSchema(env: Env) {
     "ALTER TABLE ocean_pages ADD COLUMN cover_source_url TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE ocean_pages ADD COLUMN cover_position_x REAL NOT NULL DEFAULT 50",
     "ALTER TABLE ocean_pages ADD COLUMN cover_position_y REAL NOT NULL DEFAULT 50",
-    "ALTER TABLE ocean_pages ADD COLUMN cover_zoom REAL NOT NULL DEFAULT 100"
+    "ALTER TABLE ocean_pages ADD COLUMN cover_zoom REAL NOT NULL DEFAULT 100",
+    "ALTER TABLE ocean_assets ADD COLUMN synthetic_content INTEGER NOT NULL DEFAULT 0"
   ]) { try { await env.DB.prepare(statement).run(); } catch { /* Column already exists. */ } }
 }
 
@@ -1971,6 +1973,7 @@ async function uploadOceanAsset(req: Request, env: Env, user: any) {
   const page: any = await oceanPageForUser(env,user.id,pageId);
   if (!page) return json({ error: "Page not found." }, { status: 404 });
   if (!oceanCanEdit(page)) return json({error:"You do not have permission to upload files to this page."},{status:403});
+  const syntheticContent = url.searchParams.get("synthetic") === "1";
   const filename = (url.searchParams.get("filename") || "upload.bin").split("/").pop()!.replace(/[^a-zA-Z0-9._ -]/g,"_").slice(-180);
   const mime = (req.headers.get("Content-Type") || "application/octet-stream").split(";")[0].trim();
   const declared = Number(req.headers.get("Content-Length") || 0);
@@ -1997,8 +2000,18 @@ async function uploadOceanAsset(req: Request, env: Env, user: any) {
   const up: any = await uploaded.json().catch(() => ({}));
   if (!uploaded.ok || !up.fileId) return json({ error: "Backblaze could not store this OCEAN file." }, { status: 502 });
   await env.DB.prepare("INSERT INTO ocean_assets(id,user_id,page_id,storage_key,file_name,mime_type,size,created_at) VALUES(?,?,?,?,?,?,?,?)").bind(id,user.id,pageId,key,filename,mime,bytes.byteLength,now()).run();
-  return json({ ok: true, asset: { id, file_name: filename, mime_type: mime, size: bytes.byteLength, url: "/api/ocean/assets/" + id } }, { status: 201 });
+  return json({ ok: true, asset: { id, file_name: filename, mime_type: mime, size: bytes.byteLength, synthetic_content: syntheticContent, url: "/api/ocean/assets/" + id } }, { status: 201 });
 }
+async function updateOceanAssetLabel(req: Request, env: Env, user: any, id: string) {
+  const body:any=await req.json().catch(()=>({}));
+  if(typeof body.syntheticContent!=="boolean")return json({error:"Choose whether this media is synthetically generated or materially AI-altered."},{status:400});
+  const page:any=await env.DB.prepare("SELECT p.* FROM ocean_pages p JOIN ocean_assets a ON a.page_id=p.id WHERE a.id=? AND a.user_id=? LIMIT 1").bind(id,user.id).first();
+  if(!page)return json({error:"Asset not found."},{status:404});
+  if(!oceanCanEdit(page))return json({error:"You do not have permission to change this asset label."},{status:403});
+  await env.DB.prepare("UPDATE ocean_assets SET synthetic_content=? WHERE id=? AND user_id=?").bind(body.syntheticContent?1:0,id,user.id).run();
+  return json({ok:true,syntheticContent:body.syntheticContent});
+}
+
 async function streamOceanAsset(req: Request, env: Env, user: any, id: string) {
   const asset: any = await env.DB.prepare(`SELECT a.* FROM ocean_assets a JOIN ocean_pages p ON p.id=a.page_id LEFT JOIN ocean_page_shares s ON s.page_id=p.id AND s.user_id=? WHERE a.id=? AND p.is_archived=0 AND (p.user_id=? OR s.user_id=?) LIMIT 1`).bind(user.id,id,user.id,user.id).first();
   if (!asset) return json({ error: "File not found." }, { status: 404 });
@@ -2015,6 +2028,7 @@ async function streamOceanAsset(req: Request, env: Env, user: any, id: string) {
   if (response.headers.get("Content-Length")) out.set("Content-Length",response.headers.get("Content-Length")!);
   if (response.headers.get("Content-Range")) out.set("Content-Range",response.headers.get("Content-Range")!);
   if (response.status === 206) out.set("Accept-Ranges","bytes");
+  if (Number(asset.synthetic_content)===1) out.set("X-TaalLab-Content-Label","AI-generated or materially AI-altered media");
   return new Response(response.body,{status:response.status,headers:out});
 }
 
@@ -2245,6 +2259,8 @@ async function handleOceanRequest(req: Request, env: Env, pathname: string) {
   const roleMatch = pathname.match(/^\/api\/ocean\/admin\/users\/([^/]+)$/);
   if (roleMatch && req.method === "PATCH") return updateOceanUserRole(req,env,roleMatch[1]);
   if (pathname === "/api/ocean/assets" && req.method === "POST") return uploadOceanAsset(req,env,user);
+  const assetLabelMatch=pathname.match(/^\/api\/ocean\/assets\/([a-f0-9]+)\/label$/i);
+  if(assetLabelMatch&&req.method==="PATCH")return updateOceanAssetLabel(req,env,user,assetLabelMatch[1]);
   const assetMatch = pathname.match(/^\/api\/ocean\/assets\/([a-f0-9]+)$/i);
   if (assetMatch && req.method === "GET") return streamOceanAsset(req,env,user,assetMatch[1]);
 
