@@ -37,3 +37,17 @@ jobs:
         run: npm run build
       - name: Validate Worker bundle without deploying
         run: npx wrangler deploy --dry-run --outdir .wrangler-dry-run
+      - name: Generate npm dependency license inventory
+        run: npx --yes license-checker --production --json > npm-license-inventory.json
+      - name: Generate Rust dependency license inventory
+        run: |
+          cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 > cargo-metadata.json
+          jq '[.packages[] | {name,version,license,license_file}]' cargo-metadata.json > rust-license-inventory.json
+      - name: Upload dependency license inventories
+        uses: actions/upload-artifact@v4
+        with:
+          name: third-party-license-inventories
+          path: |
+            npm-license-inventory.json
+            rust-license-inventory.json
+          retention-days: 14
