@@ -35,7 +35,9 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const SETTINGS_REFRESH = "google_refresh_token";
 const SETTINGS_FOLDER = "google_drive_folder_id";
 const now = () => Math.floor(Date.now() / 1000);
-const POLICY_VERSION = "2026-11-07";
+const TERMS_VERSION = "2026-11-07";
+const PRIVACY_VERSION = "2026-11-07.1";
+const GOOGLE_POLICY_ACCEPTANCE = `${TERMS_VERSION}:${PRIVACY_VERSION}`;
 
 async function recordPolicyAcceptance(env: Env, userId: string, method: string) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
@@ -43,7 +45,7 @@ async function recordPolicyAcceptance(env: Env, userId: string, method: string) 
     privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
   )`).run();
   await env.DB.prepare("INSERT INTO policy_acceptances(id,user_id,terms_version,privacy_version,accepted_at,method) VALUES(?,?,?,?,?,?)")
-    .bind(randomToken(16), userId, POLICY_VERSION, POLICY_VERSION, now(), method).run();
+    .bind(randomToken(16), userId, TERMS_VERSION, PRIVACY_VERSION, now(), method).run();
 }
 
 const json = (data: any, init: ResponseInit = {}) =>
@@ -923,7 +925,7 @@ async function googleAuthStart(req: Request, env: Env) {
     return new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: "Google sign-in is not configured yet." }, returnTo).toString(), "cache-control": "no-store" } });
   }
   const params = new URL(req.url).searchParams;
-  const acceptedPolicies = params.get("terms") === POLICY_VERSION && params.get("privacy") === POLICY_VERSION;
+  const acceptedPolicies = params.get("terms") === TERMS_VERSION && params.get("privacy") === PRIVACY_VERSION;
   const state = randomToken(24);
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", env.GOOGLE_LOGIN_CLIENT_ID);
@@ -939,7 +941,7 @@ async function googleAuthStart(req: Request, env: Env) {
   // State and return cookies must therefore be valid on both hosts.
   response.headers.append("set-cookie", cookie("google_login_state", state, 600, req));
   response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req));
-  response.headers.append("set-cookie", acceptedPolicies ? cookie("google_login_consent", POLICY_VERSION, 600, req) : cookie("google_login_consent", "", 0, req));
+  response.headers.append("set-cookie", acceptedPolicies ? cookie("google_login_consent", GOOGLE_POLICY_ACCEPTANCE, 600, req) : cookie("google_login_consent", "", 0, req));
   return response;
 }
 
@@ -948,7 +950,7 @@ async function googleAuthCallback(req: Request, env: Env) {
   const clearStateCookie = "google_login_state=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const clearReturnCookie = "google_login_return=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const clearConsentCookie = "google_login_consent=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
-  const consentAccepted = parseCookie(req, "google_login_consent") === POLICY_VERSION;
+  const consentAccepted = parseCookie(req, "google_login_consent") === GOOGLE_POLICY_ACCEPTANCE;
   const savedReturn = parseCookie(req, "google_login_return");
   const returnTo = savedReturn === "ocean-app" ? "ocean-app" : savedReturn === "/ocean.html" ? "/ocean.html" : "/admin";
   const fail = (message: string) => {
