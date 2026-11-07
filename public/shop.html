@@ -271,7 +271,7 @@ fetch("/api/store/products",{cache:"default"}).then(async r=>{if(!r.ok)throw new
  const box=document.createElement("aside");box.setAttribute("role","region");box.setAttribute("aria-label","Cookie and storage notice");
  box.style.cssText="position:fixed;z-index:10000;left:16px;right:16px;bottom:16px;max-width:760px;margin:0 auto;padding:16px 18px;background:#fff;color:#1d2229;border:1px solid #dce2e8;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.18);display:flex;align-items:center;gap:16px;flex-wrap:wrap;font:13px/1.55 system-ui,sans-serif";
  const copy=document.createElement("p");copy.style.cssText="margin:0;flex:1 1 420px";copy.append("TAAL LAB uses essential session cookies to keep you signed in and local storage to remember your shop cart. ");
- const link=document.createElement("a");link.href="/privacy.html";link.textContent="Privacy Policy";link.style.color="#075fb8";copy.append(link);
+ const link=document.createElement("a");link.href="/privacy.html";link.textContent="Privacy Policy";link.style.color="#075fb8";link.style.textDecoration="underline";link.style.textUnderlineOffset="3px";copy.append(link);
  const button=document.createElement("button");button.type="button";button.textContent="Got it";button.style.cssText="border:0;border-radius:9px;padding:10px 16px;background:#0068c9;color:#fff;font-weight:700;cursor:pointer";
  button.addEventListener("click",()=>{try{localStorage.setItem("taallab.essential-storage-notice.v1","dismissed")}catch{}box.remove()});
  box.append(copy,button);document.body.append(box);

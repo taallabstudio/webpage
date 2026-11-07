@@ -23,7 +23,7 @@ const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).sli
 const blankBlock=(type="text")=>({id:uid(),type,text:""});
 const SLASH_COLORS=[
  ["Gray","#7f8994","#f0f2f4"],["Red","#c64b4b","#fff0ef"],["Orange","#b86a28","#fff2e7"],
- ["Yellow","#9b7b1e","#fff9e6"],["Green","#287a4c","#eaf7ef"],["Blue","#0878e8","#eaf4ff"],["Purple","#7956ae","#f3effb"]
+ ["Yellow","#9b7b1e","#fff9e6"],["Green","#287a4c","#eaf7ef"],["Blue","#0068c9","#eaf4ff"],["Purple","#7956ae","#f3effb"]
 ];
 const OCEAN_EVENT_COLORS=[{id:"1",name:"Lavender",hex:"#7986cb"},{id:"2",name:"Sage",hex:"#33b679"},{id:"3",name:"Grape",hex:"#8e24aa"},{id:"4",name:"Flamingo",hex:"#e67c73"},{id:"5",name:"Banana",hex:"#f6bf26"},{id:"6",name:"Tangerine",hex:"#f4511e"},{id:"7",name:"Peacock",hex:"#039be5"},{id:"8",name:"Graphite",hex:"#616161"},{id:"9",name:"Blueberry",hex:"#3f51b5"},{id:"10",name:"Basil",hex:"#0b8043"},{id:"11",name:"Tomato",hex:"#d50000"}];
 const COMMANDS=[
