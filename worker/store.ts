@@ -320,21 +320,24 @@ function couponDiscount(code: string, subtotalPaise: number) {
 }
 
 function cleanCustomer(body: any) {
-  const value = (key: string, max: number) => String(body[key] || "").trim().replace(/\s+/g, " ").slice(0, max);
+  const value = (key: string, max: number) => String(body[key] || "").trim().replace(/\\s+/g, " ").slice(0, max);
   const customer = {
     fullName: value("fullName", 100),
-    phone: value("phone", 20).replace(/[\s()-]/g, ""),
+    phone: value("phone", 20).replace(/[\\s()-]/g, ""),
     addressLine1: value("addressLine1", 160),
     addressLine2: value("addressLine2", 160),
     city: value("city", 80),
     state: value("state", 80),
-    pincode: value("pincode", 12).replace(/\s/g, ""),
-    country: value("country", 80) || "India",
+    pincode: value("pincode", 12).replace(/\\s/g, ""),
+    country: value("country", 80),
   };
-  if (customer.fullName.length < 2 || !/^\+?[0-9]{10,15}$/.test(customer.phone) ||
-      customer.addressLine1.length < 4 || !customer.city || !customer.state ||
-      !/^[A-Za-z0-9 -]{4,10}$/.test(customer.pincode) || !customer.country) {
-    throw new Error("Enter your name, valid phone number, full address, city, state and PIN/postal code.");
+  if (customer.fullName.length < 2 || !/^\\+?[0-9]{10,15}$/.test(customer.phone)) {
+    throw new Error("Enter your name and a valid phone number.");
+  }
+  const hasBillingAddress = [customer.addressLine1, customer.addressLine2, customer.city, customer.state, customer.pincode, customer.country].some(Boolean);
+  if (hasBillingAddress && (customer.addressLine1.length < 4 || !customer.city || !customer.state ||
+      !/^[A-Za-z0-9 -]{4,10}$/.test(customer.pincode) || !customer.country)) {
+    throw new Error("If you provide a billing address, complete the address, city, state, PIN/postal code and country.");
   }
   return customer;
 }
