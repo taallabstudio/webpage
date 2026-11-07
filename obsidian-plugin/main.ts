@@ -65,7 +65,10 @@ export default class TaalLabObsidianSync extends Plugin {
     return Array.from(new Uint8Array(digest)).map(v => v.toString(16).padStart(2, "0")).join("");
   }
   private included(path: string) {
-    const normalized = path.replace(/\\/g, "/");
+    const normalized = path.replace(/\\/g, "/").replace(/^\\/+|\\/+$/g, "");
+    // Obsidian exposes its vault root as "/" on some platforms.
+    // It is not a vault-relative item and must never be sent to OCEAN.
+    if (!normalized) return false;
     return !normalized.split("/").some(part => part === ".obsidian");
   }
   private async uploadAttachment(file: TFile, remote?: ManifestItem) {
