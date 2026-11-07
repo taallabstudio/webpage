@@ -1,4 +1,5 @@
 import { handleStoreRequest } from "./store";
+import { handleObsidianIntegration } from "./obsidian";
 import {
   ensureAuthMethodsSchema, hasEnabledTotp, verifyTotpOrRecovery,
   startAuthenticatorSetup, confirmAuthenticatorSetup, disableAuthenticator,
@@ -2157,6 +2158,8 @@ export default {
         const content=blocks.map((block:any)=>{const tag=({heading1:"h1",heading2:"h2",heading3:"h3",quote:"blockquote",bullet:"p",numbered:"p",todo:"p",callout:"aside",code:"pre"} as any)[block.type]||"p";return "<"+tag+">"+esc(block.text||"")+"</"+tag+">";}).join("");
         return new Response("<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>"+esc(publicPage.title)+" — OCEAN</title><style>body{margin:0;background:#f7f8fa;color:#202832;font:16px/1.7 system-ui,sans-serif}.page{max-width:760px;margin:8vh auto;padding:48px;background:white;border:1px solid #e5e9ef;border-radius:16px}h1{line-height:1.2}blockquote,aside{border-left:3px solid #2586e8;padding:8px 18px;background:#f4f8fd}pre{white-space:pre-wrap;background:#f2f4f7;padding:16px;border-radius:8px}@media(max-width:700px){.page{margin:0;padding:28px 20px;border:0;border-radius:0}}</style></head><body><main class=page><h1>"+esc(publicPage.icon||"")+" "+esc(publicPage.title)+"</h1>"+content+"<p style='color:#87909b;font-size:12px;margin-top:40px'>Published with OCEAN by TaalLab</p></main></body></html>",{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
       }
+      const obsidianResponse = await handleObsidianIntegration(req, env, getSessionUser);
+      if (obsidianResponse) return obsidianResponse;
       if (url.pathname.startsWith("/api/ocean/")) {
         const oceanResponse = await handleOceanRequest(req, env, url.pathname);
         if (oceanResponse) return oceanResponse;
