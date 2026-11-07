@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+500;600;700;800&display=swap');
 :root{--ocean-bg:#191919;--ocean-panel:#202020;--ocean-panel2:#262626;--ocean-hover:#303030;--ocean-border:#343434;--ocean-text:#e7e7e7;--ocean-muted:#929292;--ocean-dim:#6f6f6f;--ocean-accent:#8bb8e8;--ocean-font:"Inter",system-ui,sans-serif;--ocean-display:"Inter",system-ui,sans-serif}
 .ocean-shell,.ocean-auth,.ocean-loading{font-family:var(--ocean-font);color:var(--ocean-text);background:var(--ocean-bg);min-height:100vh}
 .ocean-shell *,.ocean-auth *{box-sizing:border-box}
