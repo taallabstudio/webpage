@@ -41,7 +41,7 @@
   });
 
   const responsive = document.createElement("style");
-  responsive.textContent = "#taallab-privacy-notice button:focus-visible{outline:3px solid #064f9e;outline-offset:3px}@media(max-width:560px){#taallab-privacy-notice{left:12px;right:12px;bottom:12px;width:auto;align-items:flex-start;flex-direction:column}#taallab-privacy-notice button{width:100%}}";
+  responsive.textContent = ":where(button,a,input,select,textarea,[tabindex]):focus-visible{outline:3px solid #075fb8;outline-offset:3px}#taallab-privacy-notice button:focus-visible{outline:3px solid #064f9e;outline-offset:3px}@media(max-width:560px){#taallab-privacy-notice{left:12px;right:12px;bottom:12px;width:auto;align-items:flex-start;flex-direction:column}#taallab-privacy-notice button{width:100%}}";
   document.head.append(responsive);
   notice.append(copy, dismiss);
   (document.body || document.documentElement).append(notice);
