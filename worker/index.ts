@@ -29,6 +29,7 @@ export interface Env {
   UNSPLASH_ACCESS_KEY?: string;
   EMOJI_API_KEY?: string;
   RESEND_API_KEY: string;
+  POLICY_NOTICE_ENABLED?: string;
 }
 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
@@ -389,6 +390,7 @@ async function sendAuthEmail(env: Env, to: string, subject: string, html: string
 }
 
 async function sendPeriodicPolicyNotices(env: Env) {
+  if(env.POLICY_NOTICE_ENABLED!=="true") return;
   const timestamp=now(),noticeCutoff=timestamp-90*86400,retryCutoff=timestamp-86400;
   const due:any=await env.DB.prepare(`SELECT u.id,u.email FROM users u
     LEFT JOIN policy_notice_log p ON p.user_id=u.id
@@ -400,10 +402,11 @@ async function sendPeriodicPolicyNotices(env: Env) {
     await env.DB.prepare("INSERT INTO policy_notice_log(user_id,last_sent_at,last_attempt_at) VALUES(?,0,?) ON CONFLICT(user_id) DO UPDATE SET last_attempt_at=excluded.last_attempt_at")
       .bind(user.id,timestamp).run();
     const period=Math.floor(timestamp/(90*86400));
-    const result=await sendAuthEmail(env,String(user.email),"Important TaalLab service and policy reminder",
+    let result:any;
+    try { result=await sendAuthEmail(env,String(user.email),"Important TaalLab service and policy reminder",
       `<p>This is a periodic service notice from TaalLab, not a marketing email.</p><p>Please review our <a href="${origin(env)}/terms.html">Terms of Service</a> and <a href="${origin(env)}/privacy.html">Privacy Policy</a>. You must use TaalLab lawfully and follow the rules for files and content you upload, store, share or publish. Where required by law, TaalLab may remove or disable access to content or suspend an account, and may report matters to the appropriate authority.</p><p>For questions or complaints, contact <a href="mailto:contact@taallab.in">contact@taallab.in</a>.</p>`,
       `This is a periodic service notice from TaalLab, not a marketing email. Please review the Terms of Service at ${origin(env)}/terms.html and Privacy Policy at ${origin(env)}/privacy.html. Use TaalLab lawfully and follow the rules for files and content you upload, store, share or publish. Where required by law, TaalLab may remove or disable access to content or suspend an account, and may report matters to the appropriate authority. Contact contact@taallab.in for questions or complaints.`,
-      `policy-notice-${user.id}-${period}`);
+      `policy-notice-${user.id}-${period}`); } catch(error) { console.error("Periodic policy notice failed",user.id,error); continue; }
     if(result.sent)await env.DB.prepare("UPDATE policy_notice_log SET last_sent_at=?,last_attempt_at=? WHERE user_id=?").bind(timestamp,timestamp,user.id).run();
   }
 }
