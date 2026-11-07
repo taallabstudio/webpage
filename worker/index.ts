@@ -822,6 +822,7 @@ async function createManagedUser(req: Request, env: Env) {
   const role = body.role === "admin" ? "admin" : "user";
 
   if (!email || !email.includes("@")) return json({ error: "Enter a valid email address." }, { status: 400 });
+  if (body.ageConfirmed !== true) return json({ error: "Confirm that the account holder is at least 18 years old." }, { status: 400 });
   if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, { status: 400 });
 
   const existing: any = await env.DB.prepare("SELECT id FROM users WHERE email=? LIMIT 1").bind(email).first();
