@@ -276,8 +276,17 @@ async function ensureSupportSchema(env: Env) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS parent_child_links (
     id TEXT PRIMARY KEY, parent_user_id TEXT NOT NULL, child_user_id TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('active','revoked')), created_at INTEGER NOT NULL,
-    linked_at INTEGER NOT NULL, revoked_at INTEGER
+    linked_at INTEGER NOT NULL, revoked_at INTEGER, parent_attested_at INTEGER NOT NULL,
+    verification_status TEXT NOT NULL DEFAULT 'pending', verified_at INTEGER,
+    verified_by TEXT, verification_method TEXT
   )`).run();
+  const parentLinkColumns: any = await env.DB.prepare("PRAGMA table_info(parent_child_links)").all();
+  const parentLinkColumnNames = (parentLinkColumns.results || []).map((column: any) => column.name);
+  if (!parentLinkColumnNames.includes("parent_attested_at")) await env.DB.prepare("ALTER TABLE parent_child_links ADD COLUMN parent_attested_at INTEGER NOT NULL DEFAULT 0").run();
+  if (!parentLinkColumnNames.includes("verification_status")) await env.DB.prepare("ALTER TABLE parent_child_links ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'pending'").run();
+  if (!parentLinkColumnNames.includes("verified_at")) await env.DB.prepare("ALTER TABLE parent_child_links ADD COLUMN verified_at INTEGER").run();
+  if (!parentLinkColumnNames.includes("verified_by")) await env.DB.prepare("ALTER TABLE parent_child_links ADD COLUMN verified_by TEXT").run();
+  if (!parentLinkColumnNames.includes("verification_method")) await env.DB.prepare("ALTER TABLE parent_child_links ADD COLUMN verification_method TEXT").run();
   await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_parent_child_active ON parent_child_links(child_user_id) WHERE status='active'").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_parent_links_parent ON parent_child_links(parent_user_id,status)").run();
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS parental_consent_records (
@@ -761,10 +770,49 @@ async function requireAdultParent(req: Request, env: Env) {
   return user;
 }
 
+
+async function listPendingParentVerifications(req: Request, env: Env) {
+  await requireAdmin(req,env);
+  const rows: any=await env.DB.prepare(`SELECT l.id,l.child_user_id,l.parent_user_id,l.created_at,l.linked_at,l.parent_attested_at,
+      c.email AS child_email,c.display_name AS child_name,p.email AS parent_email,p.display_name AS parent_name,
+      p.email_verified_at AS parent_email_verified_at,p.date_of_birth AS parent_date_of_birth,
+      c.email_verified_at AS child_email_verified_at,c.date_of_birth AS child_date_of_birth
+    FROM parent_child_links l
+    JOIN users c ON c.id=l.child_user_id
+    JOIN users p ON p.id=l.parent_user_id
+    WHERE l.status='active' AND l.verification_status='pending'
+    ORDER BY l.linked_at ASC`).all();
+  return json({verifications:rows.results||[]});
+}
+
+async function verifyParentLinkManually(req: Request, env: Env, childId: string) {
+  const admin=await requireAdmin(req,env);
+  const body=await req.json().catch(()=>({}));
+  if(body.confirmManualVerification!==true) return json({error:"Explicitly confirm that the adult's identity, age and parent/guardian relationship were checked outside this application."},{status:400});
+  const link: any=await env.DB.prepare(`SELECT l.id,l.parent_user_id,l.verification_status,
+      p.account_type AS parent_account_type,p.email_verified_at AS parent_email_verified_at,p.status AS parent_status,
+      c.account_type AS child_account_type,c.email_verified_at AS child_email_verified_at,c.date_of_birth AS child_date_of_birth,c.status AS child_status
+    FROM parent_child_links l JOIN users p ON p.id=l.parent_user_id JOIN users c ON c.id=l.child_user_id
+    WHERE l.child_user_id=? AND l.status='active' LIMIT 1`).bind(childId).first();
+  if(!link) return json({error:"No active parent link was found for this child account."},{status:404});
+  if(link.verification_status==="verified") return json({ok:true,message:"This parent link has already been verified."});
+  if(link.parent_account_type!=="adult" || !link.parent_email_verified_at || link.parent_status!=="active" ||
+     link.child_account_type!=="child" || !link.child_email_verified_at || !link.child_date_of_birth || link.child_status!=="active") {
+    return json({error:"The parent or child account no longer meets the minimum account checks."},{status:409});
+  }
+  const timestamp=now();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE parent_child_links SET verification_status='verified',verified_at=?,verified_by=?,verification_method='manual_identity_and_relationship_review' WHERE id=? AND verification_status='pending'").bind(timestamp,admin.id,link.id),
+    env.DB.prepare("UPDATE users SET parental_consent_status='consented',updated_at=? WHERE id=? AND parent_user_id=? AND account_type='child'").bind(timestamp,childId,link.parent_user_id),
+    env.DB.prepare("INSERT INTO parental_consent_events(id,parent_user_id,child_user_id,event_type,details_json,created_at) VALUES(?,?,?,'parent_verification_approved',?,?)").bind(randomToken(16),link.parent_user_id,childId,JSON.stringify({verificationMethod:"manual_identity_and_relationship_review",reviewedBy:admin.id,reviewedAt:timestamp}),timestamp),
+  ]);
+  return json({ok:true,message:"Manual verification recorded. Child permissions can now be enabled by the parent."});
+}
+
 async function getParentDashboard(req: Request, env: Env) {
   const parent = await requireAdultParent(req, env);
   const children: any = await env.DB.prepare(`SELECT u.id,u.email,u.display_name,u.account_type,u.parental_consent_status,
-      l.linked_at,p.tutorial_access,p.lesson_downloads,p.comments,p.uploads_sharing,p.updated_at
+      l.linked_at,l.parent_attested_at,l.verification_status,l.verified_at,p.tutorial_access,p.lesson_downloads,p.comments,p.uploads_sharing,p.updated_at
     FROM parent_child_links l JOIN users u ON u.id=l.child_user_id
     LEFT JOIN child_permissions p ON p.child_user_id=u.id
     WHERE l.parent_user_id=? AND l.status='active' ORDER BY l.linked_at DESC`).bind(parent.id).all();
@@ -819,11 +867,11 @@ async function acceptParentInvite(req: Request, env: Env) {
   const timestamp=now(), linkId=randomToken(16), consentId=randomToken(16);
   const initialScope={tutorial_access:false,lesson_downloads:false,comments:false,uploads_sharing:false,purchases:false,payments:false};
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO parent_child_links(id,parent_user_id,child_user_id,status,created_at,linked_at) VALUES(?,?,?,'active',?,?)").bind(linkId,parent.id,child.id,timestamp,timestamp),
+    env.DB.prepare("undefined").bind(linkId,parent.id,child.id,timestamp,timestamp,invite.parent_attested_at),
     env.DB.prepare("INSERT INTO child_permissions(child_user_id,parent_user_id,tutorial_access,lesson_downloads,comments,uploads_sharing,updated_at) VALUES(?,?,0,0,0,0,?)").bind(child.id,parent.id,timestamp),
-    env.DB.prepare("INSERT INTO parental_consent_records(id,parent_user_id,child_user_id,policy_version,scope_json,verification_method,consented_at) VALUES(?,?,?,?,?,?,?)").bind(consentId,parent.id,child.id,PARENT_CONSENT_VERSION,JSON.stringify(initialScope),"adult_age_screened_verified_email_parent_attestation_child_account_acceptance",timestamp),
+    env.DB.prepare("INSERT INTO parental_consent_records(id,parent_user_id,child_user_id,policy_version,scope_json,verification_method,consented_at) VALUES(?,?,?,?,?,?,?)").bind(consentId,parent.id,child.id,PARENT_CONSENT_VERSION,JSON.stringify(initialScope),"parent_attestation_and_child_acceptance_pending_manual_verification",timestamp),
     env.DB.prepare("INSERT INTO parental_consent_events(id,parent_user_id,child_user_id,event_type,details_json,created_at) VALUES(?,?,?,'link_accepted',?,?)").bind(randomToken(16),parent.id,child.id,JSON.stringify({policyVersion:PARENT_CONSENT_VERSION,initialPermissions:initialScope}),timestamp),
-    env.DB.prepare("UPDATE users SET parent_user_id=?,parental_consent_status='consented',updated_at=? WHERE id=? AND account_type='child' AND parent_user_id IS NULL").bind(parent.id,timestamp,child.id),
+    env.DB.prepare("UPDATE users SET parent_user_id=?,parental_consent_status='pending_verification',updated_at=? WHERE id=? AND account_type='child' AND parent_user_id IS NULL").bind(parent.id,timestamp,child.id),
     env.DB.prepare("UPDATE parent_link_invites SET consumed_at=? WHERE id=? AND consumed_at IS NULL").bind(timestamp,invite.id),
   ]);
   return json({ok:true,message:"Parent account linked. All optional child permissions start switched off."});
@@ -834,8 +882,9 @@ async function updateChildPermissions(req: Request, env: Env, childId: string, b
   const entries=CHILD_PERMISSION_KEYS.filter((key:string)=>Object.prototype.hasOwnProperty.call(body,key));
   if(entries.length!==1 || typeof body[entries[0]]!=="boolean") return json({error:"Update one permission at a time using a true or false value."},{status:400});
   const permission=entries[0], enabled=body[permission] as boolean;
-  const link: any=await env.DB.prepare("SELECT id FROM parent_child_links WHERE parent_user_id=? AND child_user_id=? AND status='active' LIMIT 1").bind(parent.id,childId).first();
+  const link: any=await env.DB.prepare("SELECT id,verification_status FROM parent_child_links WHERE parent_user_id=? AND child_user_id=? AND status='active' LIMIT 1").bind(parent.id,childId).first();
   if(!link) return json({error:"This child account is not linked to your account."},{status:404});
+  if(link.verification_status!=="verified") return json({error:"Child permissions cannot be enabled until TaalLab completes the separate adult/guardian verification review."},{status:403});
   const current: any=await env.DB.prepare("SELECT * FROM child_permissions WHERE child_user_id=? AND parent_user_id=? LIMIT 1").bind(childId,parent.id).first();
   if(!current) return json({error:"Child permissions are unavailable. Contact support."},{status:409});
   if(Number(current[permission])!==Number(enabled)){
@@ -2645,6 +2694,9 @@ export default {
       if ((url.pathname === "/api/auth/logout" || url.pathname === "/api/admin/logout") && req.method === "POST") return authLogout(req, env);
       if (url.pathname === "/api/auth/me" && req.method === "GET") return currentUser(env, req);
       if (url.pathname === "/api/account/date-of-birth" && req.method === "POST") return saveDateOfBirth(req, env);
+      if (url.pathname === "/api/admin/parental-verifications" && req.method === "GET") return listPendingParentVerifications(req, env);
+      const parentVerifyMatch=url.pathname.match(/^\\/api\\/admin\\/parental-verifications\\/([^/]+)$/);
+      if (parentVerifyMatch && req.method === "PATCH") return verifyParentLinkManually(req, env, parentVerifyMatch[1]);
       if (url.pathname === "/api/parent/dashboard" && req.method === "GET") return getParentDashboard(req, env);
       if (url.pathname === "/api/parent/invites" && req.method === "POST") return createParentInvite(req, env);
       if (url.pathname === "/api/parent/invites/accept" && req.method === "POST") return acceptParentInvite(req, env);
