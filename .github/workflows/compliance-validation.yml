@@ -34,5 +34,17 @@ jobs:
       - name: Build website and application
         run: npm run build
 
+      - name: Generate third-party dependency licence report
+        run: |
+          npx --yes license-checker --json > /tmp/taallab-third-party-licenses.json
+          node -e 'const r=require("/tmp/taallab-third-party-licenses.json"); const licenses={}; const missing=[]; for (const [name,p] of Object.entries(r)) { const l=String(p.licenses||"UNKNOWN"); licenses[l]=(licenses[l]||0)+1; if (!p.licenses || /unknown|unlicensed|noassertion/i.test(l)) missing.push(name); } console.log("THIRD_PARTY_LICENSE_COUNTS",JSON.stringify(licenses)); console.log("PACKAGES_REQUIRING_REVIEW",JSON.stringify(missing));'
+
+      - name: Upload dependency licence report
+        uses: actions/upload-artifact@v4
+        with:
+          name: taallab-third-party-licenses
+          path: /tmp/taallab-third-party-licenses.json
+          if-no-files-found: error
+
       - name: Validate Cloudflare Worker bundle without deploying
         run: npx wrangler deploy --dry-run --outdir /tmp/taallab-worker-dry-run
