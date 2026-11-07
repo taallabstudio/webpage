@@ -246,7 +246,7 @@ async function sendAuthEmail(env: Env, to: string, subject: string, html: string
       "Idempotency-Key": idempotencyKey,
     },
     body: JSON.stringify({
-      from: "TaalLab <contact@taallab.work>",
+      from: "TaalLab <contact@taallab.in>",
       to: [to],
       subject,
       html,
@@ -268,8 +268,8 @@ async function createEmailVerification(env: Env, user: any) {
   const code=randomCode(), tokenHash=await hashText(code), createdAt=now();
   await env.DB.prepare("INSERT INTO email_verification_tokens(token_hash,user_id,created_at,expires_at,attempts) VALUES(?,?,?,?,0)").bind(tokenHash,user.id,createdAt,createdAt+600).run();
   const safeEmail=String(user.email).replace(/[&<>"]/g,(x)=>( {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"} as any)[x]);
-  const html=`<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033"><h2>Verify your TaalLab email</h2><p>Enter this code to confirm that <strong>${safeEmail}</strong> belongs to you:</p><div style="font-size:32px;font-weight:700;letter-spacing:8px;margin:24px 0">${code}</div><p style="font-size:13px;color:#687080">This code expires in 10 minutes and can only be used up to five times.</p><p style="font-size:13px;color:#687080">If you did not create this account, ignore this email.</p><p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.work</p></div>`;
-  const text=`Your TaalLab email verification code is: ${code}\n\nThis code expires in 10 minutes and can only be used up to five times.\nIf you did not create this account, ignore this email.\n\nTaalLab\ncontact@taallab.work`;
+  const html=`<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033"><h2>Verify your TaalLab email</h2><p>Enter this code to confirm that <strong>${safeEmail}</strong> belongs to you:</p><div style="font-size:32px;font-weight:700;letter-spacing:8px;margin:24px 0">${code}</div><p style="font-size:13px;color:#687080">This code expires in 10 minutes and can only be used up to five times.</p><p style="font-size:13px;color:#687080">If you did not create this account, ignore this email.</p><p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.in</p></div>`;
+  const text=`Your TaalLab email verification code is: ${code}\n\nThis code expires in 10 minutes and can only be used up to five times.\nIf you did not create this account, ignore this email.\n\nTaalLab\ncontact@taallab.in`;
   return sendAuthEmail(env,user.email,"Verify your TaalLab email",html,text,`verify-email:${user.id}:${createdAt}`);
 }
 
@@ -281,7 +281,7 @@ async function sendTwoFactorCode(env: Env, user: any, challengeId: string, code:
       <div style="font-size:32px;font-weight:700;letter-spacing:8px;margin:24px 0">${code}</div>
       <p style="font-size:13px;color:#687080">The code expires in 10 minutes and can only be used a limited number of times.</p>
       <p style="font-size:13px;color:#687080">If you did not try to sign in, change your password and contact TaalLab.</p>
-      <p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.work</p>
+      <p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.in</p>
     </div>`;
   const text = `Your TaalLab sign-in code is: ${code}
 
@@ -407,7 +407,7 @@ async function requestPasswordReset(req: Request, env: Env) {
       <p style="margin:28px 0"><a href="${link}" style="display:inline-block;background:#147ce5;color:white;text-decoration:none;padding:13px 20px;border-radius:8px;font-weight:600">Reset password</a></p>
       <p style="font-size:13px;color:#687080">This link expires in 30 minutes and can only be used once.</p>
       <p style="font-size:13px;color:#687080">If you did not request a password reset, you can ignore this email.</p>
-      <p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.work</p>
+      <p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.in</p>
     </div>`;
   const text = `Reset your TaalLab password: ${link}
 
@@ -415,7 +415,7 @@ This link expires in 30 minutes and can only be used once.
 If you did not request a password reset, you can ignore this email.
 
 TaalLab
-contact@taallab.work`;
+contact@taallab.in`;
   const sent = await sendAuthEmail(env, user.email, "Reset your TaalLab password", html, text, `password-reset:${user.id}:${createdAt}`);
   if (!sent.sent) {
     await env.DB.prepare("DELETE FROM password_reset_tokens WHERE token_hash=?").bind(tokenHash).run();
@@ -1073,7 +1073,7 @@ async function sendTransferEmail(env: Env, recipientEmail: string, transferId: s
         <a href="${transferUrl}" style="display:inline-block;background:#147ce5;color:white;text-decoration:none;padding:13px 20px;border-radius:8px;font-weight:600">View &amp; Download Files</a>
       </p>
       <p style="font-size:13px;color:#687080">This private transfer link will expire according to the delivery settings.</p>
-      <p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.work</p>
+      <p style="font-size:13px;color:#687080">TaalLab<br>contact@taallab.in</p>
     </div>
   `;
   const text = `You received a file from TaalLab.
@@ -1082,7 +1082,7 @@ ${message ? String(message) + "\n\n" : ""}View and download your files:
 ${transferUrl}
 
 TaalLab
-contact@taallab.work`;
+contact@taallab.in`;
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -1092,7 +1092,7 @@ contact@taallab.work`;
       "Idempotency-Key": `trackdeliver-transfer-${transferId}`,
     },
     body: JSON.stringify({
-      from: "TaalLab <contact@taallab.work>",
+      from: "TaalLab <contact@taallab.in>",
       to: [recipientEmail],
       subject,
       html,
@@ -1214,8 +1214,8 @@ ${message || "No message provided."}`;
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "TaalLab Website <contact@taallab.work>",
-      to: ["contact@taallab.work"],
+      from: "TaalLab Website <contact@taallab.in>",
+      to: ["contact@taallab.in"],
       reply_to: email,
       subject,
       html,
