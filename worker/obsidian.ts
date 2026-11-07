@@ -56,7 +56,7 @@ function markdownBlocks(markdown: string) {
     add("text", line); listNo = 0;
   }
   if (code) add("code", codeLines.join("\n"));
-  return blocks.slice(0, 500);
+  return blocks;
 }
 
 async function ensureSchema(env: Env) {
@@ -156,6 +156,7 @@ async function syncNote(req: Request, env: Env, user: User) {
   if (frontmatterJson.length > 20000) return json({ error: "Frontmatter exceeds the 20 KB limit." }, 413);
   const markdown = content.replace(/^---\s*\n[\s\S]*?\n---\s*(?:\n|$)/, "");
   const blocks = markdownBlocks(markdown);
+  if (blocks.length > 5000) return json({ error: "This note contains more than 5,000 Markdown blocks and cannot be safely converted yet." }, 413);
   const timestamp = now();
   const existing: any = await env.DB.prepare("SELECT id FROM ocean_pages WHERE user_id=? AND source='obsidian' AND external_id=? LIMIT 1").bind(user.id, externalId).first();
   let id: string;
