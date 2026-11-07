@@ -53,9 +53,13 @@ The repository contains these local assets:
 
 The owner has confirmed the source/permission position for the three named local assets. This is an owner-provided confirmation, not an independent legal verification; the underlying licence documents, releases and AI-generation records should be retained in TaalLab's business records. Product covers remain separately subject to source/licence evidence.
 
-## 4. npm dependencies — incomplete until a lockfile and full report exist
+## 4. npm dependencies — pinned and inventoried; notice clearance remains
 
-The current `package.json` uses version ranges and the repository has no `package-lock.json`. No root `LICENSE` or third-party notices inventory was found in the repository tree. Therefore the exact resolved dependency tree for a particular build cannot be reconstructed from the repository alone, and this is not a complete transitive dependency audit.
+The repository now commits `package-lock.json` (lockfile version 3), and the main validation/deployment workflows use `npm ci` so they install the pinned dependency tree. The generated `docs/THIRD-PARTY-LICENSE-INVENTORY.md` records 158 third-party package/version entries from the exact installed tree, including direct, transitive and development/build dependencies. The private root package is excluded.
+
+An `npm audit` run on 7 November 2026 reported zero known vulnerabilities in both the full dependency tree and the production dependency tree. The audit is time-sensitive and must be rerun after dependency changes and before releases. To address the earlier build-tool findings, `sharp` was updated to `0.35.5` and `wrangler` to `4.158.0`.
+
+The inventory records package-declared licence metadata; it is not a bundle of the actual licence texts or a legal clearance. Before shipping desktop/mobile binaries, inspect the actual package licence files, determine which packages/native components are included in each artifact, and include all required notices/licence texts. The repository still does not contain a complete bundled third-party notices file.
 
 Package metadata/source evidence checked for representative direct dependencies:
 
@@ -117,7 +121,7 @@ Account settings now offer a separate adult-only optional marketing opt-in, unch
 ## 8. Required follow-up before marking P1 licensing/legal items complete
 
 - File the logo and studio-photography licence/permission evidence and AI-generation records for the headphones image in TaalLab's business records. Review product-cover rights separately.
-- Generate and retain a complete licence report from the exact dependency tree; add a lockfile and a third-party notices file for shipped app builds.
+- Review actual package licence texts and create the required third-party notices bundle for shipped app builds. Confirm whether the Sharp `libvips` LGPL component is included in any distributed artifact and meet its obligations if so. The exact lockfile and 158-entry metadata inventory are now committed.
 - Confirm Unsplash production application status and API compliance in the provider console.
 - Obtain legal advice on Indian intermediary obligations and whether Taal Lab will seek U.S. DMCA section 512 safe-harbour protection; appoint/register a real agent only if proceeding.
 - Choose the adults-only or verifiable-parental-consent product policy before collecting data from children.
