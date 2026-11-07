@@ -7,4 +7,4 @@ Disallow: /reset-password
 Disallow: /d/
 Disallow: /api/
 
-Sitemap: https://taallab.work/sitemap.xml
+Sitemap: https://taallab.in/sitemap.xml
