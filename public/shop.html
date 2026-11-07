@@ -174,13 +174,39 @@ const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",ma
 const cartRead=()=>{try{const v=JSON.parse(localStorage.getItem(CART_KEY)||"[]");return Array.isArray(v)?v:[]}catch{return []}};
 const cartWrite=items=>{localStorage.setItem(CART_KEY,JSON.stringify(items));renderCart();if(typeof renderProducts==="function")renderProducts()};
 window.addEventListener("storage",event=>{if(event.key===CART_KEY){renderCart();renderProducts()}});
-const openCart=()=>{cartBackdrop.classList.add("open");cartBackdrop.setAttribute("aria-hidden","false");document.body.style.overflow="hidden"};
-const closeCart=()=>{cartBackdrop.classList.remove("open");cartBackdrop.setAttribute("aria-hidden","true");document.body.style.overflow=""};
+const cartDrawer=cartBackdrop.querySelector(".cart-drawer");
+const closeCartButton=document.querySelector("#close-cart");
+let cartReturnFocus=null;
+const onCartKeydown=e=>{
+ if(e.key==="Escape"){e.preventDefault();closeCart();return;}
+ if(e.key!=="Tab")return;
+ const focusable=[...cartDrawer.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')];
+ if(!focusable.length){e.preventDefault();return;}
+ const first=focusable[0],last=focusable[focusable.length-1];
+ if(e.shiftKey&&(document.activeElement===first||document.activeElement===cartDrawer)){e.preventDefault();last.focus();}
+ else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+};
+const openCart=()=>{
+ if(cartBackdrop.classList.contains("open"))return;
+ cartReturnFocus=document.activeElement;
+ cartBackdrop.classList.add("open");cartBackdrop.setAttribute("aria-hidden","false");document.body.style.overflow="hidden";
+ document.querySelector("#open-cart").setAttribute("aria-expanded","true");
+ document.addEventListener("keydown",onCartKeydown);
+ closeCartButton.focus();
+};
+const closeCart=()=>{
+ if(!cartBackdrop.classList.contains("open"))return;
+ cartBackdrop.classList.remove("open");cartBackdrop.setAttribute("aria-hidden","true");document.body.style.overflow="";
+ document.querySelector("#open-cart").setAttribute("aria-expanded","false");
+ document.removeEventListener("keydown",onCartKeydown);
+ if(cartReturnFocus instanceof HTMLElement)cartReturnFocus.focus();
+ cartReturnFocus=null;
+};
 document.querySelector("#open-cart").addEventListener("click",openCart);
 document.querySelector("#close-cart").addEventListener("click",closeCart);
 cartCheckout.addEventListener("click",()=>{const items=cartRead().filter(p=>!ownedProductIds.has(p.id));if(items.length)location.href="/checkout.html?products="+encodeURIComponent(items.map(p=>p.id).join(","))});
 cartBackdrop.addEventListener("click",e=>{if(e.target===cartBackdrop)closeCart()});
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCart()});
+
 const navToggle=document.querySelector(".mobile-nav-toggle");
 const siteNav=document.querySelector("#shop-navigation");
 navToggle.addEventListener("click",()=>{const open=siteNav.classList.toggle("mobile-open");navToggle.setAttribute("aria-expanded",String(open));navToggle.setAttribute("aria-label",open?"Close navigation":"Open navigation");navToggle.textContent=open?"×":"☰"});
