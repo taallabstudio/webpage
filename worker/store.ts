@@ -215,6 +215,25 @@ function ensureStoreSchema(env: StoreEnv): Promise<void> {
   return storeSchemaPromise;
 }
 
+export async function exportCustomerPrivacyData(env: StoreEnv, userId: string) {
+  await ensureStoreSchema(env);
+  const [profile, orders] = await Promise.all([
+    env.DBStore.prepare("SELECT full_name,phone,address_line1,address_line2,city,state,pincode,country,updated_at FROM store_customer_profiles WHERE user_id=? LIMIT 1").bind(userId).first(),
+    env.DBStore.prepare(`SELECT order_number,product_id,amount,currency,status,razorpay_order_id,razorpay_payment_id,
+      customer_email,customer_name,customer_phone,address_line1,address_line2,city,state,pincode,country,
+      coupon_code,discount_amount,created_at,updated_at,paid_at,download_count,last_downloaded_at,
+      terms_version,privacy_version,accepted_at,checkout_group_id,group_total
+      FROM store_orders WHERE user_id=? ORDER BY created_at DESC`).bind(userId).all(),
+  ]);
+  return { profile: profile || null, orders: orders.results || [] };
+}
+
+export async function cleanupStoreRetention(env: StoreEnv) {
+  await ensureStoreSchema(env);
+  const cutoff = unixNow() - 30 * 86400;
+  await env.DBStore.prepare("DELETE FROM store_orders WHERE status!='paid' AND created_at<=?").bind(cutoff).run();
+}
+
 function rowProduct(row: any): Product & {features:string;version:string;status:string;coverKey:string;updatedAt:number} {
   return {id:String(row.id),name:String(row.name),description:String(row.description||""),category:String(row.category),price:Number(row.price),active:Number(row.active)===1 && row.status==="published",fileKey:String(row.file_key||""),fileName:String(row.file_name||""),features:String(row.features||""),version:String(row.version||"1.0"),status:String(row.status||"draft"),coverKey:String(row.cover_key||""),updatedAt:Number(row.updated_at||0)};
 }
