@@ -35,5 +35,6 @@ out.push("## Packages requiring manual licence-text follow-up", "",
   "No standalone licence/notice file matching the generator rules was found in the package root. Check package metadata, README notices and upstream licence files before distribution.", "");
 for (const item of missing) out.push("- `" + item.package + "` — `" + item.licence + "`" + (item.repository ? " — " + item.repository : ""));
 fs.writeFileSync(".audit/THIRD-PARTY-NOTICES.md", out.join("\n"));
+fs.writeFileSync("docs/THIRD-PARTY-NOTICES.md", out.join("\n"));
 fs.writeFileSync(".audit/third-party-notices-summary.json", JSON.stringify({packages:packages.length, packagesWithNotices:new Set(notices.map(x=>x.package)).size, noticeFiles:notices.length, missing}, null, 2));
 console.log("Generated notice bundle: " + new Set(notices.map(x=>x.package)).size + "/" + packages.length + " packages have standalone notice files; " + missing.length + " need manual review.");
