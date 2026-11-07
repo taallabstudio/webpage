@@ -364,9 +364,14 @@ async function getSessionUser(req: Request, env: Env) {
   return row || null;
 }
 
-async function requireUser(req: Request, env: Env) {
+async function requireUser(req: Request, env: Env, options: { allowPendingAge?: boolean } = {}) {
   const user = await getSessionUser(req, env);
   if (!user) throw json({ error: "Unauthorized" }, { status: 401 });
+  if (!options.allowPendingAge && user.role !== "admin" &&
+      (!user.date_of_birth || user.account_type === "unclassified" ||
+       (user.account_type === "child" && user.parental_consent_status !== "verified"))) {
+    throw json({ error: "Complete the age and parent/guardian setup before using this account feature." }, { status: 403 });
+  }
   return user;
 }
 
@@ -675,7 +680,7 @@ async function authSetup(req: Request, env: Env) {
 }
 
 async function saveDateOfBirth(req: Request, env: Env) {
-  const user = await requireUser(req, env);
+  const user = await requireUser(req, env, { allowPendingAge: true });
   if (!user.email_verified_at) return json({ error: "Verify your email address before adding your date of birth." }, { status: 403 });
   if (user.role === "admin") return json({ ok: true, accountType: "adult" });
   if (user.date_of_birth) return json({ error: "Your date of birth has already been saved. Contact support if it needs correcting." }, { status: 409 });
