@@ -830,7 +830,7 @@ function googleLoginRedirect(env: Env, params: Record<string, string> = {}, retu
 
 async function googleAuthStart(req: Request, env: Env) {
   const requestedReturn = new URL(req.url).searchParams.get("return_to") || "/admin";
-  const returnTo = requestedReturn === "/ocean.html" ? "/ocean.html" : "/admin";
+  const returnTo = requestedReturn === "ocean-app" ? "ocean-app" : requestedReturn === "/ocean.html" ? "/ocean.html" : "/admin";
   if (!env.GOOGLE_LOGIN_CLIENT_ID || !env.GOOGLE_LOGIN_CLIENT_SECRET) {
     return new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: "Google sign-in is not configured yet." }, returnTo).toString(), "cache-control": "no-store" } });
   }
@@ -856,9 +856,11 @@ async function googleAuthCallback(req: Request, env: Env) {
   const url = new URL(req.url);
   const clearStateCookie = "google_login_state=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const clearReturnCookie = "google_login_return=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
-  const returnTo = parseCookie(req, "google_login_return") === "/ocean.html" ? "/ocean.html" : "/admin";
+  const savedReturn = parseCookie(req, "google_login_return");
+  const returnTo = savedReturn === "ocean-app" ? "ocean-app" : savedReturn === "/ocean.html" ? "/ocean.html" : "/admin";
   const fail = (message: string) => {
-    const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, { google_error: message }, returnTo).toString(), "cache-control": "no-store" } });
+    const failureUrl = returnTo === "ocean-app" ? `ocean://oauth/callback?error=${encodeURIComponent(message)}` : googleLoginRedirect(env, { google_error: message }, returnTo).toString();
+    const response = new Response(null, { status: 302, headers: { location: failureUrl, "cache-control": "no-store" } });
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
     return response;
@@ -940,18 +942,38 @@ async function googleAuthCallback(req: Request, env: Env) {
   if (Number(user.two_factor_enabled) !== 0) {
     const challenge = await startTwoFactorChallenge(env, user);
     if (challenge.error) return fail("We could not send your TaalLab sign-in code. Please try again.");
+    const challengeParams = new URLSearchParams({
+      google_2fa: "1", challenge_id: challenge.challengeId, email: user.email,
+      method: challenge.method === "totp" ? "authenticator" : "email",
+    });
+    const challengeUrl = returnTo === "ocean-app"
+      ? "ocean://oauth/callback?" + challengeParams.toString()
+      : googleLoginRedirect(env, Object.fromEntries(challengeParams.entries()), returnTo).toString();
     const response = new Response(null, {
       status: 302,
-      headers: { location: googleLoginRedirect(env, {
-        google_2fa: "1", challenge_id: challenge.challengeId, email: user.email,
-        method: challenge.method === "totp" ? "authenticator" : "email",
-      }, returnTo).toString(), "cache-control": "no-store" },
+      headers: { location: challengeUrl, "cache-control": "no-store" },
     });
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
     return response;
   }
 
+  if (returnTo === "ocean-app") {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS google_app_login_codes (
+      code_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      expires_at INTEGER NOT NULL
+    )`).run();
+    const appCode = randomToken(32);
+    const codeHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(appCode))))
+      .map((value) => value.toString(16).padStart(2, "0")).join("");
+    await env.DB.prepare("INSERT INTO google_app_login_codes(code_hash,user_id,expires_at) VALUES(?,?,?)")
+      .bind(codeHash, user.id, now() + 120).run();
+    const response = new Response(null, { status: 302, headers: { location: "ocean://oauth/callback?code=" + encodeURIComponent(appCode), "cache-control": "no-store" } });
+    response.headers.append("set-cookie", clearStateCookie);
+    response.headers.append("set-cookie", clearReturnCookie);
+    return response;
+  }
   const sid = await createUserSession(env, user.id);
   const response = new Response(null, { status: 302, headers: { location: googleLoginRedirect(env, {}, returnTo).toString(), "cache-control": "no-store" } });
   response.headers.append("set-cookie", clearStateCookie);
@@ -2232,6 +2254,25 @@ export default {
       }
       if (url.pathname === "/api/auth/google/start" && req.method === "GET") return googleAuthStart(req, env);
       if (url.pathname === "/api/auth/google/callback" && req.method === "GET") return googleAuthCallback(req, env);
+      if (url.pathname === "/api/auth/google/exchange" && req.method === "POST") {
+        await env.DB.prepare(`CREATE TABLE IF NOT EXISTS google_app_login_codes (
+          code_hash TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          expires_at INTEGER NOT NULL
+        )`).run();
+        const body = await req.json().catch(() => ({}));
+        const code = String(body.code || "");
+        if (!/^[a-f0-9]{64}$/.test(code)) return json({ error: "Google sign-in code is invalid or expired." }, { status: 400 });
+        const codeHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code))))
+          .map((value) => value.toString(16).padStart(2, "0")).join("");
+        const row: any = await env.DB.prepare("DELETE FROM google_app_login_codes WHERE code_hash=? AND expires_at>? RETURNING user_id")
+          .bind(codeHash, now()).first();
+        if (!row?.user_id) return json({ error: "Google sign-in code is invalid or expired. Please try again." }, { status: 401 });
+        const user: any = await env.DB.prepare("SELECT id,email,role,status FROM users WHERE id=? LIMIT 1").bind(row.user_id).first();
+        if (!user || user.status !== "active") return json({ error: "This TaalLab account is unavailable." }, { status: 401 });
+        const sid = await createUserSession(env, user.id);
+        return attachSessionCookie(json({ ok: true, user: { id: user.id, email: user.email, role: user.role } }), sid, req);
+      }
       if (url.pathname === "/api/google/login" && req.method === "GET") return googleLogin(req, env);
       if (url.pathname === "/api/google/callback" && req.method === "GET") return googleCallback(req, env);
 
