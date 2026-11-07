@@ -82,4 +82,4 @@ Re-check these items before introducing new features or marketing pages. If AI g
 - Name the person or department responsible for copyright complaints and Indian grievances, and provide its phone contact.
 - Verify actual DPAs and provider account settings outside this repository.
 - Review the retention periods for tax/accounting records with the business's accountant or legal adviser.
-- Review how existing accounts created before the age gate should be handled; the new gate applies to new account creation paths and does not prove the age of legacy accounts.
+- Review how existing accounts created before the age gate should be handled; the new gate applies to new account creation paths and does not prove the age of legacy accounts.\n- Add a first-login policy re-acceptance flow for legacy and administrator-created accounts that do not yet have a current, user-originated acceptance record. Do not treat an administrator-created account or a periodic email as user acceptance.
