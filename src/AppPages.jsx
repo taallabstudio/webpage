@@ -632,6 +632,49 @@ function SecurityMethods({user}) {
   </section>;
 }
 
+function PrivacyControls({user}) {
+  const [requestType,setRequestType]=useState("deletion");
+  const [description,setDescription]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const [message,setMessage]=useState("");
+
+  async function submitRequest(event) {
+    event.preventDefault();
+    setBusy(true);setError("");setMessage("");
+    try {
+      const result=await api("/account/privacy-request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:requestType,description})});
+      setMessage((result.alreadyOpen?"You already have an open request. Reference: ":"Your request has been received. Reference: ")+result.requestId+". TaalLab will review it and contact you at "+user?.email+".");
+      setDescription("");
+    } catch(e) { setError(e.message||"Could not submit your privacy request."); }
+    finally { setBusy(false); }
+  }
+
+  return <section id="privacy-data" className="panel" style={{maxWidth:720,padding:24,marginTop:18,scrollMarginTop:24}}>
+    <span className="eyebrow">YOUR DATA</span><h2>Privacy &amp; personal data</h2>
+    <p className="muted" style={{marginTop:6}}>Download a copy of the account information TaalLab holds, or submit a request to correct or delete your personal data.</p>
+    <div style={{display:"flex",flexWrap:"wrap",gap:10,marginTop:18}}>
+      <a className="primary-btn" href="/api/account/data-export" download><Download size={15}/> Download my data</a>
+    </div>
+    <form onSubmit={submitRequest} style={{marginTop:22}}>
+      <label>Request type
+        <select value={requestType} onChange={e=>setRequestType(e.target.value)}>
+          <option value="deletion">Delete my account and personal data</option>
+          <option value="correction">Correct my personal data</option>
+        </select>
+      </label>
+      <label>Additional details <span className="muted">(optional)</span>
+        <textarea value={description} onChange={e=>setDescription(e.target.value)} maxLength={1000} rows={3} placeholder="Tell us what you would like us to review."/>
+      </label>
+      <p className="muted" style={{fontSize:12,lineHeight:1.6}}>For deletion requests, TaalLab will verify the request and review connected services, shared content and records that must be retained for legal, tax, payment or security reasons. Submitting this request does not immediately delete your account. You can also manage Google Drive and Calendar data in your Google Account.</p>
+      {error&&<div className="error-box" role="alert">{error}</div>}
+      {message&&<div className="success-pill" role="status">{message}</div>}
+      <button className="primary-btn" type="submit" disabled={busy}>{busy?"Submitting…":"Submit privacy request"}</button>
+    </form>
+    <p className="muted" style={{fontSize:12,marginTop:16}}>Privacy questions: <a href="mailto:contact@taallab.in">contact@taallab.in</a> · <a href="/privacy.html">Privacy Policy</a></p>
+  </section>;
+}
+
 function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [currentPassword,setCurrentPassword]=useState("");
   const [newPassword,setNewPassword]=useState("");
@@ -724,6 +767,7 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
         <button className="primary-btn" disabled={profileSaving}>{profileSaving?"Saving profile…":"Save profile"}</button>
       </form>
     </section>
+    <PrivacyControls user={user}/>
     <SecurityMethods user={user}/>
     <section className="panel" style={{maxWidth:620,padding:24,marginTop:18}}><h2>Change password</h2><form onSubmit={change}>
       <label>Current password<input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} required/></label>
