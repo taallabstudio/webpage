@@ -1,4 +1,4 @@
-import { handleStoreRequest } from "./store";
+import { handleStoreRequest, exportCustomerPrivacyData, cleanupStoreRetention } from "./store";
 import {
   ensureAuthMethodsSchema, hasEnabledTotp, verifyTotpOrRecovery,
   startAuthenticatorSetup, confirmAuthenticatorSetup, disableAuthenticator,
@@ -230,7 +230,21 @@ async function ensureSupportSchema(env: Env) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS booking_rate_limits (
     identity TEXT PRIMARY KEY,
     last_sent_at INTEGER NOT NULL
+  )`).run();  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, terms_version TEXT NOT NULL,
+    privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
   )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS privacy_requests (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    request_type TEXT NOT NULL CHECK(request_type IN ('deletion','correction')),
+    description TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','in_review','completed','declined')),
+    created_at INTEGER NOT NULL,
+    resolved_at INTEGER
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_user ON privacy_requests(user_id,created_at DESC)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_status ON privacy_requests(status,created_at)").run();
 }
 
 function normalizeEmail(value: unknown) {
@@ -642,6 +656,100 @@ async function authSetup(req: Request, env: Env) {
 async function currentUser(env: Env, req: Request) {
   const user = await getSessionUser(req, env);
   return user ? json({ authenticated: true, user }) : json({ authenticated: false });
+}
+
+async function exportAccountData(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  await ensureOceanSchema(env);
+  const [identity, acceptances, transfers, files, pages, shares, comments, assets, calendar, passkeys, authenticator, recovery, store] = await Promise.all([
+    env.DB.prepare("SELECT id,email,role,created_at,updated_at,email_verified_at,display_name,two_factor_enabled FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
+    env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at").bind(user.id).all(),
+    env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
+    env.DB.prepare("SELECT f.id,f.transfer_id,f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC").bind(user.id).all(),
+    env.DB.prepare("SELECT id,parent_id,title,icon,cover,cover_credit,cover_credit_url,cover_source_url,blocks_json,is_favorite,is_folder,is_archived,general_access,created_at,updated_at FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT page_id,permission,created_at,updated_at FROM ocean_page_shares WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT id,page_id,body,created_at FROM ocean_comments WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT id,page_id,file_name,mime_type,size,created_at FROM ocean_assets WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT email,scope,connected_at,updated_at FROM ocean_google_calendar WHERE user_id=? LIMIT 1").bind(user.id).first(),
+    env.DB.prepare("SELECT name,device_type,backed_up,created_at,last_used_at FROM passkey_credentials WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT enabled,created_at,updated_at FROM user_totp WHERE user_id=? LIMIT 1").bind(user.id).first(),
+    env.DB.prepare("SELECT COUNT(*) AS remaining FROM auth_recovery_codes WHERE user_id=? AND used_at IS NULL").bind(user.id).first(),
+    exportCustomerPrivacyData({ ...env, getCustomer: async () => ({ id: String(user.id), email: String(user.email) }) }, String(user.id)),
+  ]);
+  const payload = {
+    exported_at: new Date().toISOString(),
+    account: identity || null,
+    policy_acceptances: acceptances.results || [],
+    transfers: transfers.results || [],
+    transfer_files: files.results || [],
+    ocean_pages: pages.results || [],
+    shared_pages: shares.results || [],
+    comments: comments.results || [],
+    ocean_assets: assets.results || [],
+    google_calendar_connection: calendar || null,
+    authentication: {
+      passkeys: passkeys.results || [],
+      authenticator: authenticator ? { enabled: Number(authenticator.enabled) === 1, created_at: authenticator.created_at, updated_at: authenticator.updated_at } : null,
+      unused_recovery_codes: Number(recovery?.remaining || 0),
+    },
+    store,
+    notes: [
+      "This export contains account data available in TaalLab's application databases.",
+      "Files themselves are not included; only transfer and file metadata is included.",
+      "Google Drive and Google Calendar content stored in your Google account is not copied into this export. Manage that data through Google.",
+      "Payment card and bank credentials are held by the payment provider and are not stored by TaalLab.",
+    ],
+  };
+  return new Response(JSON.stringify(payload, null, 2), {
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": 'attachment; filename="taallab-personal-data.json"',
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
+async function createPrivacyRequest(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  const body = await req.json().catch(() => ({}));
+  const type = String(body.type || "");
+  if (type !== "deletion" && type !== "correction") return json({ error: "Choose a valid privacy request type." }, { status: 400 });
+  const description = String(body.description || "").trim().slice(0, 1000);
+  const existing: any = await env.DB.prepare("SELECT id,status FROM privacy_requests WHERE user_id=? AND request_type=? AND status IN ('open','in_review') ORDER BY created_at DESC LIMIT 1")
+    .bind(user.id, type).first();
+  if (existing) return json({ ok: true, requestId: existing.id, status: existing.status, alreadyOpen: true });
+  const requestId = "PR-" + randomToken(8).toUpperCase();
+  await env.DB.prepare("INSERT INTO privacy_requests(id,user_id,request_type,description,status,created_at) VALUES(?,?,?,?, 'open', ?)")
+    .bind(requestId, user.id, type, description, now()).run();
+  const label = type === "deletion" ? "Account and personal data deletion" : "Personal data correction";
+  const notification = await sendAuthEmail(
+    env,
+    "contact@taallab.in",
+    "TaalLab privacy request " + requestId,
+    "<p>A user submitted a privacy request.</p><p><strong>Reference:</strong> " + escapeHtml(requestId) + "</p><p><strong>Type:</strong> " + escapeHtml(label) + "</p><p><strong>Account:</strong> " + escapeHtml(String(user.email)) + "</p><p>Review it in the authenticated admin privacy-request queue.</p>",
+    "A user submitted a privacy request. Reference: " + requestId + ". Type: " + label + ". Account: " + String(user.email) + ". Review it in the authenticated admin privacy-request queue.",
+    "privacy-request-" + requestId,
+  );
+  return json({ ok: true, requestId, status: "open", notificationSent: notification.sent });
+}
+
+async function listPrivacyRequests(env: Env) {
+  const rows = await env.DB.prepare(`SELECT r.id,r.user_id,r.request_type,r.description,r.status,r.created_at,r.resolved_at,u.email
+    FROM privacy_requests r LEFT JOIN users u ON u.id=r.user_id
+    ORDER BY CASE r.status WHEN 'open' THEN 0 WHEN 'in_review' THEN 1 ELSE 2 END, r.created_at ASC LIMIT 200`).all();
+  return json({ requests: rows.results || [] });
+}
+
+async function updatePrivacyRequest(req: Request, env: Env, requestId: string) {
+  await requireAdmin(req, env);
+  const body = await req.json().catch(() => ({}));
+  const status = String(body.status || "");
+  if (!["in_review", "completed", "declined"].includes(status)) return json({ error: "Choose a valid request status." }, { status: 400 });
+  const result = await env.DB.prepare("UPDATE privacy_requests SET status=?,resolved_at=? WHERE id=?")
+    .bind(status, status === "completed" || status === "declined" ? now() : null, requestId).run();
+  if (Number(result.meta?.changes || 0) !== 1) return json({ error: "Privacy request not found." }, { status: 404 });
+  return json({ ok: true, status });
 }
 
 async function updateAccountProfile(req: Request, env: Env) {
@@ -1529,6 +1637,11 @@ async function cleanup(env: Env) {
     env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM webauthn_challenges WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM google_app_login_codes WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM ocean_google_calendar_states WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM files WHERE status='deleted' AND expires_at<=?").bind(cutoff - 30 * 86400),
+    env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=?").bind(cutoff - 30 * 86400),
   ]);
 }
 
@@ -2262,6 +2375,12 @@ export default {
       if (url.pathname === "/api/account/password" && req.method === "POST") return changeOwnPassword(req, env);
       if (url.pathname === "/api/account/security" && req.method === "POST") return updateSecuritySettings(req, env);
 
+      if (url.pathname === "/api/account/data-export" && req.method === "GET") return exportAccountData(req, env);
+      if (url.pathname === "/api/account/privacy-request" && req.method === "POST") return createPrivacyRequest(req, env);
+      if (url.pathname === "/api/admin/privacy-requests" && req.method === "GET") { await requireAdmin(req, env); return listPrivacyRequests(env); }
+      const privacyRequestMatch = url.pathname.match(/^\/api\/admin\/privacy-requests\/([^/]+)$/);
+      if (privacyRequestMatch && req.method === "PATCH") return updatePrivacyRequest(req, env, privacyRequestMatch[1]);
+
       if (url.pathname === "/api/admin/users" && req.method === "GET") {
         await requireAdmin(req, env);
         return listUsers(env);
@@ -2511,8 +2630,8 @@ export default {
           }
         }
         await env.DB.batch([
-          env.DB.prepare("UPDATE files SET status='deleted' WHERE transfer_id=?").bind(id),
-          env.DB.prepare("UPDATE transfers SET status='deleted' WHERE id=?").bind(id),
+          env.DB.prepare("UPDATE files SET status='deleted',expires_at=? WHERE transfer_id=?").bind(now(), id),
+          env.DB.prepare("UPDATE transfers SET status='deleted',expires_at=? WHERE id=?").bind(now(), id),
         ]);
         return json({ ok: true });
       }
@@ -2591,6 +2710,7 @@ export default {
       cleanup(env),
       env.DB.prepare("DELETE FROM email_verification_tokens WHERE expires_at<=?").bind(now()).run(),
       env.DB.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").bind(now()).run(),
+      cleanupStoreRetention({ ...env, getCustomer: async () => null }),
     ]));
   },
 } satisfies ExportedHandler<Env>;
