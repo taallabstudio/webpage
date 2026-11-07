@@ -518,6 +518,9 @@ function Admin({initialUpload=false}) {
   const [authed,setAuthed]=useState(null);
   const [user,setUser]=useState(null);
   const [page,setPage]=useState(initialUpload ? "upload" : "dashboard");
+  const [mobileNavOpen,setMobileNavOpen]=useState(false);
+  const mobileNavRef=useRef(null);
+  const mobileNavToggleRef=useRef(null);
   const [stats,setStats]=useState(null);
   const [transfers,setTransfers]=useState([]);
   const [selected,setSelected]=useState(null);
@@ -537,18 +540,28 @@ function Admin({initialUpload=false}) {
   if(!authed) return <Login onLogin={refresh}/>;
   if(user?.role!=="admin") { location.replace("/account"); return <div className="loading"><RefreshCw className="spin"/> Redirecting to your account…</div>; }
 
-  async function logout(){await api("/auth/logout",{method:"POST"});setAuthed(false);setUser(null)}
+  function navigateAdmin(next){setPage(next);setMobileNavOpen(false);mobileNavToggleRef.current?.focus();}
+  useEffect(()=>{
+    if(!mobileNavOpen)return;
+    const first=mobileNavRef.current?.querySelector("button");
+    first?.focus();
+    const onKeyDown=(event)=>{if(event.key==="Escape"){event.preventDefault();setMobileNavOpen(false);mobileNavToggleRef.current?.focus();}};
+    document.addEventListener("keydown",onKeyDown);
+    return ()=>document.removeEventListener("keydown",onKeyDown);
+  },[mobileNavOpen]);
+  async function logout(){await api("/auth/logout",{method:"POST"});setAuthed(false);setUser(null);setMobileNavOpen(false);}
   return <div className="admin-layout">
-    <aside className="sidebar"><Logo/><div className="side-links">
-      <button className={page==="dashboard"?"active":""} onClick={()=>setPage("dashboard")}><Gauge/> Dashboard</button>
-      <button className={page==="transfers"?"active":""} onClick={()=>setPage("transfers")}><FolderOpen/> Transfers</button>
-      <button className={page==="products"?"active":""} onClick={()=>setPage("products")}><HardDrive/> Store Products</button>
-      <button className={page==="upload"?"active":""} onClick={()=>setPage("upload")}><UploadCloud/> New Transfer</button>
-      <button className={page==="users"?"active":""} onClick={()=>setPage("users")}><UserRound/> Users</button>
-      <button className={page==="settings"?"active":""} onClick={()=>setPage("settings")}><Settings/> Account</button>
+    <aside id="admin-sidebar" ref={mobileNavRef} className={"sidebar"+(mobileNavOpen?" mobile-open":"")}><Logo/><div className="side-links">
+      <button className={page==="dashboard"?"active":""} onClick={()=>navigateAdmin("dashboard")}><Gauge/> Dashboard</button>
+      <button className={page==="transfers"?"active":""} onClick={()=>navigateAdmin("transfers")}><FolderOpen/> Transfers</button>
+      <button className={page==="products"?"active":""} onClick={()=>navigateAdmin("products")}><HardDrive/> Store Products</button>
+      <button className={page==="upload"?"active":""} onClick={()=>navigateAdmin("upload")}><UploadCloud/> New Transfer</button>
+      <button className={page==="users"?"active":""} onClick={()=>navigateAdmin("users")}><UserRound/> Users</button>
+      <button className={page==="settings"?"active":""} onClick={()=>navigateAdmin("settings")}><Settings/> Account</button>
     </div><div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div><button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
+    {mobileNavOpen&&<button type="button" className="mobile-nav-backdrop" aria-label="Close navigation" onClick={()=>{setMobileNavOpen(false);mobileNavToggleRef.current?.focus();}}/>}
     <main className="admin-main">
-      <div className="admin-mobile-head"><Logo/><button><Menu/></button></div>
+      <div className="admin-mobile-head"><Logo/><button ref={mobileNavToggleRef} type="button" aria-label={mobileNavOpen?"Close navigation":"Open navigation"} aria-expanded={mobileNavOpen} aria-controls="admin-sidebar" onClick={()=>setMobileNavOpen(v=>!v)}>{mobileNavOpen?<X/>:<Menu/>}</button></div>
       {page==="dashboard"&&<Dashboard stats={stats} transfers={transfers} onOpen={setSelected}/>}
       {page==="transfers"&&<Transfers transfers={transfers} onOpen={setSelected}/>}
       {page==="products"&&<StoreProductManager/>}
@@ -894,7 +907,7 @@ function TransferTable({transfers,onOpen}) {
       </td>
       <td>{fmtDate(t.created_at)}</td><td>{fmtDate(t.expires_at)}</td><td>{t.file_count}</td><td>{formatBytes(t.total_size)}</td><td>{t.downloads}</td>
       <td><span className={`status ${t.status}`}>{t.status}</span></td>
-      <td><button className="icon-btn"><MoreHorizontal/></button></td>
+      <td><span className="icon-btn" aria-hidden="true"><MoreHorizontal/></span></td>
     </tr>)}
   </tbody></table></div>;
 }
@@ -1002,7 +1015,7 @@ function Upload({onDone}) {
     </div></div>;
   return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">NEW TRANSFER</span><h1>Send files</h1><p>Upload large studio assets and create a private client link.</p></div></div>
     <div className="upload-grid"><section className="panel upload-panel"><div className="dropzone" onDragOver={e=>e.preventDefault()} onDrop={drop}><UploadCloud/><h2>Drop files here</h2><p>or choose multiple files from your computer</p><label className="primary-btn"><Plus/> Select files<input hidden type="file" multiple onChange={addFiles}/></label><small>Files go directly to private R2 storage.</small></div>
-      {!!files.length&&<div className="upload-files">{files.map(f=><div className="upload-file" key={f.id}><File/><div><strong>{f.name}</strong><small>{formatBytes(f.size)}</small></div><button className="icon-btn" onClick={()=>setFiles(files.filter(x=>x.id!==f.id))}><X/></button></div>)}</div>}
+      {!!files.length&&<div className="upload-files">{files.map(f=><div className="upload-file" key={f.id}><File/><div><strong>{f.name}</strong><small>{formatBytes(f.size)}</small></div><button type="button" className="icon-btn" aria-label={"Remove "+f.name} onClick={()=>setFiles(files.filter(x=>x.id!==f.id))}><X/></button></div>)}</div>}
     </section><section className="panel message-panel">
       <label>Client email <span className="muted">(optional)</span><input type="email" list="client-users" value={recipientEmail} placeholder="client@example.com — leave blank for link only" onChange={e=>{setRecipientEmail(e.target.value);setRecipientId("")}}/><datalist id="client-users">{recipients.map(u=><option key={u.id} value={u.email}>{u.email}</option>)}</datalist></label>
       <label>Select existing user <span className="muted">(optional)</span><select value={recipientId} onChange={e=>{const id=e.target.value;setRecipientId(id);const match=recipients.find(u=>u.id===id);if(match)setRecipientEmail(match.email)}}><option value="">No account / enter email manually…</option>{recipients.map(u=><option key={u.id} value={u.id}>{u.email}{u.role==="admin"?" (Admin)":""}</option>)}</select></label>
