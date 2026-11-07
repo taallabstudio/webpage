@@ -1467,8 +1467,9 @@ async function trashDriveFile(env: Env, fileId: string) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ trashed: true }),
   });
-  if (!response.ok) {
-    console.error("Drive delete failed", fileId, await response.text());
+  if (!response.ok && response.status !== 404) {
+    const detail = await response.text();
+    throw new Error(`Google Drive could not trash file ${fileId}: HTTP ${response.status} ${detail.slice(0, 300)}`);
   }
 }
 
@@ -1624,23 +1625,31 @@ async function cleanup(env: Env) {
     .bind(cutoff)
     .all();
 
-  for (const f of files.results as any[]) {
+  for (const file of files.results as any[]) {
     const refs: any = await env.DB.prepare(
-      "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND id!=?"
-    ).bind(f.storage_key, f.id).first();
+      "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND expires_at>? AND id!=?"
+    ).bind(file.storage_key, cutoff, file.id).first();
 
-    if (Number(refs?.n || 0) > 0) continue;
+    // An unexpired record still references this object, so only this expired
+    // record can be retired; the shared object must remain available.
+    if (Number(refs?.n || 0) > 0) {
+      await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(file.id).run();
+      continue;
+    }
 
     try {
-      await trashDriveFile(env, f.storage_key);
-    } catch (e) {
-      console.error("Drive delete failed", f.storage_key, e);
+      await trashDriveFile(env, String(file.storage_key));
+      await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(file.id).run();
+    } catch (error) {
+      // Keep the metadata and retry on the next scheduled run. The expired
+      // timestamp prevents downloads while the provider deletion is retried.
+      console.error("Expired file deletion will be retried", file.id, error);
+      await env.DB.prepare("UPDATE files SET status='expired' WHERE id=?").bind(file.id).run();
     }
   }
 
   await env.DB.batch([
-    env.DB.prepare("UPDATE files SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
-    env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
+    env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted' AND NOT EXISTS (SELECT 1 FROM files WHERE files.transfer_id=transfers.id AND files.status='expired')").bind(cutoff),
     env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM webauthn_challenges WHERE expires_at<=?").bind(cutoff),
