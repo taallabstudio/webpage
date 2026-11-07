@@ -230,6 +230,7 @@ async function ensureSupportSchema(env: Env) {
     method TEXT NOT NULL
   )`).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_policy_acceptances_user ON policy_acceptances(user_id, accepted_at)").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS privacy_requests (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, email TEXT NOT NULL, request_type TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)").run();
 }
 
 const TERMS_VERSION = "2026-11-07";
@@ -238,6 +239,34 @@ const PRIVACY_VERSION = "2026-11-07";
 async function recordPolicyAcceptance(env: Env, userId: string, method: string, acceptedAt = now()) {
   await env.DB.prepare("INSERT INTO policy_acceptances(id,user_id,terms_version,privacy_version,accepted_at,method) VALUES(?,?,?,?,?,?)")
     .bind(randomToken(16), userId, TERMS_VERSION, PRIVACY_VERSION, acceptedAt, method).run();
+}
+
+async function accountDataExport(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  await ensureSupportSchema(env);
+  const account = await env.DB.prepare("SELECT id,email,role,status,display_name,created_at,updated_at,email_verified_at,two_factor_enabled FROM users WHERE id=? LIMIT 1").bind(user.id).first();
+  const transfers = await env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all();
+  const files = await env.DB.prepare("SELECT f.id,f.transfer_id,f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC").bind(user.id).all();
+  const acceptances = await env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at").bind(user.id).all();
+  const google = await env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=? LIMIT 1").bind(user.id).first();
+  const orders = await env.DBStore.prepare("SELECT order_number,product_id,amount,currency,status,customer_email,customer_name,customer_phone,address_line1,address_line2,city,state,pincode,country,coupon_code,discount_amount,created_at,updated_at,paid_at,download_count,last_downloaded_at FROM store_orders WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all().catch(() => ({results:[]}));
+  const profile = await env.DBStore.prepare("SELECT full_name,phone,address_line1,address_line2,city,state,pincode,country,updated_at FROM store_customer_profiles WHERE user_id=? LIMIT 1").bind(user.id).first().catch(() => null);
+  const data = {exportedAt:new Date().toISOString(),account,transfers:transfers.results||[],transferFileMetadata:files.results||[],storeOrders:orders.results||[],savedStoreProfile:profile,googleSignIn:google?{connected:true,email:google.email,connectedAt:google.created_at}:{connected:false},policyAcceptances:acceptances.results||[],notes:["File contents are not included in this JSON export. Download available transfers before they expire.","Payment credentials are handled by the payment provider and are not stored by Taal Lab.","Some records may be retained where required for accounting, security, dispute handling or applicable law."]};
+  const date = new Date().toISOString().slice(0,10);
+  return new Response(JSON.stringify(data,null,2), {headers:{"content-type":"application/json; charset=utf-8","content-disposition":"attachment; filename=taallab-data-export-"+date+".json","cache-control":"no-store","x-content-type-options":"nosniff"}});
+}
+
+async function requestAccountDeletion(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  await ensureSupportSchema(env);
+  const existing = await env.DB.prepare("SELECT id FROM privacy_requests WHERE user_id=? AND request_type=? AND status IN (?,?) ORDER BY created_at DESC LIMIT 1").bind(user.id,"deletion","received","in_review").first();
+  if (existing) return json({ok:true,requestId:existing.id,alreadyOpen:true});
+  const created = now();
+  const requestId = "TLPR-" + randomToken(6).toUpperCase();
+  await env.DB.prepare("INSERT INTO privacy_requests(id,user_id,email,request_type,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)").bind(requestId,user.id,user.email,"deletion","received",created,created).run();
+  const notice = await sendAuthEmail(env,"contact@taallab.in","Account deletion request — "+requestId,"<p>Account deletion request: <strong>"+requestId+"</strong></p><p>Account email: "+String(user.email)+"</p><p>User ID: "+String(user.id)+"</p>","Account deletion request "+requestId+"\nEmail: "+user.email+"\nUser ID: "+user.id,"privacy-request-"+requestId);
+  if (!notice.sent) console.error("Privacy request notification failed",requestId);
+  return json({ok:true,requestId,notificationSent:notice.sent});
 }
 
 function normalizeEmail(value: unknown) {
@@ -2276,6 +2305,8 @@ export default {
       if ((url.pathname === "/api/auth/login" || url.pathname === "/api/admin/login") && req.method === "POST") return authLogin(req, env);
       if ((url.pathname === "/api/auth/logout" || url.pathname === "/api/admin/logout") && req.method === "POST") return authLogout(req, env);
       if (url.pathname === "/api/auth/me" && req.method === "GET") return currentUser(env, req);
+      if (url.pathname === "/api/account/data-export" && req.method === "GET") return accountDataExport(req, env);
+      if (url.pathname === "/api/account/privacy-request" && req.method === "POST") return requestAccountDeletion(req, env);
       if (url.pathname === "/api/account/profile" && req.method === "PATCH") return updateAccountProfile(req, env);
       if (url.pathname === "/api/account/password" && req.method === "POST") return changeOwnPassword(req, env);
       if (url.pathname === "/api/account/security" && req.method === "POST") return updateSecuritySettings(req, env);
