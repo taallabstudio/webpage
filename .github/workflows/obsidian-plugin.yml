@@ -1,0 +1,42 @@
+name: Build Obsidian plugin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "obsidian-plugin/**"
+      - ".github/workflows/obsidian-plugin.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: obsidian-plugin/package.json
+      - name: Install dependencies
+        working-directory: obsidian-plugin
+        run: npm install
+      - name: Build plugin
+        working-directory: obsidian-plugin
+        run: npm run build
+      - name: Package plugin
+        run: |
+          mkdir -p dist/taallab-ocean-sync
+          cp obsidian-plugin/main.js obsidian-plugin/manifest.json dist/taallab-ocean-sync/
+          cp obsidian-plugin/README.md dist/taallab-ocean-sync/
+          cd dist
+          zip -r taallab-ocean-sync.zip taallab-ocean-sync
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taallab-ocean-sync
+          path: dist/taallab-ocean-sync.zip
+          if-no-files-found: error
+          retention-days: 30
