@@ -39,4 +39,4 @@ This schedule records the retention behaviour implemented in the application. It
 - Confirm the legal basis and exact retention period for privacy-request and policy-acceptance records.
 - Review the contact mailbox retention policy for booking enquiries.
 - Verify provider-side deletion, backups, regional processing and DPA settings.
-- Decide and implement the adult-only versus verifiable parental-consent product policy before collecting children's personal data.
+- No blanket 18+ account-registration restriction is approved. Keep the product decision under review and implement applicable child-data safeguards, including verifiable parental consent where required, before knowingly processing children's personal data.
