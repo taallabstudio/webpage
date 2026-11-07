@@ -1368,13 +1368,13 @@ async function driveFile(env: Env, fileId: string) {
   return response.json();
 }
 
-async function deleteDriveFilePermanently(env: Env, fileId: string) {
+async function deleteDriveFilePermanently(env: Env, fileId: string): Promise<boolean> {
   const response = await driveFetch(env, `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
     method: "DELETE",
   });
-  if (!response.ok && response.status !== 404) {
-    console.error("Permanent Drive deletion failed", fileId, response.status, await response.text());
-  }
+  if (response.ok || response.status === 404) return true;
+  console.error("Permanent Drive deletion failed", fileId, response.status, await response.text());
+  return false;
 }
 
 async function streamDriveFile(env: Env, fileId: string, req: Request, downloadName: string, mimeType: string, attachment: boolean) {
@@ -1528,6 +1528,7 @@ async function cleanup(env: Env) {
     .bind(cutoff)
     .all();
 
+  const failedFileIds: string[] = [];
   for (const f of files.results as any[]) {
     const refs: any = await env.DB.prepare(
       "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND id!=?"
@@ -1536,15 +1537,19 @@ async function cleanup(env: Env) {
     if (Number(refs?.n || 0) > 0) continue;
 
     try {
-      await deleteDriveFilePermanently(env, f.storage_key);
+      if (!(await deleteDriveFilePermanently(env, f.storage_key))) failedFileIds.push(String(f.id));
     } catch (e) {
+      failedFileIds.push(String(f.id));
       console.error("Drive delete failed", f.storage_key, e);
     }
   }
 
   const metadataCutoff = cutoff - 30 * 86400;
+  const markExpiredFiles = failedFileIds.length
+    ? env.DB.prepare(`UPDATE files SET status='deleted' WHERE expires_at<=? AND status!='deleted' AND id NOT IN (${failedFileIds.map(() => "?").join(",")})`).bind(cutoff, ...failedFileIds)
+    : env.DB.prepare("UPDATE files SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff);
   await env.DB.batch([
-    env.DB.prepare("UPDATE files SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
+    markExpiredFiles,
     env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?").bind(cutoff),
@@ -2641,7 +2646,8 @@ export default {
             "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND transfer_id!=?"
           ).bind(f.storage_key, id).first();
           if (Number(refs?.n || 0) === 0) {
-            try { await trashDriveFile(env, f.storage_key); } catch (e) { console.error(e); }
+            const deleted = await deleteDriveFilePermanently(env, f.storage_key);
+            if (!deleted) return json({ error: "A file could not be permanently deleted from storage. The transfer was not marked deleted; please retry." }, { status: 502 });
           }
         }
         await env.DB.batch([
