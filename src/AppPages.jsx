@@ -767,6 +767,28 @@ function PrivacyRequestAdmin() {
   </section>;
 }
 
+
+function MarketingPreferences({user}) {
+  const [eligible,setEligible]=useState(user?.account_type==="adult"&&Boolean(user?.email_verified_at));
+  const [enabled,setEnabled]=useState(false);
+  const [loading,setLoading]=useState(true);
+  const [saving,setSaving]=useState(false);
+  const [error,setError]=useState("");
+  const [message,setMessage]=useState("");
+  const [unsubscribeUrl,setUnsubscribeUrl]=useState("");
+  useEffect(()=>{let active=true;api("/account/marketing-preference").then(d=>{if(!active)return;setEligible(Boolean(d.eligible));setEnabled(Boolean(d.enabled))}).catch(e=>{if(active)setError(e.message||"Could not load marketing preferences.")}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[user?.id]);
+  async function change(next){if(saving||!eligible)return;setSaving(true);setError("");setMessage("");try{const d=await api("/account/marketing-preference",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:next})});setEnabled(Boolean(d.enabled));setUnsubscribeUrl(d.unsubscribeUrl||"");setMessage(d.message||"Preference updated.")}catch(e){setError(e.message||"Could not update marketing preference.")}finally{setSaving(false)}}
+  return <section className="panel" style={{maxWidth:720,padding:24,marginBottom:18}}>
+    <h2>Marketing emails</h2>
+    <p className="muted" style={{marginTop:6}}>This is optional and is not required to use TaalLab. Account, security, booking and purchase messages are separate from marketing consent.</p>
+    {!eligible?<p className="muted">Marketing email preferences are available only to adult accounts with a verified email address. Child accounts are not subscribed.</p>:<label className="policy-consent" style={{marginTop:14,alignItems:"flex-start"}}><input type="checkbox" checked={enabled} disabled={loading||saving} onChange={e=>change(e.target.checked)}/><span><strong>I'd like to receive occasional TaalLab product updates and marketing emails.</strong><br/><small className="muted">Unchecked by default. You can withdraw consent at any time. Every marketing email must include a working unsubscribe option.</small></span></label>}
+    {loading&&<p className="muted">Loading preference…</p>}
+    {error&&<div className="error-box" role="alert" style={{marginTop:12}}>{error}</div>}
+    {message&&<div className="success-pill" role="status" style={{marginTop:12}}>{message}</div>}
+    {enabled&&<p className="muted" style={{marginTop:10}}>No marketing campaigns are currently being sent. Your preference is saved for future campaigns. {unsubscribeUrl&&<a href={unsubscribeUrl}>Open your one-click unsubscribe page</a>}</p>}
+  </section>;
+}
+
 function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [currentPassword,setCurrentPassword]=useState("");
   const [newPassword,setNewPassword]=useState("");
@@ -859,6 +881,7 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
         <button className="primary-btn" disabled={profileSaving}>{profileSaving?"Saving profile…":"Save profile"}</button>
       </form>
     </section>
+    <MarketingPreferences user={user}/>
     <PrivacyControls user={user}/>
     {showGoogleDrive&&<PrivacyRequestAdmin/>}
     <SecurityMethods user={user}/>
