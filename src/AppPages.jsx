@@ -1062,7 +1062,7 @@ function TransferDetail({transfer,onClose,onChanged}) {
   const [detail,setDetail]=useState(null);
   useEffect(()=>{api(`/admin/transfers/${transfer.id}`).then(setDetail)},[transfer.id]);
   if(!detail)return <div className="detail-drawer"><RefreshCw className="spin"/></div>;
-  return <div className="detail-drawer"><div className="drawer-head"><div><span className="eyebrow">TRANSFER DETAILS</span><h2>{detail.id}</h2></div><button onClick={onClose}><X/></button></div>
+  return <div className="detail-drawer"><div className="drawer-head"><div><span className="eyebrow">TRANSFER DETAILS</span><h2>{detail.id}</h2></div><button type="button" aria-label="Close transfer details" onClick={onClose}><X/></button></div>
     <div className="detail-stats"><span>Created<strong>{fmtDate(detail.created_at)}</strong></span><span>Expires<strong>{fmtDate(detail.expires_at)}</strong></span><span>Total size<strong>{formatBytes(detail.total_size)}</strong></span><span>Downloads<strong>{detail.downloads}</strong></span></div>
     {detail.recipient_email&&<div className="message-box"><MessageSquare size={18}/><p><strong>Client:</strong> {detail.recipient_email}</p></div>}
     {detail.message&&<div className="message-box"><MessageSquare size={18}/><p>“{detail.message}”</p></div>}
