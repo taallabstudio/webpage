@@ -37,7 +37,7 @@ This document records the retention behavior implemented in the application. It 
 
 ## Cookie, storage and tracker review
 
-- Essential session cookies support sign-in; local storage holds the shop cart and the privacy-notice dismissal.
+- Essential session cookies support sign-in; local storage holds the shop cart, OCEAN theme/recent-emoji preferences and the privacy-notice dismissal.
 - The repository scan on 7 November 2026 found no configured Google Analytics/gtag, Google Tag Manager, Meta Pixel, Hotjar, Microsoft Clarity, Segment, Mixpanel, PostHog, Plausible or Umami integrations.
 - Google Fonts is requested as an external font resource. Razorpay and Google authentication resources are contacted when users invoke those features. These are disclosed in the public Privacy Policy and shared notice; they are not presented as optional analytics consent.
 - If optional analytics, advertising, session replay or marketing trackers are added, they must not load before the applicable consent is recorded. Add a consent platform and test its blocking behavior before adding any such script.
