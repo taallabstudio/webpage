@@ -244,7 +244,7 @@ async function recordPolicyAcceptance(env: Env, userId: string, method: string, 
 async function accountDataExport(req: Request, env: Env) {
   const user = await requireUser(req, env);
   await ensureSupportSchema(env);
-  const account = await env.DB.prepare("SELECT id,email,role,status,display_name,created_at,updated_at,email_verified_at,two_factor_enabled FROM users WHERE id=? LIMIT 1").bind(user.id).first();
+  const account = await env.DB.prepare("SELECT id,email,role,status,display_name,avatar_data,created_at,updated_at,email_verified_at,two_factor_enabled FROM users WHERE id=? LIMIT 1").bind(user.id).first();
   const transfers = await env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all();
   const files = await env.DB.prepare("SELECT f.id,f.transfer_id,f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC").bind(user.id).all();
   const acceptances = await env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at").bind(user.id).all();
@@ -264,7 +264,9 @@ async function requestAccountDeletion(req: Request, env: Env) {
   const created = now();
   const requestId = "TLPR-" + randomToken(6).toUpperCase();
   await env.DB.prepare("INSERT INTO privacy_requests(id,user_id,email,request_type,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)").bind(requestId,user.id,user.email,"deletion","received",created,created).run();
-  const notice = await sendAuthEmail(env,"contact@taallab.in","Account deletion request — "+requestId,"<p>Account deletion request: <strong>"+requestId+"</strong></p><p>Account email: "+String(user.email)+"</p><p>User ID: "+String(user.id)+"</p>","Account deletion request "+requestId+"\nEmail: "+user.email+"\nUser ID: "+user.id,"privacy-request-"+requestId);
+  const safeEmail = String(user.email).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const safeId = String(user.id).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const notice = await sendAuthEmail(env,"contact@taallab.in","Account deletion request — "+requestId,"<p>Account deletion request: <strong>"+requestId+"</strong></p><p>Account email: "+safeEmail+"</p><p>User ID: "+safeId+"</p>","Account deletion request "+requestId+"\nEmail: "+user.email+"\nUser ID: "+user.id,"privacy-request-"+requestId);
   if (!notice.sent) console.error("Privacy request notification failed",requestId);
   return json({ok:true,requestId,notificationSent:notice.sent});
 }
