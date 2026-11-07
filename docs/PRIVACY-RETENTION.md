@@ -16,14 +16,14 @@ This document records the retention behavior implemented in the application. It 
 | Google app hand-off codes | 2 minutes | Expired rows removed hourly. |
 | Google Calendar OAuth state | Stored expiry | Expired rows removed hourly. |
 | Transfer file objects | Transfer's displayed expiry | Worker attempts deletion from connected Google Drive at/after expiry. Failed deletion remains eligible for retry. |
-| Transfer and file metadata | 30 days after transfer expiry | Purged after expiry only after associated file records are marked deleted; failed storage deletion keeps the record for retry. |
-| Booking anti-abuse identifiers | 30 days after last activity | Old rate-limit rows are removed hourly. |
+| Transfer and file metadata | 1 year after transfer expiry | Purged after expiry only after associated file records are marked deleted; failed storage deletion keeps the record for retry. |
+| Booking anti-abuse identifiers | 1 year after last activity | Old rate-limit rows are removed hourly. |
 
 ## Records not automatically deleted
 
 - Account credentials, profile data and OCEAN workspace content remain while the account is active. Account deletion is a recorded request that requires review; it is not an immediate destructive action.
 - Store customer profiles remain while needed for account and checkout features, or until a deletion request is reviewed and processed.
-- Orders, payment references, invoices/tax data and related evidence must be retained for the period required by applicable accounting, tax, payment-provider and dispute obligations. The exact statutory period must be confirmed for TaalLab's legal and tax status before implementing automatic deletion.
+- Orders, payment references, invoices/tax data and related evidence must be retained for at least one year where applicable under DPDP Rule 8(3), and longer where accounting, tax, payment-provider or dispute obligations require it. The exact statutory period must be confirmed for TaalLab's legal and tax status before implementing automatic deletion.
 - Policy acceptance and privacy-request records are retained as needed to evidence consent and handle legal claims. A specific fixed purge period requires legal review.
 - Marketing preference and unsubscribe/suppression records are retained while needed to honour the user's opt-out and prevent future marketing sends. Transactional security and purchase emails are not controlled by marketing consent.
 - Data held directly by Google, Razorpay, Cloudflare, Backblaze, Resend, Unsplash or Emoji API is subject to the relevant provider's retention controls and contractual terms.
@@ -41,6 +41,10 @@ This document records the retention behavior implemented in the application. It 
 - The repository scan on 7 November 2026 found no configured Google Analytics/gtag, Google Tag Manager, Meta Pixel, Hotjar, Microsoft Clarity, Segment, Mixpanel, PostHog, Plausible or Umami integrations.
 - Google Fonts is requested as an external font resource. Razorpay and Google authentication resources are contacted when users invoke those features. These are disclosed in the public Privacy Policy and shared notice; they are not presented as optional analytics consent.
 - If optional analytics, advertising, session replay or marketing trackers are added, they must not load before the applicable consent is recorded. Add a consent platform and test its blocking behavior before adding any such script.
+
+## DPDP security-log readiness
+
+Rule 6(1)(e) of the Digital Personal Data Protection Rules, 2025 requires relevant logs and personal data used to detect, investigate and remediate unauthorised access to be retained for one year. Rule 8(3) also specifies one-year retention for processing purposes in the Seventh Schedule. Rules 6 and 8 are scheduled to commence eighteen months after publication of the Rules (14 May 2027). The current code retains transfer/download metadata and booking rate-limit records for one year, but it does not yet provide a complete dedicated security-event log for every sign-in, account change, transfer access and administrative action. Implement and test that log coverage before commencement, and confirm the precise Rule 8(3) scope with counsel.
 
 ## Manual review still required
 
