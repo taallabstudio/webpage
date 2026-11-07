@@ -638,6 +638,12 @@ function PrivacyControls({user}) {
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
+  const [requests,setRequests]=useState([]);
+  async function loadRequests() {
+    try { const result=await api("/account/privacy-requests");setRequests(result.requests||[]); }
+    catch { /* The request form remains available if history cannot be loaded. */ }
+  }
+  useEffect(()=>{loadRequests();},[]);
 
   async function submitRequest(event) {
     event.preventDefault();
@@ -646,6 +652,7 @@ function PrivacyControls({user}) {
       const result=await api("/account/privacy-request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:requestType,description})});
       setMessage((result.alreadyOpen?"You already have an open request. Reference: ":"Your request has been received. Reference: ")+result.requestId+". TaalLab will review it and contact you at "+user?.email+".");
       setDescription("");
+      await loadRequests();
     } catch(e) { setError(e.message||"Could not submit your privacy request."); }
     finally { setBusy(false); }
   }
@@ -671,6 +678,13 @@ function PrivacyControls({user}) {
       {message&&<div className="success-pill" role="status">{message}</div>}
       <button className="primary-btn" type="submit" disabled={busy}>{busy?"Submitting…":"Submit privacy request"}</button>
     </form>
+    {requests.length>0&&<div style={{marginTop:22}}>
+      <h3 style={{fontSize:14,marginBottom:10}}>Your privacy requests</h3>
+      <div style={{display:"grid",gap:8}}>{requests.map(item=><div key={item.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,padding:"11px 12px",border:"1px solid var(--line)",borderRadius:10}}>
+        <span><strong style={{display:"block",fontSize:12}}>{item.id}</strong><small className="muted">{item.request_type==="deletion"?"Account deletion":"Data correction"} · {fmtDate(item.created_at)}</small></span>
+        <span className={"status "+(item.status==="completed"?"active":item.status==="declined"?"deleted":"expired")}>{item.status.replace("_"," ")}</span>
+      </div>)}</div>
+    </div>}
     <p className="muted" style={{fontSize:12,marginTop:16}}>Privacy questions: <a href="mailto:contact@taallab.in">contact@taallab.in</a> · <a href="/privacy.html">Privacy Policy</a></p>
   </section>;
 }
