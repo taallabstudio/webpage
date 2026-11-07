@@ -20,7 +20,7 @@
 
   const copy = document.createElement("p");
   copy.style.cssText = "margin:0;flex:1 1 420px";
-  copy.append("TAAL LAB uses essential session cookies for sign-in and local storage for your shop cart. We do not currently load advertising or analytics trackers. Google Fonts may be requested to display the site; payment and Google sign-in services connect when you choose to use them. ");
+  copy.append("TAAL LAB uses essential session cookies for sign-in and local storage for your shop cart. The website code does not currently load optional advertising or analytics scripts. Google Fonts may be requested to display the site; payment and Google sign-in services connect when you choose to use them. ");
 
   const link = document.createElement("a");
   link.href = "/privacy.html";
