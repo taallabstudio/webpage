@@ -148,6 +148,17 @@ async function hashPassword(password: string) {
 
 async function ensureSupportSchema(env: Env) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS privacy_requests (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    request_type TEXT NOT NULL CHECK(request_type IN ('deletion')),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','processing','completed','rejected')),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    completed_at INTEGER
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_user_status ON privacy_requests(user_id,status,created_at DESC)").run();
   const columns: any = await env.DB.prepare("PRAGMA table_info(files)").all();
   const hasLastDownloaded = (columns.results || []).some((col: any) => col.name === "last_downloaded_at");
   if (!hasLastDownloaded) {
@@ -642,6 +653,71 @@ async function authSetup(req: Request, env: Env) {
 async function currentUser(env: Env, req: Request) {
   const user = await getSessionUser(req, env);
   return user ? json({ authenticated: true, user }) : json({ authenticated: false });
+}
+
+async function exportAccountData(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  await ensureOceanSchema(env);
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, terms_version TEXT NOT NULL,
+    privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
+  )`).run();
+
+  const [account, transfers, files, acceptances, googleIdentity, pages, shares, comments, assets, calendar] = await Promise.all([
+    env.DB.prepare("SELECT id,email,role,status,created_at,updated_at,email_verified_at,two_factor_enabled,display_name,avatar_data FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
+    env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
+    env.DB.prepare("SELECT f.id,f.transfer_id,f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC").bind(user.id).all(),
+    env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at DESC").bind(user.id).all(),
+    env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=? LIMIT 1").bind(user.id).first(),
+    env.DB.prepare("SELECT id,parent_id,title,icon,cover,is_favorite,is_archived,created_at,updated_at,is_folder,is_shared,general_access,cover_credit,cover_credit_url,cover_source_url FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT page_id,permission,created_at,updated_at FROM ocean_page_shares WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT id,page_id,body,created_at FROM ocean_comments WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT id,page_id,file_name,mime_type,size,created_at FROM ocean_assets WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT email,scope,connected_at,updated_at FROM ocean_google_calendar WHERE user_id=? LIMIT 1").bind(user.id).first(),
+  ]);
+
+  return new Response(JSON.stringify({
+    exported_at: new Date().toISOString(),
+    service: "TAAL LAB",
+    notice: "This export contains account and workspace records available in the TaalLab databases. It excludes passwords, session secrets, OAuth refresh tokens, private storage keys and download tokens.",
+    account, transfers: transfers.results || [], files: files.results || [],
+    policy_acceptances: acceptances.results || [], google_identity: googleIdentity || null,
+    ocean: { pages: pages.results || [], page_shares: shares.results || [], comments: comments.results || [], assets: assets.results || [], google_calendar_connection: calendar || null },
+  }, null, 2), {
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": `attachment; filename="taallab-account-data-${String(user.id).slice(0,8)}.json"`,
+      "cache-control": "no-store, private",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
+async function requestAccountDeletion(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  const body = await req.json().catch(() => ({}));
+  if (body.confirmation !== "DELETE MY ACCOUNT") {
+    return json({ error: "Type DELETE MY ACCOUNT to confirm this request." }, { status: 400 });
+  }
+  const existing: any = await env.DB.prepare("SELECT id,status,created_at FROM privacy_requests WHERE user_id=? AND request_type='deletion' AND status IN ('pending','processing') ORDER BY created_at DESC LIMIT 1").bind(user.id).first();
+  if (existing) return json({ ok: true, requestId: existing.id, status: existing.status, message: "A deletion request is already awaiting review." });
+
+  const id = randomToken(16);
+  const createdAt = now();
+  await env.DB.prepare("INSERT INTO privacy_requests(id,user_id,email,request_type,status,created_at,updated_at) VALUES(?,?,?,'deletion','pending',?,?)")
+    .bind(id, user.id, user.email, createdAt, createdAt).run();
+
+  const safeEmail = escapeHtml(String(user.email || ""));
+  const adminMessage = await sendAuthEmail(env, "contact@taallab.in", "Account deletion request — TaalLab", 
+    `<p>A user has submitted an account deletion request.</p><p><strong>Request:</strong> ${id}</p><p><strong>Account:</strong> ${safeEmail}</p><p><strong>Submitted:</strong> ${new Date(createdAt * 1000).toISOString()}</p><p>Review associated transfer, OCEAN and store records, and retain only information required by applicable law or legitimate dispute/security needs. Do not treat this email as proof that deletion has been completed.</p>`,
+    `Account deletion request\nRequest: ${id}\nAccount: ${user.email}\nSubmitted: ${new Date(createdAt * 1000).toISOString()}\nReview related data and retention obligations before processing.`,
+    `privacy-deletion-admin:${id}`);
+  await sendAuthEmail(env, String(user.email), "We received your TaalLab privacy request",
+    `<p>We received your account deletion request.</p><p><strong>Reference:</strong> ${id}</p><p>Your account has not been deleted yet. We will review linked workspace, transfer and purchase records and any information that must be retained by law. Contact <a href="mailto:contact@taallab.in">contact@taallab.in</a> with this reference if you need help.</p>`,
+    `We received your TaalLab account deletion request. Reference: ${id}. Your account has not been deleted yet. Contact contact@taallab.in with this reference if you need help.`,
+    `privacy-deletion-user:${id}`);
+
+  return json({ ok: true, requestId: id, status: "pending", notificationSent: adminMessage.sent, message: "Your request has been recorded for review. Your account and data have not yet been deleted." });
 }
 
 async function updateAccountProfile(req: Request, env: Env) {
@@ -1512,23 +1588,41 @@ async function cleanup(env: Env) {
 
   for (const f of files.results as any[]) {
     const refs: any = await env.DB.prepare(
-      "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND id!=?"
-    ).bind(f.storage_key, f.id).first();
+      "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND id!=? AND expires_at>?"
+    ).bind(f.storage_key, f.id, cutoff).first();
 
-    if (Number(refs?.n || 0) > 0) continue;
+    if (Number(refs?.n || 0) > 0) {
+      await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(f.id).run();
+      continue;
+    }
 
     try {
       await trashDriveFile(env, f.storage_key);
+      await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(f.id).run();
     } catch (e) {
-      console.error("Drive delete failed", f.storage_key, e);
+      // Leave the record eligible for retry on the next scheduled run.
+      console.error("Drive delete failed; will retry", f.storage_key, e);
     }
   }
 
   await env.DB.batch([
-    env.DB.prepare("UPDATE files SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
     env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM email_verification_tokens WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM password_reset_tokens WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM google_app_login_codes WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM ocean_google_calendar_states WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM booking_rate_limits WHERE last_sent_at<=?").bind(cutoff - 30 * 86400),
+  ]);
+
+  // Keep expired transfer metadata for a short recovery/dispute window, then purge it.
+  // File objects are removed above; only records expired for more than 30 days are purged here.
+  const metadataCutoff = cutoff - 30 * 86400;
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM files WHERE transfer_id IN (SELECT id FROM transfers WHERE status='deleted' AND expires_at<=?)").bind(metadataCutoff),
+    env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=?").bind(metadataCutoff),
   ]);
 }
 
@@ -2258,6 +2352,8 @@ export default {
       if ((url.pathname === "/api/auth/login" || url.pathname === "/api/admin/login") && req.method === "POST") return authLogin(req, env);
       if ((url.pathname === "/api/auth/logout" || url.pathname === "/api/admin/logout") && req.method === "POST") return authLogout(req, env);
       if (url.pathname === "/api/auth/me" && req.method === "GET") return currentUser(env, req);
+      if (url.pathname === "/api/account/data-export" && req.method === "GET") return exportAccountData(req, env);
+      if (url.pathname === "/api/account/privacy-request" && req.method === "POST") return requestAccountDeletion(req, env);
       if (url.pathname === "/api/account/profile" && req.method === "PATCH") return updateAccountProfile(req, env);
       if (url.pathname === "/api/account/password" && req.method === "POST") return changeOwnPassword(req, env);
       if (url.pathname === "/api/account/security" && req.method === "POST") return updateSecuritySettings(req, env);
@@ -2589,8 +2685,6 @@ export default {
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(Promise.all([
       cleanup(env),
-      env.DB.prepare("DELETE FROM email_verification_tokens WHERE expires_at<=?").bind(now()).run(),
-      env.DB.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").bind(now()).run(),
     ]));
   },
 } satisfies ExportedHandler<Env>;
