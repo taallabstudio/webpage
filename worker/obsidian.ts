@@ -48,11 +48,11 @@ function markdownBlocks(markdown: string) {
     if (bullet) { add("bullet", bullet[1]); listNo = 0; continue; }
     const numbered = line.match(/^\s*\d+[.)]\s+(.+)$/);
     if (numbered) { add("numbered", numbered[1]); listNo++; continue; }
+    const callout = line.match(/^\s*>\s*\[!(\w+)\]\s*(.*)$/i);
+    if (callout) { add("callout", (callout[2] ? callout[2] + " " : "") + "[" + callout[1] + "]"); listNo = 0; continue; }
     const quote = line.match(/^\s*>\s?(.*)$/);
     if (quote) { add("quote", quote[1]); listNo = 0; continue; }
     if (/^\s*([-*_])\1\1+\s*$/.test(line)) { add("divider", ""); listNo = 0; continue; }
-    const callout = line.match(/^\s*>\s*\[!(\w+)\]\s*(.*)$/i);
-    if (callout) { add("callout", (callout[2] ? callout[2] + " " : "") + "[" + callout[1] + "]"); listNo = 0; continue; }
     add("text", line); listNo = 0;
   }
   if (code) add("code", codeLines.join("\n"));
