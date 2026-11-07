@@ -1434,8 +1434,11 @@ async function trashDriveFile(env: Env, fileId: string) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ trashed: true }),
   });
+  if (response.status === 404) return;
   if (!response.ok) {
-    console.error("Drive delete failed", fileId, await response.text());
+    const detail = await response.text().catch(() => "");
+    console.error("Drive delete failed", fileId, response.status, detail);
+    throw new Error(`Google Drive file deletion failed (HTTP ${response.status}).`);
   }
 }
 
