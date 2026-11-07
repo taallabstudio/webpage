@@ -21,6 +21,7 @@ Repository: `taallabstudio/webpage`
 - Parent accounts must be separately email-verified and age-screened as adult before they can send an invitation.
 - Parent invitation requires an explicit parent/legal-guardian attestation. The invitation is single-use, hashed at rest, expires after 24 hours and is sent to the child's verified account email.
 - The child must sign in to their own account and accept the invitation. The parent cannot take over the child's account.
+- Acceptance creates a pending link only. The child remains blocked from protected account features until an authorised TaalLab administrator records a separate manual identity, age and parent/guardian relationship review. Parent permission toggles remain disabled until that review is approved.
 - Consent records capture parent/child account references, policy version, permission scope, timestamp and method. Separate events record link acceptance, permission changes and withdrawal.
 - The parent dashboard provides four independent permissions: tutorial viewing, lesson-material downloads, comments/discussions, and uploads/sharing. All start off.
 - Purchases and payments are always disabled for child accounts, regardless of parent settings.
@@ -31,7 +32,7 @@ Repository: `taallabstudio/webpage`
 
 ## Remaining P1 limitations — do not describe as complete
 
-1. **Independent adult/parent verification:** this flow uses user-entered date of birth, verified email ownership, parent attestation and child acceptance. It does not verify government ID, legal age or parental authority. A suitable independent provider or documented manual verification process may be required.
+1. **Independent adult/parent verification:** the application does not itself verify government ID or legal parental authority. The admin queue requires a separate manual review outside the app before child access is enabled. TaalLab must define approved evidence, staff roles, escalation, review logging and legal adequacy with counsel; a suitable verification provider may be preferable.
 2. **Tutorial system integration:** this repository has no tutorial catalogue, lesson-material library, discussion feature or tutorial playback route. A child tutorial-access endpoint checks the parent toggle and a valid entitlement, but no catalogue/entitlement assignment or player exists yet. The other three permissions are stored and exposed for future content routes; they cannot be enforced by content features that do not exist in this repository.
 3. **Automated authorization tests:** add integration tests for pending/consented/withdrawn child access, each permission, parent ownership, invitation expiry/replay and payment rejection.
 4. **Legal review:** obtain local legal review of age assurance, parental authority, consent scope, child-data minimisation, retention and withdrawal before enabling child accounts in production.
