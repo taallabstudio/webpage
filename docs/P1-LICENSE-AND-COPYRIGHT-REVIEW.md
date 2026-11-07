@@ -35,7 +35,7 @@ The API key/account must remain controlled by Taal Lab, and the production appli
 
 The TrackDeliver administrator upload form now requires the uploader to affirm that they own the rights to each selected file or have permission from the rights holder to upload and share it with the intended recipient. The control is required before transfer creation and is also checked by the client-side upload handler. This is an uploader attestation, not independent verification of ownership, a licence, model/property releases, or lawful content. Keep the wording and workflow under review as upload surfaces are added; the control currently applies to the TrackDeliver admin transfer uploader, not automatically to product cover management or OCEAN cover selection.
 
-The uploader must not upload material they are not authorised to distribute. Taal Lab should provide a clear complaint/contact route and respond to valid rights complaints. This checkbox does not replace a documented repeat-infringer process or counsel's assessment of applicable Indian intermediary duties or U.S. DMCA safe-harbour eligibility.
+The uploader must not upload material they are not authorised to distribute. The public Terms now provide a copyright/content complaint route at `contact@taallab.in`, with the information requested to identify the work and disputed material. This is an intake route, not a designated DMCA agent registration. Taal Lab still needs an operational review/takedown/repeat-infringer process and counsel's assessment of applicable Indian intermediary duties or U.S. DMCA safe-harbour eligibility.
 
 ### Local image and brand asset evidence
 
