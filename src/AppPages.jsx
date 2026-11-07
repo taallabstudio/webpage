@@ -106,12 +106,33 @@ function TransferPage({id}) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState(null);
+  const [ageGate,setAgeGate]=useState(false);
+  const [ageChecked,setAgeChecked]=useState(false);
+  const [ageLoading,setAgeLoading]=useState(true);
 
   useEffect(() => {
-    api(`/transfers/${id}`).then(setData).catch(e => setError(e.message));
+    let active=true;
+    api("/age/status").then(({confirmed})=>{
+      if(!active)return;
+      if(confirmed)api(`/transfers/${id}`).then(value=>{if(active)setData(value)}).catch(e=>{if(active)setError(e.message)});
+      else setAgeGate(true);
+    }).catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setAgeLoading(false)});
+    return()=>{active=false};
   }, [id]);
 
-  if (error) return <div className="transfer-shell"><Header/><div className="expired"><Clock3/><h2>Transfer Expired</h2><p>{error}</p></div></div>;
+  async function confirmTransferAge(){
+    setError("");
+    try{
+      await api("/age/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ageConfirmed:true})});
+      setAgeGate(false);
+      const value=await api(`/transfers/${id}`);
+      setData(value);
+    }catch(e){setError(e.message||"Could not confirm your age.");}
+  }
+
+  if(ageLoading)return <div className="loading"><RefreshCw className="spin"/> Loading transfer…</div>;
+  if(ageGate)return <div className="transfer-shell"><Header/><div className="transfer-bg"/><section className="transfer-card age-gate-card"><div className="login-icon"><ShieldCheck/></div><h2>Age confirmation required</h2><p>Taal Lab file transfers are intended for adults aged 18 and over. We do not offer this service to people under 18 and do not ask for your date of birth.</p><label className="policy-consent"><input type="checkbox" checked={ageChecked} onChange={e=>setAgeChecked(e.target.checked)}/><span>I confirm that I am at least 18 years old.</span></label>{error&&<div className="error-box" role="alert">{error}</div>}<button className="primary-btn full" type="button" disabled={!ageChecked} onClick={confirmTransferAge}>Continue to transfer</button><p className="muted"><a href="/terms.html">Terms of Service</a> · <a href="/privacy.html">Privacy Policy</a></p></section></div>;
+  if (error) return <div className="transfer-shell"><Header/><div className="expired"><Clock3/><h2>Transfer Unavailable</h2><p>{error}</p></div></div>;
   if (!data) return <div className="loading"><RefreshCw className="spin"/> Loading transfer…</div>;
 
   return <div className="transfer-shell">
