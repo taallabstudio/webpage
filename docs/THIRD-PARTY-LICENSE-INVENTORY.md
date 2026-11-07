@@ -10,6 +10,12 @@ Generated from the GitHub Actions Node.js 24 installation for `taallabstudio/web
 - `Production tree` means the package is not marked development-only or optional in the lockfile. This classification does not prove that a package is shipped in a particular binary.
 - Licence expressions are reproduced from package metadata. Dual-licence expressions require review against the actual package licence files and selected terms.
 
+## npm vulnerability audit
+
+- Full dependency tree: 0 known vulnerabilities ({"info":0,"low":0,"moderate":0,"high":0,"critical":0,"total":0}).
+- Production dependency tree: 0 known vulnerabilities ({"info":0,"low":0,"moderate":0,"high":0,"critical":0,"total":0}).
+- Results reflect the npm advisory database at the time this CI run was performed; rerun the audit for every dependency update and before each release.
+
 ## Licence summary
 
 | Declared licence | Package entries |
@@ -190,7 +196,7 @@ Generated from the GitHub Actions Node.js 24 installation for `taallabstudio/web
 
 ## Items requiring review before binary distribution
 
-- The inventory contains `@img/sharp-libvips-linux-x64` entries declared `LGPL-3.0-or-later`. Confirm whether any corresponding library is included in a distributed artifact; if it is, meet applicable LGPL notice, source/relinking and redistribution requirements.
+- The inventory contains an `@img/sharp-libvips-linux-x64` entry declared `LGPL-3.0-or-later`. Confirm whether the corresponding library is included in a distributed artifact; if it is, meet applicable LGPL notice, source/relinking and redistribution requirements.
 - `caniuse-lite` declares `CC-BY-4.0`; preserve required attribution if its data is redistributed.
 - `@speed-highlight/core` declares `CC0-1.0`; retain package metadata with the audit evidence.
 - This report records declared package metadata. It does not replace review of actual licence texts, copyright notices, attribution files, native binaries, fonts, product artwork, or non-npm assets.
