@@ -1,6 +1,6 @@
 [
   {
-    "AllowedOrigins": ["https://taallab.work", "https://www.taallab.work"],
+    "AllowedOrigins": ["https://taallab.in", "https://www.taallab.in"],
     "AllowedMethods": ["PUT", "GET", "HEAD"],
     "AllowedHeaders": ["Content-Type"],
     "ExposeHeaders": ["ETag", "Content-Length", "Content-Range"],
