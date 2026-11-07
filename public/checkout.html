@@ -54,11 +54,12 @@
   <div class="rule"></div>
   <h2 class="section-title">Coupon code</h2>
   <div class="coupon-row"><input id="couponCode" maxlength="40" autocomplete="off" placeholder="Enter coupon code" aria-label="Coupon code"><button class="coupon-btn" id="apply-coupon" type="button">Apply</button></div>
-  <p id="coupon-message" class="small" role="status">Try TAAL10 for 10% off (up to ₹100). Valid until 23 October 2026.</p>
+  <p id="coupon-message" class="small" role="status">No promotional codes are currently active. The total shown is the amount payable.</p>
   <div class="totals"><div><span>Subtotal</span><strong id="subtotal">—</strong></div><div id="discount-row" hidden><span>Discount <b id="discount-label"></b></span><strong id="discount">−₹0.00</strong></div><div class="total"><span>Total</span><strong id="total">—</strong></div></div>
+  <label class="save-option" style="margin-top:20px"><input id="acceptTerms" type="checkbox" required><span><strong>I agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a> and acknowledge the <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</strong><small>This is required to place your order. Your agreement is recorded with your order.</small></span></label>
   <button class="btn" id="pay" type="submit" disabled>Loading checkout…</button>
 </form>
-<p id="message" role="status" class="small"></p><p class="small">Your download link is time-limited and only works after a verified payment. Do not share it.</p></section></main>
+<p id="message" role="status" class="small"></p><p class="small">Your download link is time-limited and only works after a verified payment. Do not share it.</p></section><footer class="small" style="width:min(620px,100%);margin:24px auto 0;display:flex;flex-wrap:wrap;gap:16px;justify-content:center"><a href="/privacy.html">Privacy Policy</a><a href="/terms.html">Terms of Service</a><a href="/refunds.html">Refund Policy</a><a href="mailto:contact@taallab.in">Contact: contact@taallab.in</a></footer></main>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
 const params=new URLSearchParams(location.search);
@@ -131,7 +132,7 @@ form.addEventListener("submit",async e=>{
  pay.disabled=true;pay.textContent="Starting secure checkout…";say("");
  try{
   const customer=customerValues();
-  const order=await post("/api/store/create-order",{productIds,...customer,saveDetails:document.querySelector("#saveDetails").checked,couponCode:appliedCoupon?.code||""});
+  const order=await post("/api/store/create-order",{productIds,...customer,saveDetails:document.querySelector("#saveDetails").checked,acceptTerms:document.querySelector("#acceptTerms").checked,couponCode:appliedCoupon?.code||""});
   if(!window.Razorpay)throw new Error("Secure checkout could not load. Please disable script blockers and retry.");
   const description=products.length===1?products[0].name:"TaalLab — "+products.length+" digital products";
   const rz=new Razorpay({key:order.keyId,amount:order.amount,currency:order.currency,name:"TAAL LAB",description,order_id:order.orderId,prefill:{name:customer.fullName,email:account.email,contact:customer.phone},theme:{color:"#0878e8"},handler:async response=>{try{say("Verifying your payment…");const result=await post("/api/store/verify-payment",response);const downloads=result.downloads||[];try{const cart=JSON.parse(localStorage.getItem("taallab.store.cart.v1")||"[]");localStorage.setItem("taallab.store.cart.v1",JSON.stringify(cart.filter(p=>!productIds.includes(p.id))))}catch{}if(downloads.length===1)location.href=downloads[0].downloadUrl;else showPurchaseSuccess(downloads)}catch(e){say(e.message,"error");pay.disabled=false;pay.textContent="Retry verification"}},modal:{ondismiss:()=>{pay.disabled=false;pay.textContent="Pay securely for "+products.length+(products.length===1?" item":" items")}}});
