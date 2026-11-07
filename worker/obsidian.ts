@@ -5,7 +5,7 @@ type Env = {
   B2_APPLICATION_KEY?: string;
   B2_BUCKET_NAME?: string;
 };
-type SessionLookup = (req: Request, env: Env) => Promise<any>;
+type SessionLookup = (req: Request, env: any) => Promise<any>;
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
   status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
