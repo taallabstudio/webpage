@@ -1,0 +1,48 @@
+# TAAL LAB — P1 privacy, accessibility and trust review
+
+Last reviewed: 7 November 2026  
+Repository reviewed: `taallabstudio/webpage` (main)
+
+This is an implementation review, not a legal opinion or a certification of compliance. Findings below are based on the repository source. External provider settings, ownership evidence and real-device/manual testing cannot be proven from source code alone.
+
+## Implemented in the repository
+
+- Privacy Policy and Terms of Service are published and linked from the site.
+- The site displays an essential-storage notice. The application currently uses essential session cookies and local storage for the shop cart and interface preferences. No optional advertising or analytics trackers were found in the reviewed landing, shop and account source. The notice is informational; it is not a consent manager for optional trackers. If optional tracking is introduced, implement granular opt-in before loading it.
+- Account data export is available from account settings. The export now includes parent-child links, invitations, consent records and permission-change history.
+- Account correction/deletion requests can be submitted from account settings and reviewed in the authenticated admin queue. Fulfilment is a human-reviewed process; a request is not an automatic erasure.
+- A retention schedule is documented. Parent invitation tokens expire after 24 hours and invitation metadata is removed 30 days after expiry. Withdrawn parent-child link rows, consent records and audit events are eligible for deletion after two years, subject to legal holds and obligations. Child permission settings are deleted on withdrawal.
+- Child accounts cannot purchase or initiate payments. This is enforced server-side in store order creation and payment verification.
+- Parent linking requires a separate adult-classified account with verified email, parent/legal-guardian attestation, an expiring single-use invitation to the child's verified email, and acceptance from the child's own signed-in account.
+- Four child permissions are independently controlled and default off: tutorial viewing, lesson-material downloads, comments/discussions, and uploads/sharing. Consent withdrawal revokes the link, deletes permission settings and active child sessions, and records the withdrawal.
+- Keyboard focus indicators are present globally. The studio navigation dropdown opens on focus as well as hover; the mobile navigation button exposes `aria-expanded`. Skip links were added to the studio homepage and shop.
+- Small-text colour values in the main app stylesheet and shop stylesheet were darkened in selected muted-text roles to improve contrast.
+- The reviewed homepage and shop source did not contain countdown timers, false scarcity claims or customer testimonial/logo walls. The homepage's booking cooldown is tied to the server's real anti-abuse rate limit; it is not a sales countdown.
+- Reviewed image elements have alternative text. Decorative logo/headphone/preview images intentionally use empty alt text and are hidden from assistive technology; content images use descriptive text. Unsplash cover images include photographer and source attribution links.
+
+## Marketing email status
+
+No marketing campaign sender, marketing list or newsletter subscription flow was found in this repository. Marketing emails must remain disabled. The application currently sends transactional/security messages only (for example, verification, sign-in and parent-link emails). Do not add marketing sends until separate, affirmative opt-in and a one-click unsubscribe mechanism are implemented and tested. Transactional messages must not be repurposed as marketing.
+
+## Asset and software licensing review
+
+- Google Fonts are used for Roboto, Inter and Space Grotesk. Google Fonts documents that its families use open-source font licences (including OFL, Apache and UFL); the exact family metadata and licence file should still be recorded for each font version used: https://googlefonts.github.io/gf-guide/metadata.html and https://googlefonts.github.io/gf-guide/googlefonts.html
+- OCEAN obtains cover images through the Unsplash API and stores photographer/source attribution URLs. Unsplash's general licence permits commercial and non-commercial use, but depicted people, trademarks, artwork and property can involve separate rights: https://unsplash.com/license and https://help.unsplash.com/en/articles/2612329-releases-and-trademarks
+- The Unsplash API attribution guidance asks applications to attribute the photographer and link to the photographer and Unsplash with referral parameters. The reviewed OCEAN selection and cover display code implements this: https://help.unsplash.com/en/articles/2511315-guideline-attribution
+- Local assets `/logo.png`, `/headphones.webp`, `/studio.webp` and their generated preview variants are present in the site. The repository does not prove ownership or permission for these assets. The asset owner must confirm rights and retain original source/licence evidence before this item can be marked fully verified.
+- Direct and transitive npm dependency licences have not yet been exhaustively inventoried. The package manifest identifies the direct dependencies, but does not prove the licence of every resolved transitive package. Generate and review a dependency licence report from the production lockfile before marking software licensing complete.
+
+## Remaining P1 actions / external verification
+
+1. Obtain local legal review of child age assurance, parental authority, consent wording, data minimisation, retention and withdrawal. The current parent process is not government-ID or independent legal-identity verification.
+2. The repository has no tutorial catalogue, lesson-material library, comments/discussions feature or tutorial playback route. The child tutorial access endpoint checks the parent permission and a valid entitlement, but there is no content catalogue/player or entitlement-granting workflow to connect yet. The other three permission flags are ready for future content routes; do not claim those capabilities are live until those routes enforce them server-side.
+3. Add automated tests for parent invitation expiry/replay, child account ownership, consent withdrawal, each permission, and adult-only payment enforcement.
+4. Manually test keyboard-only navigation, screen-reader labels, contrast on every route, zoom/reflow and mobile layouts. Source review is not a substitute for WCAG testing.
+5. Confirm ownership/licensing for local logo and studio/headphone assets.
+6. Produce a complete dependency licence inventory from the exact production lockfile, including transitive packages.
+7. Verify retention, deletion, backups, regional processing and contractual/DPA settings directly in Cloudflare, Google, Resend, Razorpay and Backblaze consoles. Repository documentation cannot prove provider-console configuration.
+8. Verify the privacy-request queue operationally: named staff owner, response SLA, identity checks, fulfilment checklist, and evidence that provider-side data is handled appropriately.
+
+## No dark-pattern findings in the reviewed pages
+
+No fake countdown, false scarcity or customer-logo/testimonial section was found in the reviewed studio homepage and shop source. Signup policy consent is unchecked by default; parent authority attestation is unchecked by default; all child permissions start off. Re-review any future promotions, pricing, preselected controls, subscription flows or social-proof sections before release.
