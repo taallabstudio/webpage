@@ -1615,6 +1615,7 @@ async function publicTransfer(env: Env, id: string) {
 }
 
 async function handleDownload(env: Env, req: Request, token: string) {
+  if (parseCookie(req,"taallab_age_confirmed")!=="1") return Response.redirect(`${origin(env)}/age-confirmation.html?return=${encodeURIComponent(new URL(req.url).pathname+new URL(req.url).search)}`,302);
   const f: any = await env.DB.prepare("SELECT * FROM files WHERE download_token=?").bind(token).first();
   if (!f || f.status !== "active" || f.expires_at <= now()) return new Response("File expired or unavailable", { status: 410 });
   const t: any = await env.DB.prepare("SELECT status,expires_at FROM transfers WHERE id=?").bind(f.transfer_id).first();
@@ -1630,6 +1631,7 @@ async function handleDownload(env: Env, req: Request, token: string) {
 }
 
 async function handlePreview(env: Env, req: Request, token: string) {
+  if (parseCookie(req,"taallab_age_confirmed")!=="1") return Response.redirect(`${origin(env)}/age-confirmation.html?return=${encodeURIComponent(new URL(req.url).pathname+new URL(req.url).search)}`,302);
   const f: any = await env.DB.prepare("SELECT * FROM files WHERE download_token=?").bind(token).first();
   if (!f || f.status !== "active" || f.expires_at <= now()) return new Response("File expired or unavailable", { status: 410 });
   const t: any = await env.DB.prepare("SELECT status,expires_at FROM transfers WHERE id=?").bind(f.transfer_id).first();
@@ -2426,6 +2428,7 @@ export default {
       }
       const sharedTransfer = url.pathname.match(/^\/d\/([a-f0-9]+)$/i);
       if (sharedTransfer && req.method === "GET") {
+        if (parseCookie(req,"taallab_age_confirmed")!=="1") return env.ASSETS.fetch(new Request(new URL("/",req.url),{headers:req.headers}));
         const sharePage = await transferSharePage(req, env, sharedTransfer[1]);
         if (sharePage) return sharePage;
       }
@@ -2433,6 +2436,7 @@ export default {
       await ensureAuthMethodsSchema(env);
       const publicPageMatch=url.pathname.match(/^\/p\/([a-f0-9]+)$/i);
       if(publicPageMatch&&req.method==="GET"){
+        if(parseCookie(req,"taallab_age_confirmed")!=="1") return Response.redirect(`${origin(env)}/age-confirmation.html?return=${encodeURIComponent(url.pathname)}`,302);
         await ensureOceanSchema(env);
         const publicPage:any=await env.DB.prepare("SELECT id,title,icon,cover,blocks_json,updated_at FROM ocean_pages WHERE public_token=? AND general_access='public' AND is_archived=0 LIMIT 1").bind(publicPageMatch[1]).first();
         if(!publicPage)return new Response("This page is not publicly available.",{status:404,headers:{"content-type":"text/plain; charset=utf-8"}});
@@ -2522,6 +2526,15 @@ export default {
       if (url.pathname === "/api/account/profile" && req.method === "PATCH") return updateAccountProfile(req, env);
       if (url.pathname === "/api/account/password" && req.method === "POST") return changeOwnPassword(req, env);
       if (url.pathname === "/api/account/security" && req.method === "POST") return updateSecuritySettings(req, env);
+      if (url.pathname === "/api/age/status" && req.method === "GET") return json({ confirmed: parseCookie(req,"taallab_age_confirmed")==="1" }, { headers: { "cache-control": "no-store" } });
+      if (url.pathname === "/api/age/confirm" && req.method === "POST") {
+        const body:any=await req.json().catch(()=>({}));
+        if(body.ageConfirmed!==true)return json({error:"Confirm that you are at least 18 years old to continue."},{status:400});
+        const response=json({ok:true});
+        response.headers.append("set-cookie",cookie("taallab_age_confirmed","1",365*86400,req));
+        response.headers.set("cache-control","no-store");
+        return response;
+      }
       if (url.pathname === "/api/account/data-export" && req.method === "GET") return accountDataExport(req, env);
       if (url.pathname === "/api/account/privacy-requests" && req.method === "GET") return listAccountPrivacyRequests(req, env);
       if (url.pathname === "/api/account/privacy-requests/deletion" && req.method === "POST") return submitAccountDeletionRequest(req, env);
@@ -2833,13 +2846,17 @@ export default {
       }
 
       const transfer = url.pathname.match(/^\/api\/transfers\/([^/]+)$/);
-      if (transfer && req.method === "GET") return publicTransfer(env, transfer[1]);
+      if (transfer && req.method === "GET") {
+        if (parseCookie(req,"taallab_age_confirmed")!=="1") return json({error:"Please confirm that you are at least 18 years old to access this transfer.",ageConfirmationRequired:true},{status:403});
+        return publicTransfer(env, transfer[1]);
+      }
 
       const preview = url.pathname.match(/^\/api\/files\/([^/]+)\/preview$/);
       if (preview && req.method === "GET") return handlePreview(env, req, preview[1]);
 
       const all = url.pathname.match(/^\/api\/transfers\/([^/]+)\/download-all$/);
       if (all && req.method === "GET") {
+        if (parseCookie(req,"taallab_age_confirmed")!=="1") return json({error:"Age confirmation required.",ageConfirmationRequired:true},{status:403});
         const t: any = await env.DB.prepare("SELECT * FROM transfers WHERE id=?").bind(all[1]).first();
         if (!t || t.status !== "active" || t.expires_at <= now()) return json({ error: "Transfer expired" }, { status: 410 });
         const files = await env.DB.prepare("SELECT download_token FROM files WHERE transfer_id=? AND status='active' AND expires_at>? ORDER BY created_at")
