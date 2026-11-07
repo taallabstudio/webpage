@@ -25,6 +25,7 @@ This document records the retention behavior implemented in the application. It 
 - Store customer profiles remain while needed for account and checkout features, or until a deletion request is reviewed and processed.
 - Orders, payment references, invoices/tax data and related evidence must be retained for the period required by applicable accounting, tax, payment-provider and dispute obligations. The exact statutory period must be confirmed for TaalLab's legal and tax status before implementing automatic deletion.
 - Policy acceptance and privacy-request records are retained as needed to evidence consent and handle legal claims. A specific fixed purge period requires legal review.
+- Marketing preference and unsubscribe/suppression records are retained while needed to honour the user's opt-out and prevent future marketing sends. Transactional security and purchase emails are not controlled by marketing consent.
 - Data held directly by Google, Razorpay, Cloudflare, Backblaze, Resend, Unsplash or Emoji API is subject to the relevant provider's retention controls and contractual terms.
 
 ## User rights workflows
