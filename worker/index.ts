@@ -1118,6 +1118,7 @@ async function googleAuthStart(req: Request, env: Env) {
   }
   const params = new URL(req.url).searchParams;
   const acceptedPolicies = params.get("terms") === TERMS_VERSION && params.get("privacy") === PRIVACY_VERSION;
+  const marketingAccepted = params.get("marketing") === "1";
   const state = randomToken(24);
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", env.GOOGLE_LOGIN_CLIENT_ID);
@@ -1134,6 +1135,7 @@ async function googleAuthStart(req: Request, env: Env) {
   response.headers.append("set-cookie", cookie("google_login_state", state, 600, req));
   response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req));
   response.headers.append("set-cookie", acceptedPolicies ? cookie("google_login_consent", POLICY_CONSENT_VERSION, 600, req) : cookie("google_login_consent", "", 0, req));
+  response.headers.append("set-cookie", marketingAccepted ? cookie("google_login_marketing", "1", 600, req) : cookie("google_login_marketing", "", 0, req));
   return response;
 }
 
@@ -1142,6 +1144,8 @@ async function googleAuthCallback(req: Request, env: Env) {
   const clearStateCookie = "google_login_state=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const clearReturnCookie = "google_login_return=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
   const clearConsentCookie = "google_login_consent=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const clearMarketingCookie = "google_login_marketing=; Max-Age=0; Domain=.taallab.in; Path=/; HttpOnly; Secure; SameSite=Lax";
+  const marketingConsentAccepted = parseCookie(req, "google_login_marketing") === "1";
   const consentAccepted = parseCookie(req, "google_login_consent") === POLICY_CONSENT_VERSION;
   const savedReturn = parseCookie(req, "google_login_return");
   const returnTo = savedReturn === "ocean-app" ? "ocean-app" : savedReturn === "/ocean.html" ? "/ocean.html" : "/admin";
@@ -1151,6 +1155,7 @@ async function googleAuthCallback(req: Request, env: Env) {
     response.headers.append("set-cookie", clearStateCookie);
     response.headers.append("set-cookie", clearReturnCookie);
     response.headers.append("set-cookie", clearConsentCookie);
+    response.headers.append("set-cookie", clearMarketingCookie);
     return response;
   };
   if (!env.GOOGLE_LOGIN_CLIENT_ID || !env.GOOGLE_LOGIN_CLIENT_SECRET) return fail("Google sign-in is not configured yet.");
@@ -1228,6 +1233,7 @@ async function googleAuthCallback(req: Request, env: Env) {
     await env.DB.prepare("UPDATE users SET email_verified_at=?,updated_at=? WHERE id=?").bind(now(), now(), user.id).run();
     user.email_verified_at = now();
   }
+  if (marketingConsentAccepted) await recordMarketingConsent(env, user.id, user.email, true, "google_signup");
 
   if (Number(user.two_factor_enabled) !== 0) {
     const challenge = await startTwoFactorChallenge(env, user);
