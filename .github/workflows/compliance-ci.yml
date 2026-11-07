@@ -28,6 +28,17 @@ jobs:
           cache: ""
       - name: Install dependencies
         run: npm install
+      - name: Generate dependency licence inventory
+        run: npx --yes license-checker --json --out /tmp/taallab-third-party-licenses.json
+      - name: Preserve lockfile and licence inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: taallab-dependency-audit
+          path: |
+            package-lock.json
+            /tmp/taallab-third-party-licenses.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Build website and app assets
         run: npm run build
       - name: Bundle Cloudflare Worker without deploying
