@@ -1905,6 +1905,10 @@ async function cleanup(env: Env) {
     env.DB.prepare("DELETE FROM ocean_google_calendar_states WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM files WHERE status='deleted' AND expires_at<=?").bind(cutoff - 30 * 86400),
     env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=?").bind(cutoff - 30 * 86400),
+    env.DB.prepare("DELETE FROM parent_link_invites WHERE expires_at<=?").bind(cutoff - 30 * 86400),
+    env.DB.prepare("DELETE FROM parental_consent_records WHERE withdrawn_at IS NOT NULL AND withdrawn_at<=?").bind(cutoff - 730 * 86400),
+    env.DB.prepare("DELETE FROM parental_consent_events WHERE created_at<=? AND NOT EXISTS (SELECT 1 FROM parent_child_links l WHERE l.child_user_id=parental_consent_events.child_user_id AND l.status='active')").bind(cutoff - 730 * 86400),
+    env.DB.prepare("DELETE FROM child_permission_events WHERE changed_at<=? AND NOT EXISTS (SELECT 1 FROM parent_child_links l WHERE l.child_user_id=child_permission_events.child_user_id AND l.status='active')").bind(cutoff - 730 * 86400),
   ]);
 }
 
