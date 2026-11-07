@@ -445,7 +445,7 @@ async function sendPurchaseEmail(env: StoreEnv, order: any, product: Product) {
   const amount = (Number(order.amount) / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
   const purchaseUrl = cleanOrigin(env) + '/account/settings?tab=purchased';
   const html = '<h1>Thank you for your purchase!</h1><p>Your TaalLab payment has been verified.</p><p><b>Product:</b> ' + product.name + '</p><p><b>Order ID:</b> ' + orderNumber + '</p><p><b>Amount paid:</b> ' + amount + '</p><p><b>Purchase date:</b> ' + new Date(Number(order.paid_at || unixNow()) * 1000).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + '</p><p><a href="' + purchaseUrl + '">View my purchases and download your product</a></p>';
-  const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'TaalLab <contact@taallab.work>', to: [String(order.customer_email)], subject: 'TaalLab purchase confirmed — ' + orderNumber, html }) });
+  const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'TaalLab <contact@taallab.in>', to: [String(order.customer_email)], subject: 'TaalLab purchase confirmed — ' + orderNumber, html }) });
   if (!response.ok) console.error('Purchase confirmation email failed', response.status);
 }
 async function verifyPayment(req: Request, env: StoreEnv) {
