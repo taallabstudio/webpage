@@ -673,7 +673,7 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
     setPrivacyBusy(true);setPrivacyError("");setPrivacyMessage("");
     try{
       const result=await api("/account/privacy-request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmation:"DELETE MY ACCOUNT"})});
-      setPrivacyMessage("Deletion request "+result.requestId+" has been recorded. Your account has not been deleted; TaalLab will review linked data and any records that must be retained.");
+      setPrivacyMessage((result.message||"Your deletion request has been recorded.")+" Reference: "+result.requestId+". Your account has not been deleted.");
     }catch(e){setPrivacyError(e.message||"Could not submit your deletion request.");}
     finally{setPrivacyBusy(false);}
   }
