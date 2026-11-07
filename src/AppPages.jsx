@@ -1204,7 +1204,7 @@ function AccountPage() {
   if(checking)return <div className="loading"><RefreshCw className="spin"/> Checking your account…</div>;
   if(!user)return <Login onLogin={refreshUser}/>;
   if(user.role!=="admin" && !user.date_of_birth) return <DateOfBirthOnboarding user={user} onComplete={refreshUser}/>;
-  if(user.account_type==="child" || user.parental_consent_status==="pending") return <DateOfBirthOnboarding user={user} onComplete={refreshUser}/>;
+  if(user.account_type==="child" && user.parental_consent_status!=="consented") return <DateOfBirthOnboarding user={user} onComplete={refreshUser}/>;
   return <div className="account-page-shell">
     <header className="account-page-header"><a href="/" className="account-home-link"><Logo studioOnly/></a><SiteAccountMenu user={user} onLogout={async()=>{try{await api("/auth/logout",{method:"POST"})}catch{}setUser(null);location.href="/login"}}/></header>
     <div className="account-content-column"><AccountSettings user={user} onPasswordChanged={refreshUser}/><PurchasedProducts/></div>
@@ -1218,7 +1218,7 @@ function UserDashboard(){
   if(checking)return <div className="loading"><RefreshCw className="spin"/> Checking your account…</div>;
   if(!user)return <Login/>;
   if(user.role!=="admin" && !user.date_of_birth) return <DateOfBirthOnboarding user={user} onComplete={()=>api("/auth/me").then(d=>setUser(d.authenticated?d.user:null)).catch(()=>setUser(null))}/>;
-  if(user.account_type==="child" || user.parental_consent_status==="pending") return <DateOfBirthOnboarding user={user}/>;
+  if(user.account_type==="child" && user.parental_consent_status!=="consented") return <DateOfBirthOnboarding user={user}/>;
   return <UserPortal user={user}/>;
 }
 
