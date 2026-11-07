@@ -174,6 +174,8 @@ function Login({onLogin}) {
   const [notice,setNotice]=useState(loginParams.get("verified")==="1" ? "Email verified. You can sign in now." : "");
   const [signup,setSignup]=useState(false);
   const [policyAccepted,setPolicyAccepted]=useState(false);
+  const [ageConfirmed,setAgeConfirmed]=useState(false);
+  const [marketingConsent,setMarketingConsent]=useState(false);
   const [twoFactor,setTwoFactor]=useState(loginParams.get("google_2fa")==="1");
   const [twoFactorMethod,setTwoFactorMethod]=useState(loginParams.get("method")||"email");
   const [passkeyBusy,setPasskeyBusy]=useState(false);
@@ -265,10 +267,11 @@ function Login({onLogin}) {
       }
 
       if(signup&&!policyAccepted){setError("Please accept the Terms of Service and Privacy Policy to create an account.");return;}
+      if(signup&&!ageConfirmed){setError("You must confirm that you are at least 18 years old to create an account.");return;}
       const result=await api(signup?"/auth/signup":"/auth/login",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({email,password,acceptPolicies:signup&&policyAccepted})
+        body:JSON.stringify({email,password,acceptPolicies:signup&&policyAccepted,ageConfirmed:signup&&ageConfirmed,marketingConsent:signup&&marketingConsent})
       });
 
       if (result.requiresTwoFactor) {
@@ -405,7 +408,7 @@ function Login({onLogin}) {
     <h1>{signup?"Create account":"Sign in"}</h1>
     <p>{signup?"Create your TaalLab account to receive files shared with you.":"Manage TaalLab transfers securely."}</p>
     {!signup&&<button type="button" className="ghost-btn full" style={{marginBottom:12}} onClick={signInWithPasskey} disabled={passkeyBusy}><ShieldCheck size={17}/>{passkeyBusy?"Waiting for passkey…":"Sign in with a passkey"}</button>}
-    <button type="button" className="google-login-btn" onClick={()=>{if(signup&&!policyAccepted){setError("Please accept the Terms of Service and Privacy Policy to create an account.");return;}window.location.assign("/api/auth/google/start"+(signup?"?terms=2026-11-07.1&privacy=2026-11-07.1":""));}}>
+    <button type="button" className="google-login-btn" onClick={()=>{if(signup&&!policyAccepted){setError("Please accept the Terms of Service and Privacy Policy to create an account.");return;}if(signup&&!ageConfirmed){setError("You must confirm that you are at least 18 years old to create an account.");return;}const params=new URLSearchParams({terms:"2026-11-07.1",privacy:"2026-11-07.1",age:"1"});if(marketingConsent)params.set("marketing","1");window.location.assign("/api/auth/google/start"+(signup?"?"+params.toString():""));}}>
       <svg aria-hidden="true" viewBox="0 0 48 48" width="20" height="20"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z" transform="translate(0 4) scale(.92)"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.72 7.18l7.62 5.91c4.45-4.11 7.14-10.17 7.14-17.56Z"/><path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.2A23.9 23.9 0 0 0 0 24c0 3.87.93 7.53 2.56 10.78l7.97-6.19Z" transform="translate(0 2) scale(1)"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.89l-7.62-5.91c-2.12 1.42-4.84 2.26-8.28 2.26-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.2C6.51 42.62 14.62 48 24 48Z" transform="translate(0 -1) scale(.98)"/></svg>
       <span>Continue with Google</span>
     </button>
@@ -414,6 +417,8 @@ function Login({onLogin}) {
       <label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus required/></label>
       <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} minLength={8} required/></label>
       {signup&&<label className="policy-consent"><input type="checkbox" checked={policyAccepted} onChange={e=>setPolicyAccepted(e.target.checked)} required/><span>I agree to the <a href="/terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a> and acknowledge the <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.</span></label>}
+      {signup&&<label className="policy-consent"><input type="checkbox" checked={ageConfirmed} onChange={e=>setAgeConfirmed(e.target.checked)} required/><span>I confirm that I am at least 18 years old.</span></label>}
+      {signup&&<label className="policy-consent"><input type="checkbox" checked={marketingConsent} onChange={e=>setMarketingConsent(e.target.checked)}/><span>Send me occasional product news and promotional emails. This is optional and separate from essential account messages. I can unsubscribe at any time.</span></label>}
       {error&&<div className="error-box">{error}</div>}
       {notice&&<div className="success-pill">{notice}</div>}
       <button className="primary-btn full">{signup?"Sign up & verify email":"Sign in"}</button>
@@ -422,7 +427,7 @@ function Login({onLogin}) {
     {verificationRequired && <button className="ghost-btn full" style={{marginTop:12}} disabled={resendCooldown>0} onClick={resendVerification}>
       {resendCooldown>0?`Resend verification in ${resendCooldown}s`:"Resend verification email"}
     </button>}
-    <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSignup(v=>!v);setPolicyAccepted(false);setError("");setNotice("");setVerificationRequired(false);}}>
+    <button className="ghost-btn full" style={{marginTop:12}} onClick={()=>{setSignup(v=>!v);setPolicyAccepted(false);setAgeConfirmed(false);setMarketingConsent(false);setError("");setNotice("");setVerificationRequired(false);}}>
       {signup?"Back to sign in":"Sign up"}
     </button>
   </div></div>;
@@ -716,6 +721,17 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
   const [privacyBusy,setPrivacyBusy]=useState(false);
   const [privacyError,setPrivacyError]=useState("");
   const [privacyMessage,setPrivacyMessage]=useState("");
+  const [marketingConsent,setMarketingConsent]=useState(false);
+  const [marketingLoading,setMarketingLoading]=useState(true);
+  const [marketingSaving,setMarketingSaving]=useState(false);
+  const [marketingMessage,setMarketingMessage]=useState("");
+  useEffect(()=>{api("/account/marketing-preferences").then(d=>setMarketingConsent(!!d.consent)).catch(e=>setPrivacyError(e.message)).finally(()=>setMarketingLoading(false));},[user?.id]);
+  async function changeMarketingConsent(value){
+    setMarketingConsent(value);setMarketingSaving(true);setMarketingMessage("");setPrivacyError("");
+    try{const d=await api("/account/marketing-preferences",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({consent:value})});setMarketingConsent(!!d.consent);setMarketingMessage(value?"Marketing email consent saved.":"You are unsubscribed from marketing emails.");}
+    catch(e){setMarketingConsent(!value);setPrivacyError(e.message||"Could not update email preferences.");}
+    finally{setMarketingSaving(false);}
+  }
   const [deleteConfirmation,setDeleteConfirmation]=useState("");
   const [deleteDetails,setDeleteDetails]=useState("");
   useEffect(()=>{
@@ -784,6 +800,12 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
       {error&&<div className="error-box">{error}</div>}{message&&<div className="success-pill">{message}</div>}
       <button className="primary-btn">Change password</button>
     </form></section>
+    <section className="panel" style={{maxWidth:720,padding:24,marginTop:18,marginBottom:18}}>
+      <h2>Email preferences</h2>
+      <p className="muted" style={{marginTop:6}}>Choose separately whether TaalLab may send you optional product news and promotional emails. Essential account, security and purchase messages are not affected.</p>
+      <label className="policy-consent" style={{marginTop:14}}><input type="checkbox" checked={marketingConsent} disabled={marketingLoading||marketingSaving} onChange={e=>changeMarketingConsent(e.target.checked)}/><span>I'd like to receive occasional marketing emails from TaalLab.</span></label>
+      {marketingLoading&&<p className="muted">Loading email preferences…</p>}{marketingSaving&&<p className="muted">Saving preference…</p>}{marketingMessage&&<div className="success-pill" role="status">{marketingMessage}</div>}
+    </section>
     <section className="panel" style={{maxWidth:720,padding:24,marginTop:18}}>
       <h2>Privacy and personal data</h2>
       <p className="muted" style={{marginTop:6}}>You can download a copy of the account information currently associated with your TaalLab account or submit an account deletion request.</p>
