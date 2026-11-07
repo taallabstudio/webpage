@@ -42,6 +42,9 @@ async function recordPolicyAcceptance(env: Env, userId: string, method: string) 
     id TEXT PRIMARY KEY, user_id TEXT NOT NULL, terms_version TEXT NOT NULL,
     privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
   )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS google_app_login_codes (
+    code_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at INTEGER NOT NULL
+  )`).run();
   await env.DB.prepare("INSERT INTO policy_acceptances(id,user_id,terms_version,privacy_version,accepted_at,method) VALUES(?,?,?,?,?,?)")
     .bind(randomToken(16), userId, POLICY_VERSION, POLICY_VERSION, now(), method).run();
 }
@@ -1613,6 +1616,7 @@ async function handlePreview(env: Env, req: Request, token: string) {
 }
 
 async function cleanup(env: Env) {
+  await ensureOceanSchema(env);
   const cutoff = now();
   const files = await env.DB.prepare("SELECT id,storage_key,transfer_id FROM files WHERE expires_at<=? AND status!='deleted'")
     .bind(cutoff)
