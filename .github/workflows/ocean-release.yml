@@ -1,15 +1,7 @@
 name: Build and Release OCEAN
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/ocean-release.yml'
-      - 'src-tauri/**'
-      - 'src/**'
-      - 'worker/**'
-      - 'package.json'
+  # Release builds are intentionally manual until the compliance work is complete.
   workflow_dispatch:
     inputs:
       version:
