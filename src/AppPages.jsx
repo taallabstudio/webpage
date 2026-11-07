@@ -151,12 +151,28 @@ function TransferPage({id}) {
 }
 
 function Preview({file,onClose}) {
-  return <div className="modal-backdrop" onClick={onClose}>
-    <div className="preview-modal" onClick={e=>e.stopPropagation()}>
-      <div className="modal-head"><strong>{file.name}</strong><button onClick={onClose}><X/></button></div>
-      {file.kind === "audio" ? <audio controls autoPlay src={`/api/files/${file.token}/preview`}/> :
-       file.kind === "image" ? <img src={`/api/files/${file.token}/preview`} alt="" /> :
-       file.kind === "video" ? <video controls autoPlay src={`/api/files/${file.token}/preview`}/> :
+  const closeButton=useRef(null);
+  useEffect(()=>{
+    closeButton.current?.focus();
+    const handleKeyDown=event=>{
+      if(event.key==="Escape"){event.preventDefault();onClose();return;}
+      if(event.key!=="Tab")return;
+      const dialog=document.querySelector(".preview-modal");
+      const items=dialog?.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+      if(!items?.length)return;
+      const first=items[0],last=items[items.length-1];
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    };
+    document.addEventListener("keydown",handleKeyDown);
+    return ()=>document.removeEventListener("keydown",handleKeyDown);
+  },[onClose]);
+  return <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-title" onClick={e=>e.stopPropagation()}>
+      <div className="modal-head"><strong id="preview-title">{file.name}</strong><button ref={closeButton} type="button" aria-label={`Close preview of ${file.name}`} onClick={onClose}><X/></button></div>
+      {file.kind === "audio" ? <audio controls autoPlay aria-label={`Audio preview of ${file.name}`} src={`/api/files/${file.token}/preview`}/> :
+       file.kind === "image" ? <img src={`/api/files/${file.token}/preview`} alt={`Preview of ${file.name || "shared image"}`} /> :
+       file.kind === "video" ? <video controls autoPlay aria-label={`Video preview of ${file.name}`} src={`/api/files/${file.token}/preview`}/> :
        <div className="preview-placeholder"><FileText/><p>Preview this file in its native application.</p></div>}
     </div>
   </div>;
@@ -405,7 +421,7 @@ function Login({onLogin}) {
     <h1>{signup?"Create account":"Sign in"}</h1>
     <p>{signup?"Create your TaalLab account to receive files shared with you.":"Manage TaalLab transfers securely."}</p>
     {!signup&&<button type="button" className="ghost-btn full" style={{marginBottom:12}} onClick={signInWithPasskey} disabled={passkeyBusy}><ShieldCheck size={17}/>{passkeyBusy?"Waiting for passkey…":"Sign in with a passkey"}</button>}
-    <button type="button" className="google-login-btn" onClick={()=>{if(signup&&!policyAccepted){setError("Please accept the Terms of Service and Privacy Policy to create an account.");return;}window.location.assign("/api/auth/google/start"+(signup?"?terms=2026-11-07&privacy=2026-11-07.1":""));}}>
+    <button type="button" className="google-login-btn" onClick={()=>{if(signup&&!policyAccepted){setError("Please accept the Terms of Service and Privacy Policy to create an account.");return;}window.location.assign("/api/auth/google/start"+(signup?"?terms=2026-11-07&privacy=2026-11-07.2":""));}}>
       <svg aria-hidden="true" viewBox="0 0 48 48" width="20" height="20"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z" transform="translate(0 4) scale(.92)"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.72 7.18l7.62 5.91c4.45-4.11 7.14-10.17 7.14-17.56Z"/><path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.2A23.9 23.9 0 0 0 0 24c0 3.87.93 7.53 2.56 10.78l7.97-6.19Z" transform="translate(0 2) scale(1)"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.89l-7.62-5.91c-2.12 1.42-4.84 2.26-8.28 2.26-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.2C6.51 42.62 14.62 48 24 48Z" transform="translate(0 -1) scale(.98)"/></svg>
       <span>Continue with Google</span>
     </button>
@@ -639,11 +655,29 @@ function PrivacyControls({user}) {
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
   const [requests,setRequests]=useState([]);
+  const [marketingConsent,setMarketingConsent]=useState(false);
+  const [marketingLoaded,setMarketingLoaded]=useState(false);
+  const [marketingBusy,setMarketingBusy]=useState(false);
+  const [marketingMessage,setMarketingMessage]=useState("");
+  async function loadMarketingPreference() {
+    try { const result=await api("/account/marketing-preference");setMarketingConsent(Boolean(result.consented)); }
+    catch { setMarketingMessage("Marketing preference could not be loaded. Please try again."); }
+    finally { setMarketingLoaded(true); }
+  }
+  async function changeMarketingPreference(value) {
+    setMarketingBusy(true);setMarketingMessage("");
+    try {
+      await api("/account/marketing-preference",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({consent:value})});
+      setMarketingConsent(value);
+      setMarketingMessage(value?"Your optional marketing preference is saved.":"You are opted out of optional marketing emails.");
+    } catch(e) { setMarketingMessage(e.message||"Could not update your marketing preference."); }
+    finally { setMarketingBusy(false); }
+  }
   async function loadRequests() {
     try { const result=await api("/account/privacy-requests");setRequests(result.requests||[]); }
     catch { /* The request form remains available if history cannot be loaded. */ }
   }
-  useEffect(()=>{loadRequests();},[]);
+  useEffect(()=>{loadRequests();loadMarketingPreference();},[]);
 
   async function submitRequest(event) {
     event.preventDefault();
@@ -662,6 +696,14 @@ function PrivacyControls({user}) {
     <p className="muted" style={{marginTop:6}}>Download a copy of the account information TaalLab holds, or submit a request to correct or delete your personal data.</p>
     <div style={{display:"flex",flexWrap:"wrap",gap:10,marginTop:18}}>
       <a className="primary-btn" href="/api/account/data-export" download><Download size={15}/> Download my data</a>
+    </div>
+    <div style={{marginTop:22,padding:14,border:"1px solid var(--line)",borderRadius:12}}>
+      <label style={{display:"flex",alignItems:"flex-start",gap:10,fontSize:13,lineHeight:1.55}}>
+        <input type="checkbox" checked={marketingConsent} disabled={!marketingLoaded||marketingBusy} onChange={e=>changeMarketingPreference(e.target.checked)} style={{marginTop:3,flex:"0 0 auto"}}/>
+        <span><strong>Optional marketing emails</strong><br/>I agree to receive occasional product and studio updates from TaalLab by email. This is optional and is not required to use the service.</span>
+      </label>
+      <p className="muted" style={{fontSize:12,margin:"8px 0 0 27px"}}>You can withdraw this permission at any time in Account settings or through the unsubscribe link in a marketing email. Essential account, security, purchase and service messages are unaffected.</p>
+      {marketingMessage&&<p className="muted" role="status" style={{fontSize:12,margin:"8px 0 0 27px"}}>{marketingMessage}</p>}
     </div>
     <form onSubmit={submitRequest} style={{marginTop:22}}>
       <label>Request type

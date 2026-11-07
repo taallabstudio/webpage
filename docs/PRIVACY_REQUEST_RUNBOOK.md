@@ -26,6 +26,7 @@ Do not mark a request completed merely because the request was received. Review 
 - OCEAN pages, page shares, comments, uploaded assets and Google Calendar connection. Check collaborator ownership and shared-page access before removing content.
 - Digital-store customer profile and order records in the separate store database.
 - Privacy acceptance and request records, which may be needed to demonstrate the handling of the request.
+- Marketing consent and withdrawal preferences. Preserve an opt-out record while the account remains eligible for marketing; do not re-add a withdrawn address to campaigns.
 - Backups, provider-side retention and any legal hold or unresolved payment dispute.
 
 ## 4. Preserve records that must be retained

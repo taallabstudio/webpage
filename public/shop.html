@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{color-scheme:light;--bg:#f5f7f8;--panel:rgba(255,255,255,.82);--line:#e1e6eb;--text:#1d2229;--muted:#707985;--blue:#0878e8;--blue-soft:#eaf4ff}
+:root{color-scheme:light;--bg:#f5f7f8;--panel:rgba(255,255,255,.82);--line:#e1e6eb;--text:#1d2229;--muted:#626b76;--blue:#0878e8;--blue-soft:#eaf4ff}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 Inter,system-ui,sans-serif;min-height:100vh}
@@ -108,7 +108,7 @@ footer a{color:#4f5863;font-weight:600}footer a:hover{color:var(--blue)}
 
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap">
 <style>html,body,body *{font-family:"Roboto",sans-serif!important}</style>
-</head>
+<style>:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:3px solid #075fb8!important;outline-offset:3px!important}</style></head>
 <body><div class="page-glow" aria-hidden="true"></div><main class="wrap">
 <header class="landing-nav">
 <a class="studio-brand" href="/#home" aria-label="TaalLab home"><span class="site-logo"><img src="/logo.png" alt=""></span><span class="site-brand-text">TaalLab</span></a>
@@ -168,19 +168,38 @@ const cartCount=document.querySelector("#cart-count");
 const cartSubtotal=document.querySelector("#cart-subtotal");
 const cartHint=document.querySelector("#cart-hint");
 const cartCheckout=document.querySelector("#cart-checkout");
+const cartCloseButton=document.querySelector("#close-cart");
+let cartReturnFocus=null;
 let ownedProductIds=new Set();
 const sortSelect=document.querySelector("#sort-products");
 const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(n);
 const cartRead=()=>{try{const v=JSON.parse(localStorage.getItem(CART_KEY)||"[]");return Array.isArray(v)?v:[]}catch{return []}};
 const cartWrite=items=>{localStorage.setItem(CART_KEY,JSON.stringify(items));renderCart();if(typeof renderProducts==="function")renderProducts()};
 window.addEventListener("storage",event=>{if(event.key===CART_KEY){renderCart();renderProducts()}});
-const openCart=()=>{cartBackdrop.classList.add("open");cartBackdrop.setAttribute("aria-hidden","false");document.body.style.overflow="hidden"};
-const closeCart=()=>{cartBackdrop.classList.remove("open");cartBackdrop.setAttribute("aria-hidden","true");document.body.style.overflow=""};
+const openCart=()=>{
+ cartReturnFocus=document.activeElement;
+ cartBackdrop.classList.add("open");cartBackdrop.setAttribute("aria-hidden","false");document.body.style.overflow="hidden";
+ requestAnimationFrame(()=>cartCloseButton.focus());
+};
+const closeCart=()=>{
+ const wasOpen=cartBackdrop.classList.contains("open");
+ cartBackdrop.classList.remove("open");cartBackdrop.setAttribute("aria-hidden","true");document.body.style.overflow="";
+ if(wasOpen&&cartReturnFocus instanceof HTMLElement)cartReturnFocus.focus();
+};
 document.querySelector("#open-cart").addEventListener("click",openCart);
-document.querySelector("#close-cart").addEventListener("click",closeCart);
+cartCloseButton.addEventListener("click",closeCart);
 cartCheckout.addEventListener("click",()=>{const items=cartRead().filter(p=>!ownedProductIds.has(p.id));if(items.length)location.href="/checkout.html?products="+encodeURIComponent(items.map(p=>p.id).join(","))});
 cartBackdrop.addEventListener("click",e=>{if(e.target===cartBackdrop)closeCart()});
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCart()});
+document.addEventListener("keydown",event=>{
+ if(!cartBackdrop.classList.contains("open"))return;
+ if(event.key==="Escape"){event.preventDefault();closeCart();return;}
+ if(event.key!=="Tab")return;
+ const items=cartBackdrop.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+ if(!items.length)return;
+ const first=items[0],last=items[items.length-1];
+ if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+ else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+});
 const navToggle=document.querySelector(".mobile-nav-toggle");
 const siteNav=document.querySelector("#shop-navigation");
 navToggle.addEventListener("click",()=>{const open=siteNav.classList.toggle("mobile-open");navToggle.setAttribute("aria-expanded",String(open));navToggle.setAttribute("aria-label",open?"Close navigation":"Open navigation");navToggle.textContent=open?"×":"☰"});
