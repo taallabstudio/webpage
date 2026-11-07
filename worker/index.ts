@@ -1574,12 +1574,13 @@ async function accountDataExport(req: Request, env: Env) {
   const user = await requireUser(req, env);
   await ensureOceanSchema(env);
   const userId = String(user.id);
-  const [transfers, files, googleIdentities, policyAcceptances, pages, comments, shares, assets, calendar, totp, passkeys, store] = await Promise.all([
+  const [transfers, files, googleIdentities, policyAcceptances, privacyRequests, pages, comments, shares, assets, calendar, totp, passkeys, store] = await Promise.all([
     env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(userId).all(),
     env.DB.prepare(`SELECT f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status
       FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC`).bind(userId).all(),
     env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=?").bind(userId).all(),
     env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at").bind(userId).all(),
+    env.DB.prepare("SELECT request_type,status,details,created_at,updated_at,resolved_at FROM privacy_requests WHERE user_id=? ORDER BY created_at").bind(userId).all(),
     env.DB.prepare("SELECT id,parent_id,title,icon,cover,blocks_json,is_favorite,is_archived,created_at,updated_at,is_folder,is_shared,general_access,cover_credit,cover_credit_url,cover_source_url FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(userId).all(),
     env.DB.prepare("SELECT id,page_id,user_id,body,created_at FROM ocean_comments WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(userId, userId).all(),
     env.DB.prepare("SELECT page_id,user_id,permission,created_at,updated_at FROM ocean_page_shares WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(userId, userId).all(),
@@ -1604,6 +1605,7 @@ async function accountDataExport(req: Request, env: Env) {
       passkeys: passkeys.results || [],
     },
     policyAcceptances: policyAcceptances.results || [],
+    privacyRequests: privacyRequests.results || [],
     transfers: transfers.results || [],
     transferFiles: files.results || [],
     ocean: { pages: pages.results || [], comments: comments.results || [], shares: shares.results || [], assets: assets.results || [] },
