@@ -2633,12 +2633,12 @@ export default {
       if (url.pathname === "/api/parent/dashboard" && req.method === "GET") return getParentDashboard(req, env);
       if (url.pathname === "/api/parent/invites" && req.method === "POST") return createParentInvite(req, env);
       if (url.pathname === "/api/parent/invites/accept" && req.method === "POST") return acceptParentInvite(req, env);
-      const parentPermissionMatch=url.pathname.match(/^\\/api\\/parent\\/children\\/([^/]+)\\/permissions$/);
+      const parentPermissionMatch=url.pathname.match(/^\/api\/parent\/children\/([^/]+)\/permissions$/);
       if (parentPermissionMatch && req.method === "PATCH") {
         const body=await req.json().catch(()=>({}));
         return updateChildPermissions(req, env, parentPermissionMatch[1], body);
       }
-      const parentWithdrawMatch=url.pathname.match(/^\\/api\\/parent\\/children\\/([^/]+)\\/withdraw$/);
+      const parentWithdrawMatch=url.pathname.match(/^\/api\/parent\/children\/([^/]+)\/withdraw$/);
       if (parentWithdrawMatch && req.method === "POST") return withdrawChildConsent(req, env, parentWithdrawMatch[1]);
       if (url.pathname === "/api/child/permissions" && req.method === "GET") return getChildPermissions(req, env);
       if (url.pathname === "/api/tutorials/access" && req.method === "GET") return checkTutorialAccess(req, env);
