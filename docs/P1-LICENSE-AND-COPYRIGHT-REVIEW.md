@@ -100,7 +100,7 @@ Before changing signup, Taal Lab must choose one product policy:
 1. **Adults only:** do not offer accounts/services to under-18 users and implement an age declaration plus an escalation/deletion process if a child is identified; or
 2. **Support minors:** build a verifiable parent/guardian consent flow and records before processing a child's data, and assess all child-specific restrictions.
 
-A simple age checkbox is not verifiable parental consent. No child account or parental-consent workflow is represented as implemented by this review.
+A simple age checkbox is not verifiable parental consent. The application now records parent invitations, child acceptance, consent scopes and withdrawals, and keeps child access blocked until an authorised administrator records a separate manual identity, age and relationship review. This technical workflow does not by itself establish legally sufficient verifiable parental consent; local counsel must approve the evidence and procedure before child access is enabled.
 
 
 
