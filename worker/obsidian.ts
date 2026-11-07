@@ -206,7 +206,19 @@ async function uploadAttachment(req: Request, env: Env, user: User) {
   const up: any = await uploaded.json().catch(() => ({}));
   if (!uploaded.ok || !up.fileId) return json({ error: "Backblaze could not store the attachment." }, 502);
   const attachmentFolder = externalId.includes("/") ? "Obsidian/" + externalId.split("/").slice(0,-1).join("/") : "Obsidian";
-  const pageId = await ensureFolder(env, user, attachmentFolder);
+  const parentId = await ensureFolder(env, user, attachmentFolder);
+  const title = filename.slice(0,160);
+  const existingPage: any = await env.DB.prepare("SELECT id FROM ocean_pages WHERE user_id=? AND source='obsidian' AND external_id=? LIMIT 1").bind(user.id,externalId).first();
+  const pageId = existingPage?.id || randomToken(12);
+  const kind = mime.startsWith("image/") ? "image" : mime.startsWith("audio/") ? "audio" : mime.startsWith("video/") ? "video" : "file";
+  const blocks = [{ id: randomToken(6), type: kind, text: title, file_name: title, mime_type: mime, asset_url: "/api/ocean/assets/" + id }];
+  if (existingPage) {
+    await env.DB.prepare("UPDATE ocean_pages SET parent_id=?,title=?,blocks_json=?,content_hash=?,source_modified_at=?,frontmatter_json=?,deleted_at=NULL,is_archived=0,updated_at=? WHERE id=? AND user_id=?")
+      .bind(parentId,title,JSON.stringify(blocks),hash,now(),JSON.stringify({file_name:title,mime_type:mime,size:bytes.byteLength}),now(),pageId,user.id).run();
+  } else {
+    await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,icon,blocks_json,is_folder,source,external_id,content_hash,source_modified_at,frontmatter_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(pageId,user.id,parentId,title,"",JSON.stringify(blocks),0,"obsidian",externalId,hash,now(),JSON.stringify({file_name:title,mime_type:mime,size:bytes.byteLength}),now(),now()).run();
+  }
   await env.DB.prepare("INSERT INTO ocean_assets(id,user_id,page_id,storage_key,file_name,mime_type,size,created_at) VALUES(?,?,?,?,?,?,?,?)")
     .bind(id,user.id,pageId,key,filename,mime,bytes.byteLength,now()).run();
   await env.DB.prepare("INSERT INTO ocean_obsidian_attachments(id,user_id,external_id,content_hash,asset_id,created_at,updated_at,deleted_at) VALUES(?,?,?,?,?,?,?,NULL) ON CONFLICT(user_id,external_id) DO UPDATE SET content_hash=excluded.content_hash,asset_id=excluded.asset_id,updated_at=excluded.updated_at,deleted_at=NULL")
@@ -224,7 +236,7 @@ export async function handleObsidianIntegration(req: Request, env: Env, getSessi
   const user = await tokenUser(req, env);
   if (!user) return json({ error: "Invalid or revoked Obsidian integration token." }, 401);
   if (path === "/api/integrations/obsidian/manifest" && req.method === "GET") {
-    const notes = await env.DB.prepare("SELECT external_id AS externalId,content_hash AS contentHash,updated_at AS updatedAt FROM ocean_pages WHERE user_id=? AND source='obsidian' AND external_id IS NOT NULL AND external_id NOT LIKE '@folder/%' AND deleted_at IS NULL").bind(user.id).all();
+    const notes = await env.DB.prepare("SELECT external_id AS externalId,content_hash AS contentHash,updated_at AS updatedAt FROM ocean_pages WHERE user_id=? AND source='obsidian' AND external_id IS NOT NULL AND external_id LIKE '%.md' AND deleted_at IS NULL").bind(user.id).all();
     const attachments = await env.DB.prepare("SELECT external_id AS externalId,content_hash AS contentHash,updated_at AS updatedAt FROM ocean_obsidian_attachments WHERE user_id=? AND deleted_at IS NULL").bind(user.id).all();
     const folders = await env.DB.prepare("SELECT external_id AS externalId,updated_at AS updatedAt FROM ocean_pages WHERE user_id=? AND source='obsidian' AND is_folder=1 AND external_id LIKE '@folder/Obsidian/%' AND deleted_at IS NULL").bind(user.id).all();
     return json({ notes: notes.results || [], attachments: attachments.results || [], folders: folders.results || [] });
@@ -244,6 +256,7 @@ export async function handleObsidianIntegration(req: Request, env: Env, getSessi
   if (path === "/api/integrations/obsidian/attachments" && req.method === "DELETE") {
     const externalId = url.searchParams.get("externalId") || "";
     await env.DB.prepare("UPDATE ocean_obsidian_attachments SET deleted_at=?,updated_at=? WHERE user_id=? AND external_id=?").bind(now(),now(),user.id,externalId).run();
+    await env.DB.prepare("UPDATE ocean_pages SET deleted_at=?,is_archived=1,updated_at=? WHERE user_id=? AND source='obsidian' AND external_id=?").bind(now(),now(),user.id,externalId).run();
     return json({ ok: true });
   }
   return json({ error: "Obsidian integration endpoint not found." }, 404);
