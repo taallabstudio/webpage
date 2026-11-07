@@ -856,7 +856,7 @@ async function withdrawChildConsent(req: Request, env: Env, childId: string) {
     env.DB.prepare("UPDATE parent_child_links SET status='revoked',revoked_at=? WHERE id=?").bind(timestamp,link.id),
     env.DB.prepare("UPDATE parental_consent_records SET withdrawn_at=? WHERE parent_user_id=? AND child_user_id=? AND withdrawn_at IS NULL").bind(timestamp,parent.id,childId),
     env.DB.prepare("INSERT INTO parental_consent_events(id,parent_user_id,child_user_id,event_type,details_json,created_at) VALUES(?,?,?,'consent_withdrawn',?,?)").bind(randomToken(16),parent.id,childId,JSON.stringify({allPermissionsDisabled:true,sessionRevocation:true}),timestamp),
-    env.DB.prepare("UPDATE child_permissions SET tutorial_access=0,lesson_downloads=0,comments=0,uploads_sharing=0,updated_at=? WHERE child_user_id=? AND parent_user_id=?").bind(timestamp,childId,parent.id),
+    env.DB.prepare("DELETE FROM child_permissions WHERE child_user_id=? AND parent_user_id=?").bind(childId,parent.id),
     env.DB.prepare("UPDATE users SET parent_user_id=NULL,parental_consent_status='withdrawn',updated_at=? WHERE id=? AND parent_user_id=?").bind(timestamp,childId,parent.id),
     env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(childId),
   ]);
@@ -1906,6 +1906,7 @@ async function cleanup(env: Env) {
     env.DB.prepare("DELETE FROM files WHERE status='deleted' AND expires_at<=?").bind(cutoff - 30 * 86400),
     env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=?").bind(cutoff - 30 * 86400),
     env.DB.prepare("DELETE FROM parent_link_invites WHERE expires_at<=?").bind(cutoff - 30 * 86400),
+    env.DB.prepare("DELETE FROM parent_child_links WHERE status='revoked' AND revoked_at<=?").bind(cutoff - 730 * 86400),
     env.DB.prepare("DELETE FROM parental_consent_records WHERE withdrawn_at IS NOT NULL AND withdrawn_at<=?").bind(cutoff - 730 * 86400),
     env.DB.prepare("DELETE FROM parental_consent_events WHERE created_at<=? AND NOT EXISTS (SELECT 1 FROM parent_child_links l WHERE l.child_user_id=parental_consent_events.child_user_id AND l.status='active')").bind(cutoff - 730 * 86400),
     env.DB.prepare("DELETE FROM child_permission_events WHERE changed_at<=? AND NOT EXISTS (SELECT 1 FROM parent_child_links l WHERE l.child_user_id=child_permission_events.child_user_id AND l.status='active')").bind(cutoff - 730 * 86400),
