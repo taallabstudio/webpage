@@ -1,6 +1,7 @@
 [package]
 name = "ocean-desktop"
 version = "1.0.8"
+license = "UNLICENSED"
 description = "OCEAN by TaalLab"
 authors = ["TaalLab"]
 edition = "2021"
