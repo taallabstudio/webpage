@@ -44,6 +44,9 @@ async function recordPolicyAcceptance(env: Env, userId: string, method: string) 
   )`).run();
   await env.DB.prepare("INSERT INTO policy_acceptances(id,user_id,terms_version,privacy_version,accepted_at,method) VALUES(?,?,?,?,?,?)")
     .bind(randomToken(16), userId, POLICY_VERSION, POLICY_VERSION, now(), method).run();
+  const acceptedAt=now();
+  await env.DB.prepare("INSERT INTO policy_notice_log(user_id,last_sent_at,last_attempt_at) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET last_sent_at=excluded.last_sent_at,last_attempt_at=excluded.last_attempt_at")
+    .bind(userId,acceptedAt,acceptedAt).run();
 }
 
 async function recordAgeConfirmation(env: Env, userId: string, method: string) {
@@ -335,6 +338,9 @@ async function ensureSupportSchema(env: Env) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS age_confirmations (
     user_id TEXT PRIMARY KEY,confirmed_at INTEGER NOT NULL,method TEXT NOT NULL
   )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_notice_log (
+    user_id TEXT PRIMARY KEY,last_sent_at INTEGER NOT NULL DEFAULT 0,last_attempt_at INTEGER
+  )`).run();
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS policy_acceptances (
     id TEXT PRIMARY KEY, user_id TEXT NOT NULL, terms_version TEXT NOT NULL,
     privacy_version TEXT NOT NULL, accepted_at INTEGER NOT NULL, method TEXT NOT NULL
@@ -380,6 +386,26 @@ async function sendAuthEmail(env: Env, to: string, subject: string, html: string
     return { sent: false, error: data?.message || data?.error || `Email provider returned HTTP ${response.status}` };
   }
   return { sent: true, id: data?.id || null };
+}
+
+async function sendPeriodicPolicyNotices(env: Env) {
+  const timestamp=now(),noticeCutoff=timestamp-90*86400,retryCutoff=timestamp-86400;
+  const due:any=await env.DB.prepare(`SELECT u.id,u.email FROM users u
+    LEFT JOIN policy_notice_log p ON p.user_id=u.id
+    WHERE u.status='active' AND u.email_verified_at IS NOT NULL
+      AND (p.last_sent_at IS NULL OR p.last_sent_at<=?)
+      AND (p.last_attempt_at IS NULL OR p.last_attempt_at<=?)
+    ORDER BY COALESCE(p.last_sent_at,0) ASC LIMIT 50`).bind(noticeCutoff,retryCutoff).all();
+  for(const user of due.results||[]){
+    await env.DB.prepare("INSERT INTO policy_notice_log(user_id,last_sent_at,last_attempt_at) VALUES(?,0,?) ON CONFLICT(user_id) DO UPDATE SET last_attempt_at=excluded.last_attempt_at")
+      .bind(user.id,timestamp).run();
+    const period=Math.floor(timestamp/(90*86400));
+    const result=await sendAuthEmail(env,String(user.email),"Important TaalLab service and policy reminder",
+      `<p>This is a periodic service notice from TaalLab, not a marketing email.</p><p>Please review our <a href="${origin(env)}/terms.html">Terms of Service</a> and <a href="${origin(env)}/privacy.html">Privacy Policy</a>. You must use TaalLab lawfully and follow the rules for files and content you upload, store, share or publish. Where required by law, TaalLab may remove or disable access to content or suspend an account, and may report matters to the appropriate authority.</p><p>For questions or complaints, contact <a href="mailto:contact@taallab.in">contact@taallab.in</a>.</p>`,
+      `This is a periodic service notice from TaalLab, not a marketing email. Please review the Terms of Service at ${origin(env)}/terms.html and Privacy Policy at ${origin(env)}/privacy.html. Use TaalLab lawfully and follow the rules for files and content you upload, store, share or publish. Where required by law, TaalLab may remove or disable access to content or suspend an account, and may report matters to the appropriate authority. Contact contact@taallab.in for questions or complaints.`,
+      `policy-notice-${user.id}-${period}`);
+    if(result.sent)await env.DB.prepare("UPDATE policy_notice_log SET last_sent_at=?,last_attempt_at=? WHERE user_id=?").bind(timestamp,timestamp,user.id).run();
+  }
 }
 
 async function createEmailVerification(env: Env, user: any) {
@@ -1689,7 +1715,7 @@ async function accountDataExport(req: Request, env: Env) {
   const user = await requireUser(req, env);
   await ensureOceanSchema(env);
   const userId = String(user.id);
-  const [transfers, files, googleIdentities, policyAcceptances, privacyRequests, marketingPreference, ageConfirmation, pages, comments, shares, assets, calendar, totp, passkeys, store] = await Promise.all([
+  const [transfers, files, googleIdentities, policyAcceptances, privacyRequests, marketingPreference, ageConfirmation, policyNotice, pages, comments, shares, assets, calendar, totp, passkeys, store] = await Promise.all([
     env.DB.prepare("SELECT id,created_at,expires_at,message,total_size,file_count,status FROM transfers WHERE user_id=? ORDER BY created_at DESC").bind(userId).all(),
     env.DB.prepare(`SELECT f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status
       FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC`).bind(userId).all(),
@@ -1698,6 +1724,7 @@ async function accountDataExport(req: Request, env: Env) {
     env.DB.prepare("SELECT request_type,status,details,created_at,updated_at,resolved_at FROM privacy_requests WHERE user_id=? ORDER BY created_at").bind(userId).all(),
     env.DB.prepare("SELECT consent,consented_at,unsubscribed_at,updated_at,source FROM marketing_preferences WHERE user_id=? LIMIT 1").bind(userId).first(),
     env.DB.prepare("SELECT confirmed_at,method FROM age_confirmations WHERE user_id=? LIMIT 1").bind(userId).first(),
+    env.DB.prepare("SELECT last_sent_at,last_attempt_at FROM policy_notice_log WHERE user_id=? LIMIT 1").bind(userId).first(),
     env.DB.prepare("SELECT id,parent_id,title,icon,cover,blocks_json,is_favorite,is_archived,created_at,updated_at,is_folder,is_shared,general_access,cover_credit,cover_credit_url,cover_source_url FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(userId).all(),
     env.DB.prepare("SELECT id,page_id,user_id,body,created_at FROM ocean_comments WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(userId, userId).all(),
     env.DB.prepare("SELECT page_id,user_id,permission,created_at,updated_at FROM ocean_page_shares WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(userId, userId).all(),
@@ -1725,6 +1752,7 @@ async function accountDataExport(req: Request, env: Env) {
     privacyRequests: privacyRequests.results || [],
     marketingPreference: marketingPreference || { consent: 0 },
     ageConfirmation: ageConfirmation || null,
+    policyNotice: policyNotice || null,
     transfers: transfers.results || [],
     transferFiles: files.results || [],
     ocean: { pages: pages.results || [], comments: comments.results || [], shares: shares.results || [], assets: assets.results || [] },
@@ -2878,6 +2906,6 @@ export default {
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     await Promise.all([ensureSupportSchema(env), ensureAuthMethodsSchema(env), ensureOceanSchema(env)]);
-    ctx.waitUntil(Promise.all([cleanup(env), cleanupStoreData({ DBStore: env.DBStore, APP_ORIGIN: env.APP_ORIGIN, ASSETS: env.ASSETS })]));
+    ctx.waitUntil(Promise.all([cleanup(env), cleanupStoreData({ DBStore: env.DBStore, APP_ORIGIN: env.APP_ORIGIN, ASSETS: env.ASSETS }), sendPeriodicPolicyNotices(env)]));
   },
 } satisfies ExportedHandler<Env>;
