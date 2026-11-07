@@ -726,6 +726,7 @@ async function authSetup(req: Request, env: Env) {
   const setupAuthorized = setupSecret === env.ADMIN_SETUP_SECRET;
   if (!setupAuthorized) return json({ error: "Invalid setup secret." }, { status: 401 });
   if (!email || !email.includes("@")) return json({ error: "Enter a valid email address." }, { status: 400 });
+  if (body.ageConfirmed !== true) return json({ error: "Confirm that the account holder is at least 18 years old." }, { status: 400 });
   if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, { status: 400 });
 
   const count: any = await env.DB.prepare("SELECT COUNT(*) n FROM users").first();
@@ -2577,6 +2578,7 @@ export default {
 
         let recipientId = String(body.user_id || "").trim();
         const recipientEmail = normalizeEmail(body.recipient_email);
+        if ((recipientId || recipientEmail) && body.recipientAdultConfirmed !== true) return json({ error: "Confirm that the client recipient is at least 18 years old." }, { status: 400 });
         let recipientCreated = false;
         let temporaryPassword = "";
 
