@@ -849,7 +849,7 @@ async function googleAuthStart(req: Request, env: Env) {
   // The flow can begin on ocean.taallab.in and finish on taallab.in.
   // State and return cookies must therefore be valid on both hosts.
   response.headers.append("set-cookie", cookie("google_login_state", state, 600, req));
-  response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req).replace("Path=/;", "Domain=.taallab.in; Path=/;"));
+  response.headers.append("set-cookie", cookie("google_login_return", returnTo, 600, req));
   return response;
 }
 
