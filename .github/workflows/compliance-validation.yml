@@ -37,6 +37,12 @@ jobs:
       - name: Build website assets only
         run: npm run build
 
+      - name: Capture dependency vulnerability reports
+        run: |
+          npm audit --json > npm-audit.json || true
+          npm audit --omit=dev --json > npm-production-audit.json || true
+          node -e 'for (const f of ["npm-audit.json","npm-production-audit.json"]) { const a=require("./"+f); const v=a.metadata?.vulnerabilities||{}; console.log(f, JSON.stringify(v)); }'
+
       - name: Generate production dependency licence report
         run: |
           npx --yes license-checker@25.0.1 --production --json --out npm-production-licenses.json
@@ -48,6 +54,8 @@ jobs:
           name: taal-lab-compliance-validation
           path: |
             npm-production-licenses.json
+            npm-audit.json
+            npm-production-audit.json
             dist/
           if-no-files-found: error
           retention-days: 7
