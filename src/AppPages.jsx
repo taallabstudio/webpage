@@ -1147,6 +1147,17 @@ function ParentLinkAcceptance() {
   return <div className="login-page"><section className="login-card"><Logo/><div className="login-icon"><ShieldCheck/></div><h1>Review parent link</h1><p>Accepting this request links your child account to the adult account that sent the invitation. The parent will manage separate access settings. Your parent can withdraw consent from their dashboard. If you believe this link is incorrect, contact TaalLab support.</p>{error&&<div className="error-box" role="alert">{error}</div>}<button className="primary-btn full" onClick={accept} disabled={busy||!token}>{busy?"Linking account…":"Accept parent link"}</button><a className="ghost-btn full" style={{marginTop:10}} href="/account">Cancel</a></section></div>;
 }
 
+
+function PrivacyAccessPage() {
+  const [user,setUser]=useState(null);
+  const [checking,setChecking]=useState(true);
+  async function refresh(){try{const result=await api("/auth/me");setUser(result.authenticated?result.user:null)}catch{setUser(null)}finally{setChecking(false)}}
+  useEffect(()=>{refresh()},[]);
+  if(checking)return <div className="loading"><RefreshCw className="spin"/> Checking your account…</div>;
+  if(!user)return <Login onLogin={refresh}/>;
+  return <div className="login-page" style={{alignItems:"flex-start",paddingTop:36}}><div style={{width:"min(760px,100%)"}}><a href="/account" className="ghost-btn" style={{marginBottom:16}}>Back to account</a><PrivacyControls user={user}/></div></div>;
+}
+
 function DateOfBirthOnboarding({user,onComplete}) {
   const [dateOfBirth,setDateOfBirth]=useState("");
   const [busy,setBusy]=useState(false);
@@ -1172,7 +1183,8 @@ function DateOfBirthOnboarding({user,onComplete}) {
     <h1>Parent or guardian setup needed</h1>
     <p>Your date of birth indicates that you are under 18. Before you can use account features, a parent or guardian must create or link their adult account and complete the consent process.</p>
     <div className="success-pill">Your account is waiting for parent or guardian setup. Purchases and payments are disabled.</div>
-    <p style={{fontSize:12,color:"var(--muted)"}}>We have saved your date of birth so we can continue this setup. You can sign out safely.</p>
+    <p style={{fontSize:12,color:"var(--muted)"}}>We have saved your date of birth so we can continue this setup. You can sign out safely. You can still access your personal-data export and submit a privacy request.</p>
+    <a className="ghost-btn full" style={{marginBottom:10}} href="/account/privacy">Privacy and data requests</a>
     <button className="primary-btn full" onClick={signOut}>Sign out</button>
   </section></div>;
   if(saved) return null;
@@ -1233,6 +1245,7 @@ function App(){
 
   if(path === "/admin") return <Admin/>;
 
+  if(path === "/account/privacy") return <PrivacyAccessPage/>;
   if(path === "/account") return <UserDashboard/>;
 
   if(path === "/account/parent-link") return <ParentLinkAcceptance/>;
