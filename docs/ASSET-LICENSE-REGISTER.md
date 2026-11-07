@@ -38,6 +38,21 @@ If font binaries are later self-hosted or redistributed, include each family's c
 - Runtime and build dependencies are listed in `package.json`. Run the automated dependency licence inventory in CI and review packages marked unknown, custom, dual-licensed or copyleft before release.
 - Preserve third-party copyright and licence notices when bundling or redistributing packages. This inventory does not replace the licence terms of each dependency.
 
+## Dependency licence scan (CI, 7 November 2026)
+
+The repository's CI inventory scanned 161 installed packages. All packages had a declared SPDX-style licence value in package metadata; 36 packages did not contain one of the common top-level licence/notice filenames checked by the scanner, so their actual package notices still need spot-checking. The inventory is uploaded as the `taallab-compliance-audit-reports` artifact on the pull-request workflow.
+
+Notable entries:
+- `lucide-react`: ISC.
+- React and React DOM: MIT.
+- `@simplewebauthn/browser` and `@simplewebauthn/server`: MIT.
+- `@tauri-apps/api` and Tauri plugins: Apache-2.0 OR MIT / MIT OR Apache-2.0.
+- `wrangler`: MIT OR Apache-2.0.
+- `@img/sharp-libvips-linux-x64`: LGPL-3.0-or-later (two resolved versions appeared in the scan). It is a transitive binary of the dev-only `sharp` dependency used by the prebuild image-optimization script; verify it is not copied into the shipped web or desktop runtime.
+- `caniuse-lite`: CC-BY-4.0 metadata; `@speed-highlight/core`: CC0-1.0.
+
+The repository currently has no `package-lock.json`. Because dependencies use version ranges, the exact resolved inventory can change on a future install. Add and review a lockfile before a release, then regenerate the inventory. The automated report is triage, not legal approval.
+
 ## Required owner confirmations
 
 1. Confirm ownership/permission for the logo, studio photo, headphones image and both SVG icons.
