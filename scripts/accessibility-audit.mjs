@@ -41,7 +41,8 @@ try {
   let total = 0;
   const report = [];
   for (const [label, url] of pages) {
-    const page = await browser.newPage();
+    const context = await browser.newContext();
+    const page = await context.newPage();
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.waitForTimeout(1000);
     const results = await new AxeBuilder({ page })
@@ -67,7 +68,7 @@ try {
       }
       if (violation.nodes.length > 8) console.log(`  ... and ${violation.nodes.length - 8} more affected node(s)`);
     }
-    await page.close();
+    await context.close();
   }
   await writeFile("/tmp/taallab-accessibility-report.json", JSON.stringify(report, null, 2), "utf8");
   console.log(`\nAccessibility audit complete. Total page-level violations: ${total}`);
