@@ -1628,8 +1628,8 @@ async function cleanup(env: Env) {
   // File objects are removed above; only records expired for more than 30 days are purged here.
   const metadataCutoff = cutoff - 30 * 86400;
   await env.DB.batch([
-    env.DB.prepare("DELETE FROM files WHERE transfer_id IN (SELECT id FROM transfers WHERE status='deleted' AND expires_at<=?)").bind(metadataCutoff),
-    env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=?").bind(metadataCutoff),
+    env.DB.prepare("DELETE FROM files WHERE transfer_id IN (SELECT id FROM transfers WHERE status='deleted' AND expires_at<=?) AND status='deleted'").bind(metadataCutoff),
+    env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=? AND NOT EXISTS (SELECT 1 FROM files f WHERE f.transfer_id=transfers.id AND f.status!='deleted')").bind(metadataCutoff),
   ]);
 }
 
