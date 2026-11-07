@@ -10,7 +10,7 @@ export interface StoreEnv {
   APP_ORIGIN: string;
   ASSETS: Fetcher;
   authorizeAdmin?: (req: Request) => Promise<boolean>;
-  getCustomer?: (req: Request) => Promise<{ id: string; email: string; displayName?: string } | null>;
+  getCustomer?: (req: Request) => Promise<{ id: string; email: string; displayName?: string; accountType?: string; parentalConsentStatus?: string } | null>;
 }
 
 type Product = {
@@ -392,6 +392,7 @@ async function createOrder(req: Request, env: StoreEnv) {
   if (!env.RAZORPAY_KEY_ID.startsWith("rzp_test_")) return json({ error: "Checkout is locked to protect you from real charges. Configure Razorpay Test Mode keys (rzp_test_...) to test checkout." }, 503);
   const user = await env.getCustomer?.(req);
   if (!user) return json({ error: "Please log in to continue checkout." }, 401);
+  if (user.accountType !== "adult") return json({ error: "Purchases are available only to adult accounts. A parent or guardian must complete the child-account setup." }, 403);
   const body: any = await req.json().catch(() => ({}));
   if (body.acceptTerms !== true) return json({ error: "Please accept the Terms of Service and Privacy Policy before placing your order." }, 400);
   const rawIds: string[] = Array.isArray(body.productIds) ? body.productIds.map((id: any) => String(id)) : [String(body.productId || "")];
@@ -486,6 +487,10 @@ async function verifyPayment(req: Request, env: StoreEnv) {
   await ensureStoreSchema(env);
   const order: any = await env.DBStore.prepare("SELECT * FROM store_orders WHERE razorpay_order_id=? LIMIT 1").bind(orderId).first();
   if (!order) return json({ error: "Order was not found." }, 404);
+  const customer = await env.getCustomer?.(req);
+  if (!customer || customer.accountType !== "adult" || String(order.user_id || "") !== customer.id) {
+    return json({ error: "This purchase cannot be completed from this account." }, 403);
+  }
   const groupId = String(order.checkout_group_id || order.id);
   const groupRows = order.checkout_group_id ? await env.DBStore.prepare("SELECT * FROM store_orders WHERE checkout_group_id=? ORDER BY created_at,id").bind(groupId).all() : { results: [order] };
   const orders: any[] = groupRows.results || [order];
