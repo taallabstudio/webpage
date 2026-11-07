@@ -9,7 +9,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: compliance-build-${{ github.ref }}
@@ -29,7 +29,7 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Generate dependency licence inventory
-        run: mkdir -p .audit && npx --yes license-checker --json --out .audit/third-party-licenses.json
+        run: mkdir -p .audit && npx --yes license-checker --json --out .audit/third-party-licenses.json && node scripts/generate-license-inventory.mjs
       - name: Preserve lockfile and licence inventory
         uses: actions/upload-artifact@v4
         with:
@@ -37,6 +37,7 @@ jobs:
           path: |
             package-lock.json
             .audit/third-party-licenses.json
+            docs/THIRD-PARTY-LICENSE-INVENTORY.md
           if-no-files-found: error
           retention-days: 14
       - name: Build website and app assets
@@ -45,3 +46,13 @@ jobs:
         run: npx esbuild worker/index.ts --bundle --platform=browser --format=esm --outfile=/tmp/taallab-worker.js
       - name: Validate Cloudflare Worker bundle without deploying
         run: npx wrangler deploy --dry-run --outdir=worker-dist
+      - name: Commit reproducible lockfile and licence inventory
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json docs/THIRD-PARTY-LICENSE-INVENTORY.md
+          if ! git diff --cached --quiet; then
+            git commit -m "Add reproducible npm lockfile and licence inventory"
+            git push
+          fi
