@@ -158,7 +158,8 @@ async function ensureSupportSchema(env: Env) {
     status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','processing','completed','rejected')),
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
-    completed_at INTEGER
+    completed_at INTEGER,
+    admin_notified_at INTEGER
   )`).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_privacy_requests_user_status ON privacy_requests(user_id,status,created_at DESC)").run();
   const columns: any = await env.DB.prepare("PRAGMA table_info(files)").all();
@@ -714,6 +715,7 @@ async function requestAccountDeletion(req: Request, env: Env) {
     `<p>A user has submitted an account deletion request.</p><p><strong>Request:</strong> ${id}</p><p><strong>Account:</strong> ${safeEmail}</p><p><strong>Submitted:</strong> ${new Date(createdAt * 1000).toISOString()}</p><p>Review associated transfer, OCEAN and store records, and retain only information required by applicable law or legitimate dispute/security needs. Do not treat this email as proof that deletion has been completed.</p>`,
     `Account deletion request\nRequest: ${id}\nAccount: ${user.email}\nSubmitted: ${new Date(createdAt * 1000).toISOString()}\nReview related data and retention obligations before processing.`,
     `privacy-deletion-admin:${id}`);
+  if (adminMessage.sent) await env.DB.prepare("UPDATE privacy_requests SET admin_notified_at=? WHERE id=?").bind(now(), id).run();
   await sendAuthEmail(env, String(user.email), "We received your TaalLab privacy request",
     `<p>We received your account deletion request.</p><p><strong>Reference:</strong> ${id}</p><p>Your account has not been deleted yet. We will review linked workspace, transfer and purchase records and any information that must be retained by law. Contact <a href="mailto:contact@taallab.in">contact@taallab.in</a> with this reference if you need help.</p>`,
     `We received your TaalLab account deletion request. Reference: ${id}. Your account has not been deleted yet. Contact contact@taallab.in with this reference if you need help.`,
@@ -1580,6 +1582,19 @@ async function handlePreview(env: Env, req: Request, token: string) {
   const meta: any = await driveFile(env, f.storage_key);
   if (!meta || meta.trashed || meta.capabilities?.canDownload === false) return new Response("File missing", { status: 404 });
   return streamDriveFile(env, f.storage_key, req, f.original_name, f.mime_type, false);
+}
+
+async function notifyPendingPrivacyRequests(env: Env) {
+  await ensureSupportSchema(env);
+  const pending = await env.DB.prepare("SELECT id,email,created_at FROM privacy_requests WHERE request_type='deletion' AND status='pending' AND admin_notified_at IS NULL ORDER BY created_at LIMIT 10").all();
+  for (const request of pending.results as any[]) {
+    const safeEmail = escapeHtml(String(request.email || ""));
+    const sent = await sendAuthEmail(env, "contact@taallab.in", "Account deletion request — TaalLab",
+      `<p>A user has submitted an account deletion request.</p><p><strong>Request:</strong> ${escapeHtml(String(request.id))}</p><p><strong>Account:</strong> ${safeEmail}</p><p><strong>Submitted:</strong> ${new Date(Number(request.created_at) * 1000).toISOString()}</p><p>Review linked records and retention obligations before processing. Do not treat this email as proof that deletion has been completed.</p>`,
+      `Account deletion request\nRequest: ${request.id}\nAccount: ${request.email}\nReview linked records and retention obligations.`,
+      `privacy-deletion-admin:${request.id}`);
+    if (sent.sent) await env.DB.prepare("UPDATE privacy_requests SET admin_notified_at=? WHERE id=? AND admin_notified_at IS NULL").bind(now(), request.id).run();
+  }
 }
 
 async function cleanup(env: Env) {
@@ -2692,8 +2707,9 @@ export default {
   },
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(Promise.all([
-      cleanup(env),
-    ]));
+    ctx.waitUntil((async () => {
+      await cleanup(env);
+      await notifyPendingPrivacyRequests(env);
+    })());
   },
 } satisfies ExportedHandler<Env>;
