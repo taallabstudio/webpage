@@ -1581,6 +1581,13 @@ async function handlePreview(env: Env, req: Request, token: string) {
 }
 
 async function cleanup(env: Env) {
+  await ensureSupportSchema(env);
+  await ensureOceanSchema(env);
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS google_app_login_codes (
+    code_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+  )`).run();
   const cutoff = now();
   const files = await env.DB.prepare("SELECT id,storage_key,transfer_id FROM files WHERE expires_at<=? AND status!='deleted'")
     .bind(cutoff)
