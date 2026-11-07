@@ -475,9 +475,9 @@ function UserPortal({user}) {
   const downloaded=transfers.filter(t=>t.downloaded).length;
 
   return <div className="admin-layout">
-    <aside id="admin-sidebar" ref={mobileNavRef} className={"sidebar"+(mobileNavOpen?" mobile-open":"")}><Logo/><div className="side-links">
-      <button className={page==="transfers"?"active":""} onClick={()=>navigateAdmin("transfers")}><FolderOpen/> My Transfers</button>
-      <button className={page==="settings"?"active":""} onClick={()=>navigateAdmin("settings")}><Settings/> Account</button>
+    <aside className="sidebar"><Logo/><div className="side-links">
+      <button className={page==="transfers"?"active":""} onClick={()=>setPage("transfers")}><FolderOpen/> My Transfers</button>
+      <button className={page==="settings"?"active":""} onClick={()=>setPage("settings")}><Settings/> Account</button>
     </div>
     <div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div>
     <button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
@@ -560,13 +560,13 @@ function Admin({initialUpload=false}) {
   function navigateAdmin(next){setPage(next);if(mobileNavOpen){setMobileNavOpen(false);mobileNavToggleRef.current?.focus();}}
   async function logout(){await api("/auth/logout",{method:"POST"});setAuthed(false);setUser(null);setMobileNavOpen(false)}
   return <div className="admin-layout">
-    <aside className="sidebar"><Logo/><div className="side-links">
+    <aside id="admin-sidebar" ref={mobileNavRef} className={"sidebar"+(mobileNavOpen?" mobile-open":"")}><Logo/><div className="side-links">
       <button className={page==="dashboard"?"active":""} onClick={()=>navigateAdmin("dashboard")}><Gauge/> Dashboard</button>
-      <button className={page==="transfers"?"active":""} onClick={()=>setPage("transfers")}><FolderOpen/> Transfers</button>
+      <button className={page==="transfers"?"active":""} onClick={()=>navigateAdmin("transfers")}><FolderOpen/> Transfers</button>
       <button className={page==="products"?"active":""} onClick={()=>navigateAdmin("products")}><HardDrive/> Store Products</button>
       <button className={page==="upload"?"active":""} onClick={()=>navigateAdmin("upload")}><UploadCloud/> New Transfer</button>
       <button className={page==="users"?"active":""} onClick={()=>navigateAdmin("users")}><UserRound/> Users</button>
-      <button className={page==="settings"?"active":""} onClick={()=>setPage("settings")}><Settings/> Account</button>
+      <button className={page==="settings"?"active":""} onClick={()=>navigateAdmin("settings")}><Settings/> Account</button>
     </div><div style={{padding:"12px 14px",fontSize:12,opacity:.65}}>{user?.email}</div><button className="side-logout" onClick={logout}><LogOut/> Logout</button></aside>
     {mobileNavOpen&&<button type="button" className="mobile-nav-backdrop" aria-label="Close navigation" onClick={()=>{setMobileNavOpen(false);mobileNavToggleRef.current?.focus();}}/>}
     <main className="admin-main">
