@@ -764,7 +764,7 @@ function AccountSettings({user,onPasswordChanged,showGoogleDrive=false}) {
       <p className="muted" style={{marginTop:6}}>Download a copy of the account, transfer, OCEAN and digital-store information associated with this account, or submit a request to delete your account.</p>
       <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:16}}>
         <button type="button" className="primary-btn" disabled={privacyBusy} onClick={downloadPersonalData}>{privacyBusy?"Please wait…":"Download my data"}</button>
-        <button type="button" className="ghost-btn" disabled={privacyBusy} onClick={()=>{if(window.confirm("Submit an account deletion request? Your account will not be deleted immediately. TaalLab will review connected data and records that may need to be retained."))void requestDeletion();}}>Request account deletion</button>
+        <button type="button" className="ghost-btn" disabled={privacyBusy} onClick={()=>{if(window.confirm("Submit an account deletion request? Your account will not be deleted immediately. TaalLab will review connected data and records that may need to be retained.")){const confirmation=window.prompt("To confirm, type DELETE MY ACCOUNT");if(confirmation==="DELETE MY ACCOUNT")void requestDeletion();}}}>Request account deletion</button>
       </div>
       {privacyError&&<div className="error-box" role="alert" style={{marginTop:12}}>{privacyError}</div>}
       {privacyMessage&&<div className="success-pill" role="status" style={{marginTop:12}}>{privacyMessage}</div>}
