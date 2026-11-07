@@ -886,7 +886,7 @@ async function checkTutorialAccess(req: Request, env: Env) {
 async function exportAccountData(req: Request, env: Env) {
   const user = await requireUser(req, env);
   await ensureOceanSchema(env);
-  const [identity, googleIdentity, acceptances, privacyRequests, transfers, files, pages, shares, pageCollaborators, comments, assets, calendar, passkeys, authenticator, recovery, store] = await Promise.all([
+  const [identity, googleIdentity, acceptances, privacyRequests, transfers, files, pages, shares, pageCollaborators, comments, assets, calendar, passkeys, authenticator, recovery, store, parentLinks, parentInvites, consentRecords, consentEvents, permissionEvents] = await Promise.all([
     env.DB.prepare("SELECT id,email,role,created_at,updated_at,email_verified_at,display_name,avatar_data,two_factor_enabled,date_of_birth,account_type,parental_consent_status,parent_user_id FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at").bind(user.id).all(),
@@ -903,6 +903,11 @@ async function exportAccountData(req: Request, env: Env) {
     env.DB.prepare("SELECT enabled,created_at,updated_at FROM user_totp WHERE user_id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT COUNT(*) AS remaining FROM auth_recovery_codes WHERE user_id=? AND used_at IS NULL").bind(user.id).first(),
     exportCustomerPrivacyData({ ...env, getCustomer: async () => ({ id: String(user.id), email: String(user.email) }) }, String(user.id)),
+    env.DB.prepare("SELECT id,parent_user_id,child_user_id,status,created_at,linked_at,revoked_at FROM parent_child_links WHERE parent_user_id=? OR child_user_id=? ORDER BY created_at").bind(user.id,user.id).all(),
+    env.DB.prepare("SELECT id,parent_user_id,child_user_id,child_email,created_at,expires_at,consumed_at,canceled_at FROM parent_link_invites WHERE parent_user_id=? OR child_user_id=? ORDER BY created_at").bind(user.id,user.id).all(),
+    env.DB.prepare("SELECT id,parent_user_id,child_user_id,policy_version,scope_json,verification_method,consented_at,withdrawn_at FROM parental_consent_records WHERE parent_user_id=? OR child_user_id=? ORDER BY consented_at").bind(user.id,user.id).all(),
+    env.DB.prepare("SELECT id,parent_user_id,child_user_id,event_type,details_json,created_at FROM parental_consent_events WHERE parent_user_id=? OR child_user_id=? ORDER BY created_at").bind(user.id,user.id).all(),
+    env.DB.prepare("SELECT id,parent_user_id,child_user_id,permission,enabled,changed_at FROM child_permission_events WHERE parent_user_id=? OR child_user_id=? ORDER BY changed_at").bind(user.id,user.id).all(),
   ]);
   const payload = {
     exported_at: new Date().toISOString(),
@@ -910,6 +915,11 @@ async function exportAccountData(req: Request, env: Env) {
     google_sign_in_identity: googleIdentity || null,
     policy_acceptances: acceptances.results || [],
     privacy_requests: privacyRequests.results || [],
+    parent_child_links: parentLinks.results || [],
+    parent_link_invitations: parentInvites.results || [],
+    parental_consent_records: consentRecords.results || [],
+    parental_consent_events: consentEvents.results || [],
+    child_permission_events: permissionEvents.results || [],
     transfers: transfers.results || [],
     transfer_files: files.results || [],
     ocean_pages: pages.results || [],
