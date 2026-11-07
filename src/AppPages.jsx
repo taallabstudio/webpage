@@ -152,10 +152,10 @@ function TransferPage({id}) {
 
 function Preview({file,onClose}) {
   return <div className="modal-backdrop" onClick={onClose}>
-    <div className="preview-modal" onClick={e=>e.stopPropagation()}>
-      <div className="modal-head"><strong>{file.name}</strong><button onClick={onClose}><X/></button></div>
+    <div className="preview-modal" role="dialog" aria-modal="true" aria-label={"Preview "+file.name} onClick={e=>e.stopPropagation()}>
+      <div className="modal-head"><strong>{file.name}</strong><button type="button" aria-label="Close preview" onClick={onClose}><X/></button></div>
       {file.kind === "audio" ? <audio controls autoPlay src={`/api/files/${file.token}/preview`}/> :
-       file.kind === "image" ? <img src={`/api/files/${file.token}/preview`} alt="" /> :
+       file.kind === "image" ? <img src={`/api/files/${file.token}/preview`} alt={file.name+" preview"} /> :
        file.kind === "video" ? <video controls autoPlay src={`/api/files/${file.token}/preview`}/> :
        <div className="preview-placeholder"><FileText/><p>Preview this file in its native application.</p></div>}
     </div>
