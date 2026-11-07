@@ -181,6 +181,15 @@ async function ensureSupportSchema(env: Env) {
   if (!hasDisplayName) await env.DB.prepare("ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''").run();
   const hasAvatarData = (userColumns.results || []).some((col: any) => col.name === "avatar_data");
   if (!hasAvatarData) await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_data TEXT NOT NULL DEFAULT ''").run();
+  const currentUserColumns: any = await env.DB.prepare("PRAGMA table_info(users)").all();
+  const hasDateOfBirth = (currentUserColumns.results || []).some((col: any) => col.name === "date_of_birth");
+  if (!hasDateOfBirth) await env.DB.prepare("ALTER TABLE users ADD COLUMN date_of_birth TEXT").run();
+  const hasAccountType = (currentUserColumns.results || []).some((col: any) => col.name === "account_type");
+  if (!hasAccountType) await env.DB.prepare("ALTER TABLE users ADD COLUMN account_type TEXT NOT NULL DEFAULT 'unclassified'").run();
+  const hasParentalConsentStatus = (currentUserColumns.results || []).some((col: any) => col.name === "parental_consent_status");
+  if (!hasParentalConsentStatus) await env.DB.prepare("ALTER TABLE users ADD COLUMN parental_consent_status TEXT NOT NULL DEFAULT 'not_required'").run();
+  const hasParentUserId = (currentUserColumns.results || []).some((col: any) => col.name === "parent_user_id");
+  if (!hasParentUserId) await env.DB.prepare("ALTER TABLE users ADD COLUMN parent_user_id TEXT").run();
 
   const hasEmailVerified = (userColumns.results || []).some((col: any) => col.name === "email_verified_at");
   if (!hasEmailVerified) {
@@ -347,7 +356,8 @@ async function startTwoFactorChallenge(env: Env, user: any) {
 async function getSessionUser(req: Request, env: Env) {
   const sid = parseCookie(req, "taallab_session");
   if (!sid) return null;
-  const row: any = await env.DB.prepare(`SELECT u.id,u.email,u.role,u.status,u.created_at,u.updated_at,u.email_verified_at,u.two_factor_enabled,u.display_name,u.avatar_data
+  const row: any = await env.DB.prepare(`SELECT u.id,u.email,u.role,u.status,u.created_at,u.updated_at,u.email_verified_at,u.two_factor_enabled,u.display_name,u.avatar_data,
+      u.date_of_birth,u.account_type,u.parental_consent_status,u.parent_user_id
     FROM sessions s JOIN users u ON u.id=s.user_id
     WHERE s.id=? AND s.expires_at>? AND u.status='active' LIMIT 1`)
     .bind(sid, now()).first();
@@ -664,6 +674,32 @@ async function authSetup(req: Request, env: Env) {
   return json({ ok: true, needsVerification: true });
 }
 
+async function saveDateOfBirth(req: Request, env: Env) {
+  const user = await requireUser(req, env);
+  if (!user.email_verified_at) return json({ error: "Verify your email address before adding your date of birth." }, { status: 403 });
+  if (user.role === "admin") return json({ ok: true, accountType: "adult" });
+  if (user.date_of_birth) return json({ error: "Your date of birth has already been saved. Contact support if it needs correcting." }, { status: 409 });
+  const body = await req.json().catch(() => ({}));
+  const dob = String(body.dateOfBirth || "");
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dob)) return json({ error: "Enter a valid date of birth." }, { status: 400 });
+  const parsed = new Date(dob + "T00:00:00.000Z");
+  const today = new Date();
+  const todayIso = today.toISOString().slice(0, 10);
+  const earliest = new Date(Date.UTC(today.getUTCFullYear() - 120, today.getUTCMonth(), today.getUTCDate())).toISOString().slice(0, 10);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== dob || dob > todayIso || dob < earliest) {
+    return json({ error: "Enter a real date of birth that is not in the future." }, { status: 400 });
+  }
+  let age = today.getUTCFullYear() - parsed.getUTCFullYear();
+  const monthDifference = today.getUTCMonth() - parsed.getUTCMonth();
+  if (monthDifference < 0 || (monthDifference === 0 && today.getUTCDate() < parsed.getUTCDate())) age--;
+  const accountType = age < 18 ? "child" : "adult";
+  const consentStatus = age < 18 ? "pending" : "not_required";
+  await env.DB.prepare("UPDATE users SET date_of_birth=?,account_type=?,parental_consent_status=?,updated_at=? WHERE id=? AND date_of_birth IS NULL")
+    .bind(dob, accountType, consentStatus, now(), user.id).run();
+  const updated = await getSessionUser(req, env);
+  return json({ ok: true, accountType, parentalConsentStatus: consentStatus, user: updated });
+}
+
 async function currentUser(env: Env, req: Request) {
   const user = await getSessionUser(req, env);
   return user ? json({ authenticated: true, user }) : json({ authenticated: false });
@@ -673,7 +709,7 @@ async function exportAccountData(req: Request, env: Env) {
   const user = await requireUser(req, env);
   await ensureOceanSchema(env);
   const [identity, googleIdentity, acceptances, privacyRequests, transfers, files, pages, shares, pageCollaborators, comments, assets, calendar, passkeys, authenticator, recovery, store] = await Promise.all([
-    env.DB.prepare("SELECT id,email,role,created_at,updated_at,email_verified_at,display_name,avatar_data,two_factor_enabled FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
+    env.DB.prepare("SELECT id,email,role,created_at,updated_at,email_verified_at,display_name,avatar_data,two_factor_enabled,date_of_birth,account_type,parental_consent_status,parent_user_id FROM users WHERE id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=? LIMIT 1").bind(user.id).first(),
     env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at").bind(user.id).all(),
     env.DB.prepare("SELECT id,request_type,description,status,created_at,resolved_at FROM privacy_requests WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
@@ -2410,6 +2446,7 @@ export default {
       if ((url.pathname === "/api/auth/login" || url.pathname === "/api/admin/login") && req.method === "POST") return authLogin(req, env);
       if ((url.pathname === "/api/auth/logout" || url.pathname === "/api/admin/logout") && req.method === "POST") return authLogout(req, env);
       if (url.pathname === "/api/auth/me" && req.method === "GET") return currentUser(env, req);
+      if (url.pathname === "/api/account/date-of-birth" && req.method === "POST") return saveDateOfBirth(req, env);
       if (url.pathname === "/api/account/profile" && req.method === "PATCH") return updateAccountProfile(req, env);
       if (url.pathname === "/api/account/password" && req.method === "POST") return changeOwnPassword(req, env);
       if (url.pathname === "/api/account/security" && req.method === "POST") return updateSecuritySettings(req, env);
