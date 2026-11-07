@@ -197,6 +197,11 @@ async function ensureSupportSchema(env: Env) {
     email TEXT NOT NULL,
     created_at INTEGER NOT NULL
   )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS google_app_login_codes (
+    code_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+  )`).run();
 
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS two_factor_challenges (
     id TEXT PRIMARY KEY,
@@ -1559,25 +1564,37 @@ async function cleanup(env: Env) {
     .bind(cutoff)
     .all();
 
-  for (const f of files.results as any[]) {
+  for (const file of files.results as any[]) {
     const refs: any = await env.DB.prepare(
       "SELECT COUNT(*) n FROM files WHERE storage_key=? AND status='active' AND id!=?"
-    ).bind(f.storage_key, f.id).first();
+    ).bind(file.storage_key, file.id).first();
 
-    if (Number(refs?.n || 0) > 0) continue;
+    if (Number(refs?.n || 0) > 0) {
+      await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(file.id).run();
+      continue;
+    }
 
     try {
-      await trashDriveFile(env, f.storage_key);
+      await trashDriveFile(env, file.storage_key);
+      await env.DB.prepare("UPDATE files SET status='deleted' WHERE id=?").bind(file.id).run();
     } catch (e) {
-      console.error("Drive delete failed", f.storage_key, e);
+      // Keep the expired record so the hourly cleanup can retry the storage deletion.
+      console.error("Drive delete failed; will retry", file.storage_key, e);
     }
   }
 
+  const purgeBefore = cutoff - 90 * 86400;
   await env.DB.batch([
-    env.DB.prepare("UPDATE files SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
-    env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted'").bind(cutoff),
+    env.DB.prepare("UPDATE files SET status='expired' WHERE expires_at<=? AND status='active'").bind(cutoff),
+    env.DB.prepare("UPDATE transfers SET status='expired' WHERE expires_at<=? AND status='active'").bind(cutoff),
+    env.DB.prepare("UPDATE transfers SET status='deleted' WHERE expires_at<=? AND status!='deleted' AND NOT EXISTS (SELECT 1 FROM files WHERE files.transfer_id=transfers.id AND files.status!='deleted')").bind(cutoff),
+    env.DB.prepare("DELETE FROM files WHERE status='deleted' AND expires_at<=?").bind(purgeBefore),
+    env.DB.prepare("DELETE FROM transfers WHERE status='deleted' AND expires_at<=? AND NOT EXISTS (SELECT 1 FROM files WHERE files.transfer_id=transfers.id)").bind(purgeBefore),
     env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at<=?").bind(cutoff),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM password_reset_tokens WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM google_app_login_codes WHERE expires_at<=?").bind(cutoff),
+    env.DB.prepare("DELETE FROM booking_rate_limits WHERE last_sent_at<=?").bind(cutoff - 86400),
   ]);
 }
 
