@@ -190,7 +190,7 @@ async function initializeStoreSchema(env: StoreEnv) {
     ["order_number", "TEXT"], ["user_id", "TEXT"], ["customer_name", "TEXT"], ["customer_phone", "TEXT"],
     ["address_line1", "TEXT"], ["address_line2", "TEXT"], ["city", "TEXT"],
     ["state", "TEXT"], ["pincode", "TEXT"], ["country", "TEXT"], ["coupon_code", "TEXT"],
-    ["discount_amount", "INTEGER NOT NULL DEFAULT 0"], ["checkout_group_id", "TEXT"], ["group_total", "INTEGER"]
+    ["discount_amount", "INTEGER NOT NULL DEFAULT 0"], ["checkout_group_id", "TEXT"], ["group_total", "INTEGER"], ["terms_version", "TEXT"], ["privacy_version", "TEXT"], ["accepted_at", "INTEGER"]
   ] as const) {
     try { await env.DBStore.prepare(`ALTER TABLE store_orders ADD COLUMN ${column} ${declaration}`).run(); } catch {}
   }
@@ -284,6 +284,9 @@ function publicProduct(product: Product) {
   };
 }
 
+const TERMS_VERSION = "2026-11-07";
+const PRIVACY_VERSION = "2026-11-07";
+
 const TEMP_COUPON = { code: "TAAL10", percent: 10, maxDiscountPaise: 10000, minimumPaise: 100, expiresAt: "2026-10-24T00:00:00+05:30" };
 
 function couponDiscount(code: string, subtotalPaise: number) {
@@ -348,6 +351,7 @@ async function validateCoupon(req: Request, env: StoreEnv) {
   const user = await env.getCustomer?.(req);
   if (!user) return json({ error: "Please log in to continue checkout." }, 401);
   const body: any = await req.json().catch(() => ({}));
+  if (body.acceptTerms !== true) return json({ error: "Please accept the Terms of Service and Privacy Policy before placing your order." }, 400);
   const rawIds: string[] = Array.isArray(body.productIds) ? body.productIds.map((id: any) => String(id)) : [String(body.productId || "")];
   const ids = [...new Set(rawIds.filter(Boolean))];
   const all = await allProducts(env);
@@ -417,11 +421,11 @@ async function createOrder(req: Request, env: StoreEnv) {
     const itemOrderNumber = index === 0 ? orderNumber : "TL-" + new Date().getFullYear() + "-" + crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase();
     await env.DBStore.prepare(`INSERT INTO store_orders
       (id,order_number,product_id,amount,currency,status,razorpay_order_id,customer_email,user_id,customer_name,customer_phone,
-       address_line1,address_line2,city,state,pincode,country,coupon_code,discount_amount,created_at,updated_at,checkout_group_id,group_total)
-      VALUES(?,?,?,?,'INR','created',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+       address_line1,address_line2,city,state,pincode,country,coupon_code,discount_amount,created_at,updated_at,checkout_group_id,group_total,terms_version,privacy_version,accepted_at)
+      VALUES(?,?,?,?,'INR','created',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .bind(localId, itemOrderNumber, product.id, amount, index === 0 ? razorOrder.id : null, user.email, user.id, customer.fullName, customer.phone,
         customer.addressLine1, customer.addressLine2, customer.city, customer.state, customer.pincode, customer.country,
-        discount.code || null, proportional, created, created, localGroupId, totalAmount).run();
+        discount.code || null, proportional, created, created, localGroupId, totalAmount, TERMS_VERSION, PRIVACY_VERSION, created).run();
   }
   if (body.saveDetails === true) {
     await env.DBStore.prepare(`INSERT INTO store_customer_profiles
