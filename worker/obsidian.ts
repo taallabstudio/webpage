@@ -115,14 +115,14 @@ async function ensureFolder(env: Env, user: User, path: string) {
   for (const part of path.split("/").filter(Boolean)) {
     accumulated = accumulated ? accumulated + "/" + part : part;
     const externalId = "@folder/" + accumulated;
-    let row: any = await env.DB.prepare("SELECT id FROM ocean_pages WHERE user_id=? AND source='obsidian' AND external_id=? AND deleted_at IS NULL LIMIT 1").bind(user.id, externalId).first();
+    let row: any = await env.DB.prepare("SELECT id FROM ocean_pages WHERE user_id=? AND source='obsidian' AND external_id=? LIMIT 1").bind(user.id, externalId).first();
     if (!row) {
       const id = randomToken(12), timestamp = now();
       await env.DB.prepare("INSERT INTO ocean_pages(id,user_id,parent_id,title,icon,blocks_json,is_folder,source,external_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
         .bind(id, user.id, parentId, part.slice(0,160), "📁", "[]", 1, "obsidian", externalId, timestamp, timestamp).run();
       row = { id };
     } else if (parentId) {
-      await env.DB.prepare("UPDATE ocean_pages SET parent_id=? WHERE id=? AND user_id=?").bind(parentId, row.id, user.id).run();
+      await env.DB.prepare("UPDATE ocean_pages SET parent_id=?,deleted_at=NULL,is_archived=0,updated_at=? WHERE id=? AND user_id=?").bind(parentId, now(), row.id, user.id).run();
     }
     parentId = String(row.id);
   }
