@@ -6,7 +6,7 @@ Generated from the GitHub Actions Node.js 24 installation for `taallabstudio/web
 
 - Exact dependency versions are pinned in `package-lock.json` (lockfile version 3).
 - Inventory generated from the installed dependency tree using `license-checker`; it includes direct and transitive packages, including development/build tools.
-- 161 third-party package/version entries were identified. The private root project (`taallab-transfer@1.0.0`, marked `UNLICENSED`) is excluded.
+- 158 third-party package/version entries were identified. The private root project (`taallab-transfer@1.0.0`, marked `UNLICENSED`) is excluded.
 - `Production tree` means the package is not marked development-only or optional in the lockfile. This classification does not prove that a package is shipped in a particular binary.
 - Licence expressions are reproduced from package metadata. Dual-licence expressions require review against the actual package licence files and selected terms.
 
@@ -15,13 +15,13 @@ Generated from the GitHub Actions Node.js 24 installation for `taallabstudio/web
 | Declared licence | Package entries |
 |---|---:|
 | `0BSD` | 2 |
-| `Apache-2.0` | 10 |
+| `Apache-2.0` | 8 |
 | `Apache-2.0 OR MIT` | 1 |
 | `BSD-3-Clause` | 2 |
 | `CC-BY-4.0` | 1 |
 | `CC0-1.0` | 1 |
 | `ISC` | 14 |
-| `LGPL-3.0-or-later` | 2 |
+| `LGPL-3.0-or-later` | 1 |
 | `MIT` | 123 |
 | `MIT OR Apache-2.0` | 5 |
 
@@ -50,16 +50,14 @@ Generated from the GitHub Actions Node.js 24 installation for `taallabstudio/web
 | `@babel/types` | `7.29.11` | `MIT` | Development-only | https://github.com/babel/babel |
 | `@cloudflare/kv-asset-handler` | `0.5.0` | `MIT OR Apache-2.0` | Development-only | https://github.com/cloudflare/workers-sdk |
 | `@cloudflare/unenv-preset` | `2.16.2` | `MIT OR Apache-2.0` | Development-only | https://github.com/cloudflare/workers-sdk |
-| `@cloudflare/workerd-linux-64` | `1.20260930.2` | `Apache-2.0` | Development-only and optional | https://github.com/cloudflare/workerd |
+| `@cloudflare/workerd-linux-64` | `1.20261104.1` | `Apache-2.0` | Development-only and optional | https://github.com/cloudflare/workerd |
 | `@cspotcode/source-map-support` | `0.8.1` | `MIT` | Development-only | https://github.com/cspotcode/node-source-map-support |
 | `@esbuild/linux-x64` | `0.25.12` | `MIT` | Development-only and optional | https://github.com/evanw/esbuild |
-| `@esbuild/linux-x64` | `0.28.1` | `MIT` | Development-only and optional | https://github.com/evanw/esbuild |
+| `@esbuild/linux-x64` | `0.28.2` | `MIT` | Development-only and optional | https://github.com/evanw/esbuild |
 | `@hexagon/base64` | `1.1.28` | `MIT` | Production tree | https://github.com/hexagon/base64 |
 | `@img/colour` | `1.1.0` | `MIT` | Development-only | https://github.com/lovell/colour |
-| `@img/sharp-libvips-linux-x64` | `1.2.4` | `LGPL-3.0-or-later` | Development-only and optional | https://github.com/lovell/sharp-libvips |
-| `@img/sharp-libvips-linux-x64` | `1.3.3` | `LGPL-3.0-or-later` | Development-only and optional | https://github.com/lovell/sharp-libvips |
-| `@img/sharp-linux-x64` | `0.34.5` | `Apache-2.0` | Development-only and optional | https://github.com/lovell/sharp |
-| `@img/sharp-linux-x64` | `0.35.4` | `Apache-2.0` | Development-only and optional | https://github.com/lovell/sharp |
+| `@img/sharp-libvips-linux-x64` | `1.3.4` | `LGPL-3.0-or-later` | Development-only and optional | https://github.com/lovell/sharp-libvips |
+| `@img/sharp-linux-x64` | `0.35.5` | `Apache-2.0` | Development-only and optional | https://github.com/lovell/sharp |
 | `@jridgewell/gen-mapping` | `0.3.13` | `MIT` | Development-only | https://github.com/jridgewell/sourcemaps |
 | `@jridgewell/remapping` | `2.3.5` | `MIT` | Development-only | https://github.com/jridgewell/sourcemaps |
 | `@jridgewell/resolve-uri` | `3.1.2` | `MIT` | Development-only | https://github.com/jridgewell/resolve-uri |
@@ -122,7 +120,7 @@ Generated from the GitHub Actions Node.js 24 installation for `taallabstudio/web
 | `emoji-regex` | `8.0.0` | `MIT` | Production tree | https://github.com/mathiasbynens/emoji-regex |
 | `error-stack-parser-es` | `1.0.5` | `MIT` | Development-only | https://github.com/antfu/error-stack-parser-es |
 | `esbuild` | `0.25.12` | `MIT` | Development-only | https://github.com/evanw/esbuild |
-| `esbuild` | `0.28.1` | `MIT` | Development-only | https://github.com/evanw/esbuild |
+| `esbuild` | `0.28.2` | `MIT` | Development-only | https://github.com/evanw/esbuild |
 | `escalade` | `3.2.0` | `MIT` | Development-only | https://github.com/lukeed/escalade |
 | `fdir` | `6.5.0` | `MIT` | Development-only | https://github.com/thecodrr/fdir |
 | `find-up` | `4.1.0` | `MIT` | Production tree | https://github.com/sindresorhus/find-up |
@@ -136,7 +134,7 @@ Generated from the GitHub Actions Node.js 24 installation for `taallabstudio/web
 | `locate-path` | `5.0.0` | `MIT` | Production tree | https://github.com/sindresorhus/locate-path |
 | `lru-cache` | `5.1.1` | `ISC` | Development-only | https://github.com/isaacs/node-lru-cache |
 | `lucide-react` | `0.468.0` | `ISC` | Production tree | https://github.com/lucide-icons/lucide |
-| `miniflare` | `5.20260930.0-alpha` | `MIT` | Development-only | https://github.com/cloudflare/workers-sdk |
+| `miniflare` | `5.20261104.0-beta` | `MIT` | Development-only | https://github.com/cloudflare/workers-sdk |
 | `ms` | `2.1.3` | `MIT` | Development-only | https://github.com/vercel/ms |
 | `nanoid` | `3.3.20` | `MIT` | Development-only | https://github.com/ai/nanoid |
 | `node-releases` | `2.0.63` | `MIT` | Development-only | https://github.com/chicoxyzzy/node-releases |
@@ -164,8 +162,7 @@ Generated from the GitHub Actions Node.js 24 installation for `taallabstudio/web
 | `semver` | `6.3.2` | `ISC` | Development-only | https://github.com/npm/node-semver |
 | `semver` | `7.8.6` | `ISC` | Development-only | https://github.com/npm/node-semver |
 | `set-blocking` | `2.0.0` | `ISC` | Production tree | https://github.com/yargs/set-blocking |
-| `sharp` | `0.34.5` | `Apache-2.0` | Development-only | https://github.com/lovell/sharp |
-| `sharp` | `0.35.4` | `Apache-2.0` | Development-only | https://github.com/lovell/sharp |
+| `sharp` | `0.35.5` | `Apache-2.0` | Development-only | https://github.com/lovell/sharp |
 | `source-map-js` | `1.2.2` | `BSD-3-Clause` | Development-only | https://github.com/7rulnik/source-map-js |
 | `string-width` | `4.2.3` | `MIT` | Production tree | https://github.com/sindresorhus/string-width |
 | `strip-ansi` | `6.0.1` | `MIT` | Production tree | https://github.com/chalk/strip-ansi |
@@ -175,13 +172,13 @@ Generated from the GitHub Actions Node.js 24 installation for `taallabstudio/web
 | `tslib` | `2.9.1` | `0BSD` | Production tree | https://github.com/Microsoft/tslib |
 | `tsyringe` | `4.10.0` | `MIT` | Production tree | https://github.com/Microsoft/tsyringe |
 | `typescript` | `5.9.3` | `Apache-2.0` | Development-only | https://github.com/microsoft/TypeScript |
-| `undici` | `7.29.1` | `MIT` | Development-only | https://github.com/nodejs/undici |
+| `undici` | `7.30.1` | `MIT` | Development-only | https://github.com/nodejs/undici |
 | `unenv` | `2.0.0-rc.24` | `MIT` | Development-only | https://github.com/unjs/unenv |
 | `update-browserslist-db` | `1.3.4` | `MIT` | Development-only | https://github.com/browserslist/update-db |
 | `vite` | `6.4.5` | `MIT` | Development-only | https://github.com/vitejs/vite |
 | `which-module` | `2.0.1` | `ISC` | Production tree | https://github.com/nexdrew/which-module |
-| `workerd` | `1.20260930.2` | `Apache-2.0` | Development-only | https://github.com/cloudflare/workerd |
-| `wrangler` | `4.145.0` | `MIT OR Apache-2.0` | Development-only | https://github.com/cloudflare/workers-sdk |
+| `workerd` | `1.20261104.1` | `Apache-2.0` | Development-only | https://github.com/cloudflare/workerd |
+| `wrangler` | `4.158.0` | `MIT OR Apache-2.0` | Development-only | https://github.com/cloudflare/workers-sdk |
 | `wrap-ansi` | `6.2.0` | `MIT` | Production tree | https://github.com/chalk/wrap-ansi |
 | `ws` | `8.21.0` | `MIT` | Development-only | https://github.com/websockets/ws |
 | `y18n` | `4.0.3` | `ISC` | Production tree | https://github.com/yargs/y18n |
