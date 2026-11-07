@@ -303,8 +303,8 @@ function publicProduct(product: Product) {
   };
 }
 
-const TERMS_VERSION = "2026-11-07";
-const PRIVACY_VERSION = "2026-11-07.1";
+const TERMS_VERSION = "2026-11-07.1";
+const PRIVACY_VERSION = "2026-11-07.5";
 
 const TEMP_COUPON = { code: "TAAL10", percent: 10, maxDiscountPaise: 10000, minimumPaise: 100, expiresAt: "2026-10-24T00:00:00+05:30" };
 
