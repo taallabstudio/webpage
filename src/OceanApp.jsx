@@ -908,6 +908,7 @@ function OceanApp(){
   return()=>{document.removeEventListener("keydown",deleteCrossBlockSelection,true);document.removeEventListener("selectionchange",updateSelectionToolbar);document.removeEventListener("pointerdown",beginCrossBlockSelection,true);document.removeEventListener("pointermove",extendCrossBlockSelection,true);document.removeEventListener("pointerup",endCrossBlockSelection,true);document.removeEventListener("pointercancel",endCrossBlockSelection,true);window.removeEventListener("blur",handleWindowBlur);window.removeEventListener("scroll",updateSelectionToolbar,true);window.removeEventListener("resize",updateSelectionToolbar);};
  },[]);
  const [activePanel,setActivePanel]=useState("page"),[adminUsers,setAdminUsers]=useState([]),[adminLoading,setAdminLoading]=useState(false),[adminError,setAdminError]=useState("");
+  const [pageMenuId,setPageMenuId]=useState(null),[moveFolderMenuId,setMoveFolderMenuId]=useState(null);
  const [calendarConnection,setCalendarConnection]=useState({connected:false,email:""});
  const [calendarEvents,setCalendarEvents]=useState([]);
  const [calendarLoading,setCalendarLoading]=useState(false);
@@ -954,7 +955,7 @@ function OceanApp(){
   useEffect(()=>{if(showSlash)document.querySelector(".ocean-slash-option.is-active")?.scrollIntoView({block:"nearest"});},[activeSlashIndex,showSlash]);
  useEffect(()=>{if(!showSlash)return;const closeOutside=e=>{const menu=document.querySelector(".ocean-slash-menu");if(menu&&!menu.contains(e.target)){setShowSlash(false);setSlashQuery("");setSlashBlock(null);setSlashFromTyping(false);}};document.addEventListener("pointerdown",closeOutside);return()=>document.removeEventListener("pointerdown",closeOutside);},[showSlash]);
  useEffect(()=>{const duplicate=e=>setPage(old=>old?{...old,blocks:[...old.blocks,e.detail]}:old);const remove=e=>setPage(old=>old?{...old,blocks:old.blocks.filter(b=>b.id!==e.detail)}:old);window.addEventListener("ocean-duplicate-block",duplicate);window.addEventListener("ocean-delete-block",remove);return()=>{window.removeEventListener("ocean-duplicate-block",duplicate);window.removeEventListener("ocean-delete-block",remove);};},[]);
- useEffect(()=>{if(activePanel==="access"&&user?.role==="admin"){setAdminLoading(true);api("/ocean/admin/users").then(d=>setAdminUsers(d.users||[])).catch(e=>setAdminError(e.message)).finally(()=>setAdminLoading(false));}},[activePanel,user?.role]);
+ useEffect(()=>{if(activePanel==="settings"&&user?.role==="admin"){setAdminLoading(true);api("/ocean/admin/users").then(d=>setAdminUsers(d.users||[])).catch(e=>setAdminError(e.message)).finally(()=>setAdminLoading(false));}},[activePanel,user?.role]);
  useEffect(()=>{
   if(activePanel!=="calendar")return;
   let alive=true;
@@ -1011,6 +1012,7 @@ function OceanApp(){
  const privatePages=filteredPages.filter(p=>!p.is_shared&&!p.is_favorite);
  const sharedPages=filteredPages.filter(p=>!!p.is_shared);
  const toggleFolder=id=>setOpenFolders(old=>{const next=new Set(old);if(next.has(id))next.delete(id);else next.add(id);return next;});
+ const movePageToFolder=async(item,parentId)=>{try{await api("/ocean/pages/"+item.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({parent_id:parentId})});await loadPages();if(page?.id===item.id)setPage(old=>old?{...old,parent_id:parentId}:old);setPageMenuId(null);setMoveFolderMenuId(null);setToast(parentId?"Page moved to folder.":"Page moved to the root.");}catch(e){setToast(e.message);}};
  const renderSidebarPages=(parentId=null,depth=0,source=privatePages)=>source.filter(p=>(p.parent_id||null)===parentId).map(p=>{
   const folder=!!p.is_folder,expanded=!openFolders.has(p.id);
   return <React.Fragment key={p.id}>
