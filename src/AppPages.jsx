@@ -151,12 +151,28 @@ function TransferPage({id}) {
 }
 
 function Preview({file,onClose}) {
-  return <div className="modal-backdrop" onClick={onClose}>
-    <div className="preview-modal" onClick={e=>e.stopPropagation()}>
-      <div className="modal-head"><strong>{file.name}</strong><button onClick={onClose}><X/></button></div>
-      {file.kind === "audio" ? <audio controls autoPlay src={`/api/files/${file.token}/preview`}/> :
+  const closeButton=useRef(null);
+  useEffect(()=>{
+    closeButton.current?.focus();
+    const handleKeyDown=event=>{
+      if(event.key==="Escape"){event.preventDefault();onClose();return;}
+      if(event.key!=="Tab")return;
+      const dialog=document.querySelector(".preview-modal");
+      const items=dialog?.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+      if(!items?.length)return;
+      const first=items[0],last=items[items.length-1];
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    };
+    document.addEventListener("keydown",handleKeyDown);
+    return ()=>document.removeEventListener("keydown",handleKeyDown);
+  },[onClose]);
+  return <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-title" onClick={e=>e.stopPropagation()}>
+      <div className="modal-head"><strong id="preview-title">{file.name}</strong><button ref={closeButton} type="button" aria-label={`Close preview of ${file.name}`} onClick={onClose}><X/></button></div>
+      {file.kind === "audio" ? <audio controls autoPlay aria-label={`Audio preview of ${file.name}`} src={`/api/files/${file.token}/preview`}/> :
        file.kind === "image" ? <img src={`/api/files/${file.token}/preview`} alt={`Preview of ${file.name || "shared image"}`} /> :
-       file.kind === "video" ? <video controls autoPlay src={`/api/files/${file.token}/preview`}/> :
+       file.kind === "video" ? <video controls autoPlay aria-label={`Video preview of ${file.name}`} src={`/api/files/${file.token}/preview`}/> :
        <div className="preview-placeholder"><FileText/><p>Preview this file in its native application.</p></div>}
     </div>
   </div>;
