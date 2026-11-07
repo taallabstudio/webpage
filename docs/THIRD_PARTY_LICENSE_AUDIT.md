@@ -37,6 +37,8 @@ No third-party customer/client logos were identified in the inspected rendered w
 
 The direct dependencies in `package.json` include React, React DOM, Lucide React, aws4fetch, SimpleWebAuthn browser/server, qrcode, Tauri plugins, Vite, TypeScript, Wrangler and Sharp.
 
+The P1 CI snapshot on 7 November 2026 reported **64 production packages**: 48 MIT, 8 ISC, 2 MIT OR Apache-2.0, 1 Apache-2.0 OR MIT, 2 0BSD, 1 BSD-3-Clause, 1 Apache-2.0 and 1 `UNLICENSED`. No GPL, AGPL or LGPL packages appeared in this snapshot. The `UNLICENSED` entry is the private application package `taallab-transfer@1.0.0` itself, not a third-party dependency; `package.json` already sets `private: true`. The full report is attached to the P1 GitHub Actions run as the `third-party-license-report` artifact. This report reflects the dependency versions installed in that CI run and must be regenerated when dependencies change.
+
 The CI workflow generates a machine-readable licence report from the installed production dependency tree and uploads it as a build artifact. Review the report for:
 
 - Missing/unknown licence metadata.
