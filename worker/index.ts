@@ -671,10 +671,10 @@ async function exportAccountData(req: Request, env: Env) {
     env.DB.prepare("SELECT f.id,f.transfer_id,f.original_name,f.mime_type,f.size,f.created_at,f.expires_at,f.download_count,f.last_downloaded_at,f.status FROM files f JOIN transfers t ON t.id=f.transfer_id WHERE t.user_id=? ORDER BY f.created_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT terms_version,privacy_version,accepted_at,method FROM policy_acceptances WHERE user_id=? ORDER BY accepted_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT email,created_at FROM google_identities WHERE user_id=? LIMIT 1").bind(user.id).first(),
-    env.DB.prepare("SELECT id,parent_id,title,icon,cover,is_favorite,is_archived,created_at,updated_at,is_folder,is_shared,general_access,cover_credit,cover_credit_url,cover_source_url FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
-    env.DB.prepare("SELECT page_id,permission,created_at,updated_at FROM ocean_page_shares WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
-    env.DB.prepare("SELECT id,page_id,body,created_at FROM ocean_comments WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
-    env.DB.prepare("SELECT id,page_id,file_name,mime_type,size,created_at FROM ocean_assets WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT id,parent_id,title,icon,cover,blocks_json,is_favorite,is_archived,created_at,updated_at,is_folder,is_shared,general_access,cover_credit,cover_credit_url,cover_source_url FROM ocean_pages WHERE user_id=? ORDER BY created_at").bind(user.id).all(),
+    env.DB.prepare("SELECT s.page_id,s.user_id,s.permission,s.created_at,s.updated_at FROM ocean_page_shares s JOIN ocean_pages p ON p.id=s.page_id WHERE p.user_id=? OR s.user_id=? ORDER BY s.created_at").bind(user.id, user.id).all(),
+    env.DB.prepare("SELECT id,page_id,user_id,body,created_at FROM ocean_comments WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(user.id, user.id).all(),
+    env.DB.prepare("SELECT id,page_id,file_name,mime_type,size,created_at FROM ocean_assets WHERE user_id=? OR page_id IN (SELECT id FROM ocean_pages WHERE user_id=?) ORDER BY created_at").bind(user.id, user.id).all(),
     env.DB.prepare("SELECT email,scope,connected_at,updated_at FROM ocean_google_calendar WHERE user_id=? LIMIT 1").bind(user.id).first(),
   ]);
 
