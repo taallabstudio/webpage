@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const storageKey = "taallab.privacy-notice.v2";
+  const storageKey = "taallab.essential-storage-notice.v1";
   try {
     if (window.localStorage.getItem(storageKey) === "dismissed") return;
   } catch {}
