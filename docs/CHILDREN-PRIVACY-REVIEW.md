@@ -6,7 +6,10 @@ Scope: TaalLab website, TrackDeliver/file transfers, OCEAN and digital store.
 ## Current repository state
 
 - The Privacy Policy says the service is not designed specifically for children and that TaalLab does not knowingly seek children's personal data.
-- There is no age gate, parental-verification flow, child account mode or parent/guardian consent record in the current application.
+- The current main branch asks for date of birth after email verification, classifies accounts as adult or child, marks under-18 accounts as pending parent/guardian setup, and blocks store purchases/payment actions for those accounts.
+- A verified parent/guardian identity and consent workflow is not yet implemented; there is no parent consent endpoint or consent-token flow in the inspected main branch.
+- The Worker defines an age-eligibility helper, but it is not called by the protected account routes inspected. The client-side onboarding and store purchase restriction are not a complete server-side gate.
+- Date of birth is currently collected before parent/guardian consent is verified. This does not satisfy a parent-first consent design and must not be described as verified parental consent.
 - No child-specific tracking or targeted advertising feature was found in the repository scan.
 - Do not describe the application as having verified parental consent.
 
