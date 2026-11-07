@@ -29,3 +29,9 @@ jobs:
         run: npm run build
       - name: Bundle Cloudflare Worker without deploying
         run: npx esbuild worker/index.ts --bundle --platform=browser --format=esm --outfile=/tmp/taallab-worker.js
+      - name: Install browser accessibility test tools
+        run: |
+          npm install --no-save playwright @axe-core/playwright
+          npx playwright install --with-deps chromium
+      - name: Audit public pages against WCAG
+        run: node scripts/accessibility-audit.mjs
