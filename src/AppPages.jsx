@@ -949,6 +949,7 @@ function Upload({onDone}) {
   const [recipientEmail,setRecipientEmail]=useState("");
   const [recipients,setRecipients]=useState([]);
   const [uploading,setUploading]=useState(false);
+  const [rightsConfirmed,setRightsConfirmed]=useState(false);
   useEffect(()=>{api("/admin/users").then(d=>setRecipients((d.users||[]).filter(u=>u.status==="active"))).catch(()=>{})},[]);
   const [created,setCreated]=useState(null);
   const [recipientInfo,setRecipientInfo]=useState(null);
@@ -967,7 +968,7 @@ function Upload({onDone}) {
   const addFiles=e=>setFiles(prev=>[...prev,...Array.from(e.target.files||[])].map((f,i)=>f.id?f:Object.assign(f,{id:crypto.randomUUID()})));
   const drop=e=>{e.preventDefault();setFiles(prev=>[...prev,...Array.from(e.dataTransfer.files||[])].map(f=>Object.assign(f,{id:crypto.randomUUID()})))};
   async function upload(){
-    if(!files.length)return;
+    if(!files.length || !rightsConfirmed)return;
     setUploading(true);
     try{
       const init=await api("/admin/transfers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,user_id:recipientId||null,recipient_email:recipientEmail.trim(),files:files.map(f=>({name:f.name,size:f.size,type:f.type}))})});
@@ -1045,17 +1046,17 @@ function Upload({onDone}) {
       <button className="primary-btn" onClick={onDone}>Back to dashboard</button>
     </div></div>;
   return <div className="admin-content"><div className="page-head"><div><span className="eyebrow">NEW TRANSFER</span><h1>Send files</h1><p>Upload large studio assets and create a private client link.</p></div></div>
-    <div className="upload-grid"><section className="panel upload-panel"><div className="dropzone" onDragOver={e=>e.preventDefault()} onDrop={drop}><UploadCloud/><h2>Drop files here</h2><p>or choose multiple files from your computer</p><label className="primary-btn"><Plus/> Select files<input hidden type="file" multiple onChange={addFiles}/></label><small>Files go directly to private R2 storage.</small></div>
+    <div className="upload-grid"><section className="panel upload-panel"><div className="dropzone" onDragOver={e=>e.preventDefault()} onDrop={drop}><UploadCloud/><h2>Drop files here</h2><p>or choose multiple files from your computer</p><label className="primary-btn"><Plus/> Select files<input hidden type="file" multiple onChange={addFiles}/></label><small>Files go directly to private storage.</small></div>
       {!!files.length&&<div className="upload-files">{files.map(f=><div className="upload-file" key={f.id}><File/><div><strong>{f.name}</strong><small>{formatBytes(f.size)}</small></div><button className="icon-btn" onClick={()=>setFiles(files.filter(x=>x.id!==f.id))}><X/></button></div>)}</div>}
     </section><section className="panel message-panel">
       <label>Client email <span className="muted">(optional)</span><input type="email" list="client-users" value={recipientEmail} placeholder="client@example.com — leave blank for link only" onChange={e=>{setRecipientEmail(e.target.value);setRecipientId("")}}/><datalist id="client-users">{recipients.map(u=><option key={u.id} value={u.email}>{u.email}</option>)}</datalist></label>
       <label>Select existing user <span className="muted">(optional)</span><select value={recipientId} onChange={e=>{const id=e.target.value;setRecipientId(id);const match=recipients.find(u=>u.id===id);if(match)setRecipientEmail(match.email)}}><option value="">No account / enter email manually…</option>{recipients.map(u=><option key={u.id} value={u.id}>{u.email}{u.role==="admin"?" (Admin)":""}</option>)}</select></label>
       <small className="muted">Email is optional. If you enter an email, an existing account is reused (and reactivated if disabled); if it does not exist, a receive-only user account is created automatically. Leave it blank for a link-only transfer. Clients can receive files only; they cannot create transfers.</small>
-      <label>Client message<textarea rows="8" placeholder="Add a message for your client…" value={message} onChange={e=>setMessage(e.target.value)}/></label><div className="upload-summary"><span>Expiration</span><strong>7 days after upload</strong><span>Files</span><strong>{files.length}</strong><span>Total size</span><strong>{formatBytes(files.reduce((n,f)=>n+f.size,0))}</strong></div>{uploading?<div className="upload-progress-card" role="status" aria-live="polite">
+      <label>Client message<textarea rows="8" placeholder="Add a message for your client…" value={message} onChange={e=>setMessage(e.target.value)}/></label><div className="upload-summary"><span>Expiration</span><strong>7 days after upload</strong><span>Files</span><strong>{files.length}</strong><span>Total size</span><strong>{formatBytes(files.reduce((n,f)=>n+f.size,0))}</strong></div><label className="upload-rights-confirmation"><input type="checkbox" checked={rightsConfirmed} onChange={e=>setRightsConfirmed(e.target.checked)} disabled={uploading}/><span>I confirm that I own the rights to these files or have permission from the rights holder to upload and share them with the intended recipient.</span></label>{uploading?<div className="upload-progress-card" role="status" aria-live="polite">
         <div className="upload-progress-heading"><span className="upload-progress-icon"><RefreshCw className="spin"/></span><div><strong>{progress.done>=progress.total?"Finishing transfer…":`Uploading ${Math.min(4,progress.total-progress.done)} files in parallel`}</strong><small>{progress.done} of {progress.total} files completed</small></div><span className="upload-progress-count">{progress.total?Math.round(progress.done/progress.total*100):0}%</span></div>
         <div className="upload-progress-track"><span style={{width:`${progress.total?Math.round(progress.done/progress.total*100):0}%`}}/></div>
         <p className="upload-progress-detail">{progress.active||"Preparing your files…"}</p>
-      </div>:<button className="primary-btn full upload-submit-btn" disabled={!files.length} onClick={upload}><UploadCloud/> Create transfer</button>}</section></div>
+      </div>:<button className="primary-btn full upload-submit-btn" disabled={!files.length || !rightsConfirmed} onClick={upload}><UploadCloud/> Create transfer</button>}</section></div>
   </div>;
 }
 
